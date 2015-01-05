@@ -1,0 +1,15 @@
+<launch>
+  <!--Launch the openni supported sensor-->
+  <include file="$(find openni_launch)/launch/openni.launch">
+   <arg name="depth_registration" default="true"/>
+  </include>
+
+<!--Launch the ROS drivers for youbot -->
+  <include file="$(find youbot_oodl)/launch/youbot_oodl_driver.launch" />
+
+<!--Launch the joint publisher drivers for youbot -->
+  <include file="$(find youbot_oodl)/launch/youbot_joint_state_publisher.launch"/>
+
+<!--Steps for visualization of youbot robot from rviz Page 41 of Manual -->
+  <include file="$(find youbot_description)/launch/youbot_description.launch"/>
+</launch>
