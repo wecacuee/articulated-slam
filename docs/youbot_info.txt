@@ -1,0 +1,30 @@
+youbot_oodl can initialize the base and one or two arms for communication, then send messages relaying the state of the arms and odometry data. 
+It can receive velocity commands for the base and arms, and position commands for the arms. 
+http://wiki.ros.org/youbot_oodl
+
+Topics that should be subscribed are 
+odom : Odometry information to estimate robot's current position and
+orientation relative to its initial information
+joint_states : state of each joint
+
+Topics to be used to set arm position for capture
+arm_1/arm_controller/position_command (brics_actuator/JointPositions): Positon setpoint for each arm joint
+
+Look at 
+https://github.com/youbot/youbot-ros-pkg/blob/master/youbot_drivers/youbot_oodl/examples/youbot_arm_test.cpp
+to understand how to setup joint arm positions
+
+Details of youbot arm configuration:
+Name            Min_Value           Max_Value
+arm_joint_1    0.0100692            5.84014
+arm_joint_2    0.0100692            2.61799
+arm_joint_3    -5.02655            -0.015708
+arm_joint_4    0.0221239            3.4292
+arm_joint_5    0.110619            5.64159
+
+// Some fixed poses for youbot arm are
+home_pose = {0.02, 0.02,-0.02, 0.03, 0.12};
+view_pose = {2.9496, 1.1345, -2.5481, 3.3597, 2.9234};
+
+Gripper:
+

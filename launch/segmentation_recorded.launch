@@ -1,0 +1,39 @@
+<launch>
+  <!--Launch the openni supported sensor-->
+  <include file="$(find openni2_launch)/launch/openni2.launch">
+<arg name="load_driver" value="false"/>
+<arg name="depth_registration" value="True"/>
+  </include>
+  
+
+  <!--Set rosparam for using simulated time instead of wall-clock time -->
+  <!--Ordinary command is rosparam set /use_sim_time true-->
+  <rosparam>
+    use_sim_time: True
+  </rosparam>
+  
+
+  <!-- Display the RGB frame-->
+  <node pkg="image_view" type="image_view" name="rgb_display">
+    <remap from="image" to="/camera/rgb/image_raw" />
+  </node>
+
+ <!-- Display the depth frame, can not display raw because of 16UC1 format
+ <node pkg="image_view" type="image_view" name="depth_display">
+    <remap from="image" to="/camera/depth_registered/image_raw" />
+  </node>
+-->
+
+ <!-- Launch the current node-->
+ <node pkg="aae" type="segment" name="segment" output="screen">
+  </node>
+ 
+<!-- Play the recorded ros file-->
+ <!-- For the choices made for recording asus xtion data: http://wiki.ros.org/openni_launch/Tutorials/BagRecordingPlayback -->
+<!-- Declare the filename argument-->
+<arg name="fname" default="/home/surenkum/work/thesis/data/ros_recorded/data_recorded_door.bag"/>
+ <node pkg="rosbag" type="play" name="ros_play" output="screen" 
+  args="--clock $(arg fname)">
+  </node>
+
+</launch>
