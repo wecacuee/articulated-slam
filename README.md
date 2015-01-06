@@ -23,6 +23,10 @@ iii) roslaunch /home/youbot/work/thesis/code/robot_initialize.launch on youbot c
 
 roslaunch aae segmentation_sensor.launch
 
+This launch file by default doesn't record a bag of data. For recording a bag pass the record parameter as true
+
+roslaunch aae segmentation_sensor.launch record_data:=True
+
 #Helpful Links
 To record video from rviz display use glc-capture and glc-play
 
