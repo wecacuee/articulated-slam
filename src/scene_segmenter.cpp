@@ -18,13 +18,19 @@
 #include <pcl_ros/point_cloud.h>
 #include "brics_actuator/JointPositions.h"
 
+#include <pcl/ModelCoefficients.h>
+#include <pcl/filters/extract_indices.h>
+#include <pcl/sample_consensus/method_types.h>
+#include <pcl/sample_consensus/model_types.h>
+#include <pcl/segmentation/sac_segmentation.h>
+
 typedef pcl::PointCloud<pcl::PointXYZRGB> cloudrgb;
 typedef cloudrgb::Ptr cloudrgbptr;
 
-
+/* Initialize parameters and creates nodes for advertising and subscribing*/
 void Scene_Segmenter::initParams(){
   // Initialized the publisher here
-  pub = node.advertise<sensor_msgs::PointCloud2> ("/camera/depth/voxelized", 1);
+  pub = node.advertise<sensor_msgs::PointCloud2> ("/segmented_plane", 1);
   robot_arm = node.advertise<brics_actuator::JointPositions> ("/arm_1/arm_controller/position_command",1);
   // Created a subscriber here
   sub = node.subscribe("/camera/depth_registered/points", 1, &Scene_Segmenter::voxel_filtering, this);
@@ -32,6 +38,7 @@ void Scene_Segmenter::initParams(){
 
 }
 
+/* Move the robot arm to capturing position */
 void Scene_Segmenter::move_arm(std::vector<float>& arm_position){
   brics_actuator::JointPositions command;
   std::vector <brics_actuator::JointValue> armJointPositions;
@@ -52,28 +59,63 @@ void Scene_Segmenter::move_arm(std::vector<float>& arm_position){
   std::cout<<"Send position command to the arm"<<std::endl;
 }
 
+/*Dummy code for voxel filtering a point cloud*/
 void Scene_Segmenter::voxel_filtering(const sensor_msgs::PointCloud2ConstPtr& cloud){
 
   if (arm_initialized) {
     cloudrgbptr PC (new cloudrgb());
-    cloudrgbptr PC_filtered (new cloudrgb());
+    //cloudrgbptr cloud_filtered (new cloudrgb());
     pcl::fromROSMsg(*cloud, *PC); //Now you can process this PC using the pcl functions 
-    sensor_msgs::PointCloud2 cloud_filtered;
+    // Creating a XYZ cloud for segmentation process
+    pcl::PointCloud<pcl::PointXYZ>::Ptr PC_xyz (new pcl::PointCloud<pcl::PointXYZ> ());
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZ> ());
+    copyPointCloud(*PC,*PC_xyz);
+    sensor_msgs::PointCloud2 cloud_processed;
 
 
-    // Perform the actual filtering
-    pcl::VoxelGrid<pcl::PointXYZRGB> sor ;
-    sor.setInputCloud (PC);
+    // Create the filtering object: downsample the dataset using a leaf size of 1cm
+    pcl::VoxelGrid<pcl::PointXYZ> sor ;
+    sor.setInputCloud (PC_xyz);
     sor.setLeafSize (0.01, 0.01, 0.01);
-    sor.filter (*PC_filtered);
+    sor.filter (*cloud_filtered);
 
+    // Segmentation of cloud part here
+    // Create the segmentation object for the planar model and set all the parameters
+    pcl::SACSegmentation<pcl::PointXYZ> seg;
+    pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
+    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane (new pcl::PointCloud<pcl::PointXYZ> ());
+    seg.setOptimizeCoefficients (true);
+    seg.setModelType (pcl::SACMODEL_PLANE);
+    seg.setMethodType (pcl::SAC_RANSAC);
+    seg.setMaxIterations (100);
+    seg.setDistanceThreshold (0.02);
+    // Segment the largest part from the cloud
+    seg.setInputCloud (cloud_filtered);
+    seg.segment (*inliers, *coefficients);
+    if (inliers->indices.size () == 0)
+    {
+      std::cout << "Could not estimate a planar model for the given input cloud." << std::endl;
+    }
+    // Extract the planar inliers from the input cloud
+    pcl::ExtractIndices<pcl::PointXYZ> extract;
+    extract.setInputCloud (cloud_filtered);
+    extract.setIndices (inliers);
+    extract.setNegative (false);
+
+    // Get the points associated with the planar surface
+    extract.filter (*cloud_plane);
+    //std::cout << "PointCloud representing the planar component: " << cloud_plane->points.size () << " data points." << std::endl;
+
+    *cloud_filtered = *cloud_plane;
+    
     //Convert the pcl cloud back to rosmsg
-    pcl::toROSMsg(*PC_filtered, cloud_filtered);
+    pcl::toROSMsg(*cloud_filtered, cloud_processed);
     //Set the header of the cloud
-    cloud_filtered.header.frame_id = cloud->header.frame_id;
+    cloud_processed.header.frame_id = cloud->header.frame_id;
     // Publish the data
-    //You may have to set the header frame id of the cloud_filtered also
-    pub.publish (cloud_filtered);
+    //You may have to set the header frame id of the cloud_processed also
+    pub.publish (cloud_processed);
   }
   else{
     // Send the initialization position command to the arm
