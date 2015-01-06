@@ -24,10 +24,14 @@
  <node pkg="aae" type="segment" name="segment" output="screen">
   </node>
  
-<!-- Record the neccesary topics-->
- <!-- For the choices made for recording asus xtion data: http://wiki.ros.org/openni_launch/Tutorials/BagRecordingPlayback -->
- <node pkg="rosbag" type="record" name="record" output="screen" 
-  args="-O /home/surenkum/work/thesis/data/ros_recorded/data_recorded camera/depth_registered/image_raw camera/depth_registered/camera_info camera/rgb/image_raw camera/rgb/camera_info">
-  </node>
+  <!-- Record the neccesary topics-->
+   <!-- For the choices made for recording asus xtion data: http://wiki.ros.org/openni_launch/Tutorials/BagRecordingPlayback -->
+  <!-- Defining a property to not record data by default-->
+  <arg name="record_data" default="False"/>
+  <group if="$(arg record_data)">
+   <node pkg="rosbag" type="record" name="record" output="screen" 
+    args="-O /home/surenkum/work/thesis/data/ros_recorded/data_recorded camera/depth_registered/image_raw camera/depth_registered/camera_info camera/rgb/image_raw camera/rgb/camera_info">
+    </node>
+  </group>
 
 </launch>
