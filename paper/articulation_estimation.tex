@@ -458,6 +458,24 @@ Email: dhiman@umich.edu }
 \section{Introduction}
 Imagine a robot moving in a typical living room environment which encounters indoor objects such as doors, drawers and chairs etc. We posit that in order for the robot to understand, map or interact with such objects, the robot needs to be able to understand the articulation. Pyschophysical experiments on human motion understanding have demonstrated that human first distinguish between competing motion models (translation, rotation and expansion) and then estimate the motion conditioned on motion model \cite{NIPS2008_3458}.
 
+\section{Related Work}
+\cite{martin2014online} Build on existing work on articulation estimation. Add interactive perception where manipulation adds to perception and vice versa.
+  \cite{yan2006automatic} 
+    Problem: Analysis and reconstruction of dynamical scenes
+    Method: Estimate the rigid motion subspaces. Extend the method to non-rigid
+    parts by modeling it with linear combination of key shapes. Use motion
+    segmentation ( by SVD) to segment feature trajectories for each object. Use
+    n neighbors to estimate local subspace of each point and cluster the
+    subspaces to estimate the cluster of trajectories that form the same metric subspace.
+
+    \cite{Katz_2013_7406} Uses RGBD
+
+
+\cite{sturm20103d}
+\cite{huang2012occlusion}
+\cite{Pillai-RSS-14}
+
+
 \section{Articulation Classification} We consider the problem of motion model identification from point correspondences of motion. In the current work, we consider revolute, prismatic and general motion. Consider motion of two points $x_0,x_1$ (represented in an inertial frame) on a rigid body at time $t_0$ and at some subsequent times $t_1,t_2$. The most general form of rigid body motion of a point can be represented using a rotation matrix $R$ and an associated translation vector $T$
 \begin{align}
 x_0^{t_1}& = R_{t_0}^{t_1}x_0^{t_0}+T_{t_0}^{t_1}
