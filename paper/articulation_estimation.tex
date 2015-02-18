@@ -480,9 +480,21 @@ Imagine a robot moving in a typical living room environment which encounters ind
 \begin{align}
 x_0^{t_1}& = R_{t_0}^{t_1}x_0^{t_0}+T_{t_0}^{t_1}
 \end{align}
-where the superscript on the point denotes the time. For points lying on a prismatic joint such as a drawer, rotation w.r.t inertial frame remains the same (R=I), resulting in $x_1^{t_1}-x_0^{t_1} = x_1^{t_0}-x_0^{t_0}$. This is essentially saying that the vector joining two points on a prismatic joint remains the same before and after the motion.
+where the superscript on the point denotes the time.
+\subsection{Prismatic}
+For points lying on a prismatic joint such as a drawer, rotation w.r.t inertial frame remains the same (R=I), resulting in $x_1^{t_1}-x_0^{t_1} = x_1^{t_0}-x_0^{t_0}$. This is essentially saying that the vector joining two points on a prismatic joint remains the same before and after the motion.
+\subsection{Revolute}
+For further distinction between revolute and general motion, we need information from more than one time step. For points lying on a body undergoing revolute motion such as a door, the points have same translation vector over time. Hence estimating the translation vector from two time steps $T_{t_0}^{t_1} = T_{t_1}^{t_2}$ is a sufficient condition to classify a joint as revolute joint. 
+\subsection{Plane Constrained Motion} Plane constrained motion is useful for characterizing motion of objects like chair that can be translated on a plane and rotated about the normal to the plane. Let the plane be denoted by an point $x_p$ lying on the plane and $\hat{n}$ being normal to that plane. Consider the case of a rigid body that has point $x_c^{t_0}$ in contact with the ground plane which after undergoing the motion moves to $x_c^{t_1}$. Since $x_c^{t_0}$ and $x_c^{t_1}$ both lie on the ground plane, we have
+\begin{align}
+(x_c^{t_0}-x_0)^T\hat{n}&=0\\
+(x_c^{t_1}-x_0)^T\hat{n}&=0\\
+x_c^{t_1} &= R_{t_0}^{t_1}x_c^{t_0}+T_{t_0}^{t_1}
+\end{align}
+By doing algebraic manipulation we get, $(R_{t_0}^{t_1}x_0+T-x_0)^T\hat{n}=0$
 
-For further distinction between revolute and general motion, we need information from more than one time step. For points lying on a body undergoing revolute motion such as a door, the points have same translation vector over time. Hence estimating the translation vector from two time steps $T_{t_0}^{t_1} = T_{t_1}^{t_2}$ is a sufficient condition to classify a joint as revolute joint. For general motion such as a book that can be rotated and translated anywhere in the space both the rotation and translation matrix will be different. 
+\subsection{General Rigid Body Motion}
+For general motion such as a book that can be rotated and translated anywhere in the space both the rotation and translation matrix will be different. 
 \section{Scene Understanding}
 Analysis by method such as ours is essential in order to decompose the scene into types of motion that a robot can influence on the scene.
 For example: Understanding the way a drawer can be opened, fridge door can be opened, what can be moved around in the scene
