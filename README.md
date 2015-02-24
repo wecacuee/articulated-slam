@@ -3,8 +3,11 @@ ROS package to segment articulated objects from a scene
 
 #ToDO:
 [SK] Write code for classification of joints in simulation code
+
 [] Literature survey
+
 [] Add code for doing 3D corner detection and tracking from RGBD stream
+
 [] Do floor segmentation and try Euclidean clustering and visualization
 
 # Usage
