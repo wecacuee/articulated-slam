@@ -2,6 +2,9 @@
 ROS package to segment articulated objects from a scene
 
 #ToDO:
+[SK] Write code for classification of joints in simulation code
+[] Literature survey
+[] Add code for doing 3D corner detection and tracking from RGBD stream
 [] Do floor segmentation and try Euclidean clustering and visualization
 
 # Usage
@@ -31,4 +34,3 @@ roslaunch aae segmentation_sensor.launch record_data:=True
 To record video from rviz display use glc-capture and glc-play
 
 http://robot.wpi.edu/wiki/index.php/ROS:rviz-video
-
