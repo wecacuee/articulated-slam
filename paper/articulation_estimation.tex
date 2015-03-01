@@ -465,7 +465,7 @@ Using image motion to understand motion and structure in the scene is a historic
 
 Yan and Pollefeys \cite{yan2006automatic} further extended this rank and subspace idea to estimate kinematic chains from tracked features. There are certain fundamental limitations which is common to these approaches. First, the reliance on feature tracking methods such as KLT is not suitable for indoor environments which may not have much texture. Furthermore, this feature tracking requirement limits the application of such methods tremendously by i) Not being able to track new parts/objects that enter/exit the scene, ii) Not modelling the entire scene and as a result not exploring dependencies between neighbouring objects, iii) Restricting the ability to assimilate the motion of objects in SLAM like approaches that map the entire scene. Secondly, motion orthogonal to image plane is not modelled \cite{yan2006automatic} as image projection is modelled as affine projection in the most general case. 
 
-With the discovery of cheap and commonplace hardware such as Kinect, their is a need to re-examine this structure from motion idea. First, since such hardware already provides depth for a feature point, one already has shape as estimated by traditional structure from motion. Also since depth is available, one can model the motion orthogonal to image plane. Texture-less objects can be tracked by adding depth edges to the tracking mix.
+With the discovery of cheap and commonplace hardware such as Kinect, there is a need to re-examine this structure from motion idea. First, since such hardware already provides depth for a feature point, one already has shape as estimated by traditional structure from motion. Also since depth is available, one can model the motion orthogonal to image plane. Texture-less objects can be tracked by adding depth edges to the tracking mix.
 
 
 \cite{martin2014online} Build on existing work on articulation estimation. Add interactive perception where manipulation adds to perception and vice versa.
@@ -507,6 +507,68 @@ For general motion such as a book that can be rotated and translated anywhere in
 \section{Scene Understanding}
 Analysis by method such as ours is essential in order to decompose the scene into types of motion that a robot can influence on the scene.
 For example: Understanding the way a drawer can be opened, fridge door can be opened, what can be moved around in the scene
+
+\section{Factorization Approach} In this section, we extend the factorization approach as described in \cite{costeira1998multibody} to 3-D track data available from a depth camera. Assuming for now that a single object moves relative to a static camera and we track features from frame to frame. Following the notation in the paper, lets represent a point on the object as $p_i^T = [X_i,Y_i,Z_i]^T$ in the camera frame, in the current frame $f$, the position of the point in homogeneous coordinates can be represented as 
+\begin{align}
+s_{fi}^C = \begin{bmatrix} 
+p_{fi}^C\\1
+\end{bmatrix}
+&=\begin{bmatrix}
+R_f & t_f\\
+0_{1\times3}& 1
+\end{bmatrix}
+\begin{bmatrix}
+p_i\\
+1
+\end{bmatrix}
+= \begin{bmatrix}
+R_f & t_f\\
+0_{1\times3}& 1
+\end{bmatrix}
+s_i
+\end{align}
+where $R_f$ and $t_f$ are the rotation and translation of the object from current frame w.r.t to the frame in which object points are initially represented. Assuming that we track $N$ features over $F$ frames, one can write 
+\begin{align}
+\begin{bmatrix}
+u_{11} & ... & u_{1N} \\ 
+. &  & .\\
+u_{F1} & ... & u_{FN} \\ 
+v_{11} & ... & v_{1N} \\ 
+. &  & .\\
+v_{F1} & ... & v_{FN} \\ 
+w_{11} & ... & w_{1N} \\ 
+. &  & .\\
+w_{F1} & ... & w_{FN} \\ 
+\end{bmatrix} & = 
+\begin{bmatrix}
+i_1^T & | & t_{x_1}\\
+. & | & .\\
+i_F^T & | & t_{x_F}\\
+j_1^T & | & t_{y_1}\\
+. & | & .\\
+j_F^T & | & t_{y_F}\\
+k_1^T & | & t_{z_1}\\
+. & | & .\\
+k_F^T & | & t_{z_F}\\
+\end{bmatrix}
+\begin{bmatrix}
+s_1 & . & . &. & s_N
+\end{bmatrix}\label{eq:global_motion}
+\end{align}
+where $(u_{fi},v_{fi},w_{fi})$ is the location of feature point in current frame, vectors $i_f^T,j_f^T,k_f^T$ are the rows of the rotation matrix $R_f$ and $(t_{x_f},t_{y_f},t_{z_f})$ represent the components of the translation vector at time instant with frame $f$. Equation \ref{eq:global_motion} can be represented in a accumulated form as 
+\begin{align}
+\mathbf{W} & = \mathbf{M}\mathbf{S}
+\end{align}
+where $\mathbf{W}$ represents the accumulation from trajectories of $N$ points tracked over $F$ frames, $\mathbf{M}$ contains all the information about the motion of the object present in the scene and $\mathbf{S}$ contains all the information about the shape of the object. Since rank of product of two matrices can not exceed the minimum of rank of individual matrics, It is clear that the maximum rank of $W$ is 4. Computing singular value decomposition of $\mathbf{W}$, we get 
+\begin{align}
+\mathbf{W} = \mathbf{U}\Sigma\mathbf{V}^T \label{eq:motion_factor}
+\end{align}
+where $U \in R^{3F \times 4}$, and $V \in R^{N \times 4}$ are left and right real singular matrices and $\Sigma$ is a $4\times4$ diagonal matrix of singular values. Although if $\mathbf{W}$ was full rank, we would have to consider $N$ singular values but as the rank of $W$ is 4, we only write out the components corresponding to first $4$ singular values. Writing the factorization as product of two matrices,
+\begin{align}
+\mathbf{\hat{M}} = \mathbf{U}\Sigma^{\frac{1}{2}}, \mathbf{\hat{S}} = \Sigma^{\frac{1}{2}}\mathbf{V}^T \label{eq:motion_factor}
+\end{align}
+
+\subsection{Motion and Shape Estimation} The factorization as defined in Equation \ref{eq:motion_factor} is not unique as any invertible $4 \times 4$ matrix $A$  will lead to an alternate solution $\mathbf{M} = \mathbf{\hat{M}}A$,  $\mathbf{S} = A^{-1}\mathbf{\hat{S}}$
 
 \bibliographystyle{unsrt}
 \bibliography{articulation_estimation}
