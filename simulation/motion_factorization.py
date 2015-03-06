@@ -25,6 +25,20 @@ def assemble_wmat(track_data,w_mat):
 def estimate_motion_shape(w_mat):
     # Compute SVD of w_mat
     Umat, Emat , Vmat = np.linalg.svd(w_mat, full_matrices=True)
+    # Verify rank of Emat
+    if (Emat[3]>1e-5):
+        # It's a full rank matrix
+        E_sqrt = np.diag(np.sqrt(Emat[:4]))
+        # Equation 6 in the paper
+        M_hat = Umat[:,:4]*E_sqrt
+        S_hat = E_sqrt*Vmat[:4,:]
+        # Estimating the AA^T matrix
+
+        pdb.set_trace()
+
+    else:
+        # Its not full rank which might be either due to geometry of the points or the joint type
+        print "Something interesting is going on but we cann't exactly say what"
 
 
 if __name__ == '__main__':
