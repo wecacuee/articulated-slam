@@ -468,12 +468,17 @@ Imagine a robot moving in a typical living room environment which encounters ind
     n neighbors to estimate local subspace of each point and cluster the
     subspaces to estimate the cluster of trajectories that form the same metric subspace.
 
-    \cite{Katz_2013_7406} Uses RGBD
+    \cite{katz2010interactive} uses RGB for 3D articulation estimation.
+    \cite{katz2013interactive} Uses RGBD
+
+ 
+TODO: Anguelov et al. - kinematic models of doors
+TODO: Yan and Pollefeys : Assumes affine geometry. Only revolute joints.
 
 
-\cite{sturm20103d}
-\cite{huang2012occlusion}
-\cite{Pillai-RSS-14}
+TODO: \cite{sturm20103d} : 3D trajectories by manipulation of environment \\
+TODO: \cite{huang2012occlusion} \\ 
+TODO: \cite{Pillai-RSS-14} \\
 
 
 \section{Articulation Classification} We consider the problem of motion model identification from point correspondences of motion. In the current work, we consider revolute, prismatic and general motion. Consider motion of two points $x_0,x_1$ (represented in an inertial frame) on a rigid body at time $t_0$ and at some subsequent times $t_1,t_2$. The most general form of rigid body motion of a point can be represented using a rotation matrix $R$ and an associated translation vector $T$
