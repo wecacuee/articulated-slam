@@ -84,18 +84,30 @@ def mat2euler(M, cy_thresh=None):
 
 
 '''
-To print rotation of all the frames relative to the first frame
-Input: Expects the motion matrix as estimated by the factorization process
+Analyzes whether a motion is rotation or full 6-D motion and subsequently prints
+rotation and/or translation (in case of full 6-D motion) of all the frames relative to the first frame
+Input: Expects the motion matrix as estimated by the factorization process and mean of the measurement matrix
 '''
-def analyze_rotation(M_mat):
-    # Analyze data for every frame
-    for i in range(M_mat.shape[0]/3):
+def analyze_motion(M_mat,w_mat_mean):
+    # To store the results from the translation estimation part
+    trans_est = np.zeros((3,(w_mat_mean.shape[0]/3)-1))
+    # Analyze data for every frame and comparing it to first frame
+    for i in range(1,M_mat.shape[0]/3):
         # Estimated rotation matrix is (relative w.r.t first frame)
-        R_rel = M_mat[0:3,:]*np.transpose(M_mat[i*3:(i+1)*3,:])
+        R_rel = M_mat[i*3:(i+1)*3,:]*np.transpose(M_mat[0:3,:])
         # Getting euler angles of this rotation matrix
         (z,y,x) = mat2euler(R_rel)
-        print "Rotation w.r.t to the first frame is ",z,y,x
-        pdb.set_trace()
+        print "Rotation w.r.t to the first frame in Euler angles is ",z,y,x
+        # Removing the part of rotation from the mean track estimates to figure outthe rotation and translation part
+        trans_est[:,i-1] = np.squeeze(np.asarray(w_mat_mean[i*3:(i+1)*3]-np.dot(R_rel,w_mat_mean[0:3])))
+        print "Translation w.r.t to the first frame is ",trans_est[:,i-1]
+    # Checking whether the joint can be modeled as a revolute joint only
+    if (np.max(np.mean(np.abs(trans_est),1))<1e-2):
+        print "The joint is of revolute type"
+    else:
+        print "The joint is not purely revolute"
+        
+
 
     
 

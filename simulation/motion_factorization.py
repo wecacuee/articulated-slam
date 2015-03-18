@@ -29,8 +29,10 @@ def assemble_wmat(track_data,w_mat):
 Estimate motion and shape using the paper "Shape and Motion from Image Streams under Orthography: a Factorization Method" by Carlo Tomasi and Takeo Kanade
 '''
 def estimate_motion_shape_kanade(w_mat):
+    # Getting mean of the object motion to estimate translation of the object
+    w_mat_mean = np.mean(w_mat,1)
     # Get Registered motion matrix
-    w_mat = w_mat-np.mean(w_mat,1)
+    w_mat = w_mat-w_mat_mean
     # Compute SVD of w_mat
     Umat, Emat , Vmat = np.linalg.svd(w_mat, full_matrices=True)
     # This matrix Emat is supposed to have a rank 3
@@ -51,7 +53,8 @@ def estimate_motion_shape_kanade(w_mat):
         S_mat = np.dot(np.linalg.inv(A_mat),S_hat)
         # Getting the rotation matrix
         M_mat = np.dot(M_hat,A_mat)
-        ua.analyze_rotation(M_mat)
+        ua.analyze_motion(M_mat,w_mat_mean)
+
 
 '''
 Least square solution to estimate A using exuations 9,10,11 from the paper
@@ -229,7 +232,8 @@ if __name__ == '__main__':
     w_mat = None
     # Pass in a bunch of commands and see how the rotation joint changes things
     # Here first 3 parameters are responsible for rotation and the next 3 for translation
-    joint_motion_data = np.array([[0,0,0,0,1,0],[0,np.pi/6,0,1,1,0],[0,np.pi/3,0,0,0,0],[0,np.pi/2,0,0,0,1]])
+    #joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,1,1,0],[0,np.pi/3,0,0,0,0],[0,np.pi/2,0,0,0,1]])
+    joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,0,0,0],[0,np.pi/3,0,0,0,0],[0,np.pi/2,0,0,0,0]])
     origin = np.zeros(3)
     # Processing each motion command
     for curr_motion in joint_motion_data:
