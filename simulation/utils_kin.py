@@ -1,10 +1,12 @@
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-from mpl_toolkits.mplot3d import axes3d
+from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
+import scipy.spatial as sp
 import random
 import collections
 import pdb
+import time
 
 # Sampling method
 def ransac_samples(data,n):
@@ -139,23 +141,25 @@ def articulated_links(joint,jointvars,length,sampled_pts,origin):
     return (l1_pt, l1_pt[-1, :])
 
 # Plot all the points
-def plot_points(data,fig = [],ax=[],inp_color = []):
+def plot_points(data,fig = None,ax=None,inp_color = None):
     # Takes as input all the points
-    if not fig:
+    if fig is None:
         fig = plt.figure()
         # If no plot is defined
         ax = fig.gca(projection='3d')
-    plt.ion()
-    for i in range(data.shape[0]):
-        l1 = np.asarray(data[i])        
+    for i in range(len(data)):
+        points = np.asarray(data[i])
+        hull = sp.ConvexHull(points)
         # Plotting the points with scatter
         if not inp_color:
-            ax.scatter(l1[-1,0],l1[-1,1],l1[-1,2],'z',50,'b')
+            ax.plot_trisurf(points[:,0], points[:,1],points[:,2],triangles=hull.simplices,color = 'b')
         else:
-            ax.scatter(l1[-1,0],l1[-1,1],l1[-1,2],'z',50,inp_color)
+            ax.plot_trisurf(points[:,0], points[:,1],points[:,2],triangles=hull.simplices,color = inp_color)
         # Checking if there are a prismatic joint that needs to be denoted
     # Label the axis
     ax.set_xlabel('X'),ax.set_ylabel('Y'),ax.set_zlabel('Z')
+    plt.show()
+
     return (fig,ax)
 
 
