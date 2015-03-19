@@ -257,8 +257,16 @@ if __name__ == '__main__':
     w_mat = None
     # Pass in a bunch of commands and see how the rotation joint changes things
     # Here first 3 parameters are responsible for rotation and the next 3 for translation
-    #joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,1,1,0],[0,np.pi/3,0,0,0,0],[0,np.pi/2,0,0,0,1]])
-    joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,0,0,0],[0,np.pi/3,0,0,0,0],[0,7*np.pi/8,0,0,0,0]])
+
+    # Test case for full translation and rotation
+    #joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,1,1,0],[0,np.pi/4,0,0,1,0],[0,np.pi/3,0,0,0,0],[0,np.pi/2,0,0,0,1]])
+    # Test case for translation along a plane (assume x y plane for now) and rotation
+    joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,1,1,0],[0,np.pi/4,0,0,1,0],[0,np.pi/3,0,0,0,0],[0,np.pi/2,0,1,0,0]])
+    # Test case for translation along a line (assume x axes for now) and rotation
+    #joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,1,0,0],[0,np.pi/4,0,2,0,0],[0,np.pi/3,0,1,0,0],[0,np.pi/2,0,0,0,0]])
+    # Test case for rotation only joint
+    #joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,0,0,0],[0,np.pi/3,0,0,0,0],[0,np.pi/2,0,0,0,0]])
+    # Test case for rotation and 
     origin = np.zeros(3)
     # Processing each motion command
     for curr_motion in joint_motion_data:
