@@ -120,32 +120,30 @@ def estimate_motion_shape_costeria(w_mat):
     # Compute SVD of w_mat
     Umat, Emat , Vmat = np.linalg.svd(w_mat, full_matrices=True)
     # Verify rank of Emat
-    if (Emat[3]>1e-5):
+    if True: #(Emat[3]>1e-5): # The method should work in degenerate cases
         # It's a full rank matrix to estimate rotation and translation
-        E_sqrt = np.diag(np.sqrt(Emat[:4]))
+        r = np.sum(Emat > 1e-5)
+        E_sqrt = np.diag(np.sqrt(Emat[:r]))
         # Equation 6 in the paper
-        M_hat = np.dot(Umat[:,:4],E_sqrt)
-        S_hat = np.dot(E_sqrt,Vmat[:4,:])
+        M_hat = np.dot(Umat[:,:r],E_sqrt)
+        S_hat = np.dot(E_sqrt,Vmat[:r,:])
         # Estimating the AA^T matrix using least squares
-        lst_sol = estimate_A_costeria(np.array(M_hat))
-        # Assembling the matrix AA^T from the least square solution
-        A_A_t = np.array(lst_sol)
+        A_A_t = estimate_A_costeria(np.array(M_hat))
         #A_A_t = np.array([[lst_sol[0][0],lst_sol[0][1],lst_sol[0][2],lst_sol[0][3]],[lst_sol[0][1],lst_sol[0][4],lst_sol[0][5],lst_sol[0][6]],
         #    [lst_sol[0][2],lst_sol[0][5],lst_sol[0][7],lst_sol[0][8]],[lst_sol[0][3],lst_sol[0][6],lst_sol[0][8],lst_sol[0][9]]])
         # Ideally, check if the matrix is positive definite, assuming it is --> calculate A
         # Carrying out SVD to calculate the matrix A
         U, E, V = np.linalg.svd(A_A_t, full_matrices=True)
-        A_R = np.dot(U[:,:3],np.diag(np.sqrt(Emat[:3])))
+        A_R = np.dot(U[:,:3],np.diag(np.sqrt(E[:3])))
         # Getting A_t from translation constraint
-        A_t = np.dot(np.dot(np.diag(np.sqrt(1/Emat[:4])),np.transpose(Umat[:,:4])),np.mean(w_mat,1))
+        A_t = np.diag(1/np.sqrt(Emat[:r])).dot(Umat[:,:r].T).dot(np.mean(w_mat,1))
         A_mat = np.hstack([A_R,A_t])
         # Getting the shape matrix
         S = np.dot(np.linalg.inv(A_mat),S_hat)
         # Getting the motion data
         M = np.dot(M_hat,A_mat)
         # How does one go from here?
-        pdb.set_trace()
-
+        list(ua.analyze_rotation(M[:, :3]))
 
     else:
         # Its not full rank which might be either due to geometry of the points or the joint type
@@ -154,16 +152,74 @@ def estimate_motion_shape_costeria(w_mat):
 def foldmat(mat):
     ''' Fold the matrix along diagonal i.e. nondiag entrees get double and
     symmetric while diag entrees stay same. '''
-    assert mat.shape[0] == mat.shape[1], 'requires square matrix'
-    # make symmetric
-    mat = (mat + mat.T) / 2
-    return 2*mat - np.diag(np.diag(mat))
+    return (mat + mat.T) - np.diag(np.diag(mat))
 
 def flattriu(mat):
     ''' flatten upper triangular of a matrix''' 
-    assert mat.shape[0] == mat.shape[1], 'requires square matrix'
     triu = np.triu_indices(mat.shape[0])
     return mat[triu]
+
+def triu2mat(triu):
+    ''' Returns a symmetric matrix from upper triangular values. Inverse of flattriu(mat). '''
+    l = len(triu)
+    size = ( np.sqrt(1+8*l) - 1 ) / 2 # soln for l = n(n+1)/2
+    mat = np.zeros((size,size))
+    mat[np.triu_indices(size)] = triu
+    mat = (mat + mat.T) - np.diag(np.diag(mat))# make symmetric
+    return mat
+
+def a_mat_hardcoded(M_hat, i):
+    a_mat[i*9+0,:] = np.array([M_hat[i*3+0][0]*M_hat[i*3+0][0],2*M_hat[i*3+0][0]*M_hat[i*3+0][1],
+        2*M_hat[i*3+0][0]*M_hat[i*3+0][2],2*M_hat[i*3+0][0]*M_hat[i*3+0][3],M_hat[i*3+0][1]*M_hat[i*3+0][1],
+        2*M_hat[i*3+0][1]*M_hat[i*3+0][2], 2*M_hat[i*3+0][1]*M_hat[i*3+0][3],M_hat[i*3+0][2]*M_hat[i*3+0][2],
+        2*M_hat[i*3+0][2]*M_hat[i*3+0][3],M_hat[i*3+0][3]*M_hat[i*3+0][3]])
+    # 2nd row
+    a_mat[i*9+1,:] = np.array([M_hat[i*3+1][0]*M_hat[i*3+0][0],M_hat[i*3+1][0]*M_hat[i*3+0][1]+M_hat[i*3+1][1]*M_hat[i*3+0][0],
+        M_hat[i*3+1][0]*M_hat[i*3+0][2]+M_hat[i*3+1][2]*M_hat[i*3+0][0],M_hat[i*3+1][0]*M_hat[i*3+0][3]+M_hat[i*3+1][3]*M_hat[i*3+0][0],
+        M_hat[i*3+1][1]*M_hat[i*3+0][1],M_hat[i*3+1][1]*M_hat[i*3+0][2]+M_hat[i*3+1][2]*M_hat[i*3+0][1], 
+        M_hat[i*3+1][1]*M_hat[i*3+0][3]+ M_hat[i*3+1][3]*M_hat[i*3+0][1],M_hat[i*3+1][2]*M_hat[i*3+0][2],
+        M_hat[i*3+1][2]*M_hat[i*3+0][3]+M_hat[i*3+1][3]*M_hat[i*3+0][2],M_hat[i*3+1][3]*M_hat[i*3+0][3]])
+    # 3rd row
+    a_mat[i*9+2,:] = np.array([M_hat[i*3+0][0]*M_hat[i*3+2][0],M_hat[i*3+0][0]*M_hat[i*3+2][1]+M_hat[i*3+0][1]*M_hat[i*3+2][0],
+        M_hat[i*3+0][2]*M_hat[i*3+2][0]+M_hat[i*3+0][0]*M_hat[i*3+2][2],M_hat[i*3+0][3]*M_hat[i*3+2][0]+M_hat[i*3+0][0]*M_hat[i*3+2][3],
+        M_hat[i*3+0][1]*M_hat[i*3+2][1],M_hat[i*3+0][2]*M_hat[i*3+2][1]+M_hat[i*3+0][1]*M_hat[i*3+2][2], 
+        M_hat[i*3+0][3]*M_hat[i*3+2][1]+ M_hat[i*3+0][1]*M_hat[i*3+2][3],M_hat[i*3+0][2]*M_hat[i*3+2][2],
+        M_hat[i*3+0][3]*M_hat[i*3+2][2]+M_hat[i*3+0][2]*M_hat[i*3+2][3],M_hat[i*3+0][3]*M_hat[i*3+2][3]])
+    # 4th row
+    a_mat[i*9+3,:] = np.array([M_hat[i*3+1][0]*M_hat[i*3+0][0],M_hat[i*3+1][1]*M_hat[i*3+0][0]+M_hat[i*3+1][0]*M_hat[i*3+0][1],
+        M_hat[i*3+1][2]*M_hat[i*3+0][0]+M_hat[i*3+1][0]*M_hat[i*3+0][2],M_hat[i*3+1][3]*M_hat[i*3+0][0]+M_hat[i*3+1][0]*M_hat[i*3+0][3],
+        M_hat[i*3+1][1]*M_hat[i*3+0][1],M_hat[i*3+1][2]*M_hat[i*3+0][1]+M_hat[i*3+1][1]*M_hat[i*3+0][2], 
+        M_hat[i*3+1][3]*M_hat[i*3+0][1]+ M_hat[i*3+1][1]*M_hat[i*3+0][3],M_hat[i*3+1][2]*M_hat[i*3+0][2],
+        M_hat[i*3+1][3]*M_hat[i*3+0][2]+M_hat[i*3+1][2]*M_hat[i*3+0][3],M_hat[i*3+1][3]*M_hat[i*3+0][3]])
+    # 5th row
+    a_mat[i*9+4,:] = np.array([M_hat[i*3+1][0]*M_hat[i*3+1][0],2*M_hat[i*3+1][0]*M_hat[i*3+1][1],
+        2*M_hat[i*3+1][0]*M_hat[i*3+1][2],2*M_hat[i*3+1][0]*M_hat[i*3+1][3],M_hat[i*3+1][1]*M_hat[i*3+1][1],
+        2*M_hat[i*3+1][1]*M_hat[i*3+1][2], 2*M_hat[i*3+1][1]*M_hat[i*3+1][3],M_hat[i*3+1][2]*M_hat[i*3+1][2],
+        2*M_hat[i*3+1][2]*M_hat[i*3+1][3],M_hat[i*3+1][3]*M_hat[i*3+1][3]])
+    # 6th row
+    a_mat[i*9+5,:] = np.array([M_hat[i*3+1][0]*M_hat[i*3+2][0],M_hat[i*3+1][1]*M_hat[i*3+2][0]+M_hat[i*3+1][0]*M_hat[i*3+2][1],
+        M_hat[i*3+1][2]*M_hat[i*3+2][0]+M_hat[i*3+1][0]*M_hat[i*3+2][2],M_hat[i*3+1][3]*M_hat[i*3+2][0]+M_hat[i*3+1][0]*M_hat[i*3+2][3],
+        M_hat[i*3+1][1]*M_hat[i*3+2][1],M_hat[i*3+1][2]*M_hat[i*3+2][1]+M_hat[i*3+1][1]*M_hat[i*3+2][2], 
+        M_hat[i*3+1][3]*M_hat[i*3+2][1]+ M_hat[i*3+1][1]*M_hat[i*3+2][3],M_hat[i*3+1][2]*M_hat[i*3+2][2],
+        M_hat[i*3+1][3]*M_hat[i*3+2][2]+M_hat[i*3+1][2]*M_hat[i*3+2][3],M_hat[i*3+1][3]*M_hat[i*3+2][3]])
+    # 7th row
+    a_mat[i*9+6,:] = np.array([M_hat[i*3+2][0]*M_hat[i*3+0][0],M_hat[i*3+2][1]*M_hat[i*3+0][0]+M_hat[i*3+2][0]*M_hat[i*3+0][1],
+        M_hat[i*3+2][2]*M_hat[i*3+0][0]+M_hat[i*3+2][0]*M_hat[i*3+0][2],M_hat[i*3+2][3]*M_hat[i*3+0][0]+M_hat[i*3+2][0]*M_hat[i*3+0][3],
+        M_hat[i*3+2][1]*M_hat[i*3+0][1],M_hat[i*3+2][2]*M_hat[i*3+0][1]+M_hat[i*3+2][1]*M_hat[i*3+0][2], 
+        M_hat[i*3+2][3]*M_hat[i*3+0][1]+ M_hat[i*3+2][1]*M_hat[i*3+0][3],M_hat[i*3+2][2]*M_hat[i*3+0][2],
+        M_hat[i*3+2][3]*M_hat[i*3+0][2]+M_hat[i*3+2][2]*M_hat[i*3+0][3],M_hat[i*3+2][3]*M_hat[i*3+0][3]])
+    # 8th row
+    a_mat[i*9+7,:] = np.array([M_hat[i*3+2][0]*M_hat[i*3+1][0],M_hat[i*3+2][1]*M_hat[i*3+1][0]+M_hat[i*3+2][0]*M_hat[i*3+1][1],
+        M_hat[i*3+2][2]*M_hat[i*3+1][0]+M_hat[i*3+2][0]*M_hat[i*3+1][2],M_hat[i*3+2][3]*M_hat[i*3+1][0]+M_hat[i*3+2][0]*M_hat[i*3+1][3],
+        M_hat[i*3+2][1]*M_hat[i*3+1][1],M_hat[i*3+2][2]*M_hat[i*3+1][1]+M_hat[i*3+2][1]*M_hat[i*3+1][2], 
+        M_hat[i*3+2][3]*M_hat[i*3+1][1]+ M_hat[i*3+2][1]*M_hat[i*3+1][3],M_hat[i*3+2][2]*M_hat[i*3+1][2],
+        M_hat[i*3+2][3]*M_hat[i*3+1][2]+M_hat[i*3+2][2]*M_hat[i*3+1][3],M_hat[i*3+2][3]*M_hat[i*3+1][3]])
+    # 9th row
+    a_mat[i*9+8,:] = np.array([M_hat[i*3+2][0]*M_hat[i*3+2][0],2*M_hat[i*3+2][0]*M_hat[i*3+2][1],
+        2*M_hat[i*3+2][0]*M_hat[i*3+2][2],2*M_hat[i*3+2][0]*M_hat[i*3+2][3],M_hat[i*3+2][1]*M_hat[i*3+2][1],
+        2*M_hat[i*3+2][1]*M_hat[i*3+2][2], 2*M_hat[i*3+2][1]*M_hat[i*3+2][3],M_hat[i*3+2][2]*M_hat[i*3+2][2],
+        2*M_hat[i*3+2][2]*M_hat[i*3+2][3],M_hat[i*3+2][3]*M_hat[i*3+2][3]])
+    return a_mat
 
 '''
 Least square solution to estimate A using exuations 9,10,11 from the paper
@@ -177,73 +233,20 @@ def estimate_A_costeria(M_hat):
     for i in range(M_hat.shape[0]/3):
         # Assemble a_mat
         # 1st row
-        a_mat[i*9+0, :] = flattriu(foldmat(M_hat[i*3+0, :] * M_hat[i*3+0, :].T))
-        a_mat[i*9+1, :] = flattriu(foldmat(M_hat[i*3+0, :] * M_hat[i*3+1, :].T))
-        a_mat[i*9+2, :] = flattriu(foldmat(M_hat[i*3+0, :] * M_hat[i*3+2, :].T))
-        a_mat[i*9+3, :] = flattriu(foldmat(M_hat[i*3+1, :] * M_hat[i*3+0, :].T))
-        a_mat[i*9+4, :] = flattriu(foldmat(M_hat[i*3+1, :] * M_hat[i*3+1, :].T))
-        a_mat[i*9+5, :] = flattriu(foldmat(M_hat[i*3+1, :] * M_hat[i*3+2, :].T))
-        a_mat[i*9+6, :] = flattriu(foldmat(M_hat[i*3+2, :] * M_hat[i*3+0, :].T))
-        a_mat[i*9+7, :] = flattriu(foldmat(M_hat[i*3+2, :] * M_hat[i*3+1, :].T))
-        a_mat[i*9+8, :] = flattriu(foldmat(M_hat[i*3+2, :] * M_hat[i*3+2, :].T))
-        # a_mat[i*9+0,:] = np.array([M_hat[i*3+0][0]*M_hat[i*3+0][0],2*M_hat[i*3+0][0]*M_hat[i*3+0][1],
-        #     2*M_hat[i*3+0][0]*M_hat[i*3+0][2],2*M_hat[i*3+0][0]*M_hat[i*3+0][3],M_hat[i*3+0][1]*M_hat[i*3+0][1],
-        #     2*M_hat[i*3+0][1]*M_hat[i*3+0][2], 2*M_hat[i*3+0][1]*M_hat[i*3+0][3],M_hat[i*3+0][2]*M_hat[i*3+0][2],
-        #     2*M_hat[i*3+0][2]*M_hat[i*3+0][3],M_hat[i*3+0][3]*M_hat[i*3+0][3]])
-        # # 2nd row
-        # a_mat[i*9+1,:] = np.array([M_hat[i*3+1][0]*M_hat[i*3+0][0],M_hat[i*3+1][0]*M_hat[i*3+0][1]+M_hat[i*3+1][1]*M_hat[i*3+0][0],
-        #     M_hat[i*3+1][0]*M_hat[i*3+0][2]+M_hat[i*3+1][2]*M_hat[i*3+0][0],M_hat[i*3+1][0]*M_hat[i*3+0][3]+M_hat[i*3+1][3]*M_hat[i*3+0][0],
-        #     M_hat[i*3+1][1]*M_hat[i*3+0][1],M_hat[i*3+1][1]*M_hat[i*3+0][2]+M_hat[i*3+1][2]*M_hat[i*3+0][1], 
-        #     M_hat[i*3+1][1]*M_hat[i*3+0][3]+ M_hat[i*3+1][3]*M_hat[i*3+0][1],M_hat[i*3+1][2]*M_hat[i*3+0][2],
-        #     M_hat[i*3+1][2]*M_hat[i*3+0][3]+M_hat[i*3+1][3]*M_hat[i*3+0][2],M_hat[i*3+1][3]*M_hat[i*3+0][3]])
-        # # 3rd row
-        # a_mat[i*9+2,:] = np.array([M_hat[i*3+0][0]*M_hat[i*3+2][0],M_hat[i*3+0][0]*M_hat[i*3+2][1]+M_hat[i*3+0][1]*M_hat[i*3+2][0],
-        #     M_hat[i*3+0][2]*M_hat[i*3+2][0]+M_hat[i*3+0][0]*M_hat[i*3+2][2],M_hat[i*3+0][3]*M_hat[i*3+2][0]+M_hat[i*3+0][0]*M_hat[i*3+2][3],
-        #     M_hat[i*3+0][1]*M_hat[i*3+2][1],M_hat[i*3+0][2]*M_hat[i*3+2][1]+M_hat[i*3+0][1]*M_hat[i*3+2][2], 
-        #     M_hat[i*3+0][3]*M_hat[i*3+2][1]+ M_hat[i*3+0][1]*M_hat[i*3+2][3],M_hat[i*3+0][2]*M_hat[i*3+2][2],
-        #     M_hat[i*3+0][3]*M_hat[i*3+2][2]+M_hat[i*3+0][2]*M_hat[i*3+2][3],M_hat[i*3+0][3]*M_hat[i*3+2][3]])
-        # # 4th row
-        # a_mat[i*9+3,:] = np.array([M_hat[i*3+1][0]*M_hat[i*3+0][0],M_hat[i*3+1][1]*M_hat[i*3+0][0]+M_hat[i*3+1][0]*M_hat[i*3+0][1],
-        #     M_hat[i*3+1][2]*M_hat[i*3+0][0]+M_hat[i*3+1][0]*M_hat[i*3+0][2],M_hat[i*3+1][3]*M_hat[i*3+0][0]+M_hat[i*3+1][0]*M_hat[i*3+0][3],
-        #     M_hat[i*3+1][1]*M_hat[i*3+0][1],M_hat[i*3+1][2]*M_hat[i*3+0][1]+M_hat[i*3+1][1]*M_hat[i*3+0][2], 
-        #     M_hat[i*3+1][3]*M_hat[i*3+0][1]+ M_hat[i*3+1][1]*M_hat[i*3+0][3],M_hat[i*3+1][2]*M_hat[i*3+0][2],
-        #     M_hat[i*3+1][3]*M_hat[i*3+0][2]+M_hat[i*3+1][2]*M_hat[i*3+0][3],M_hat[i*3+1][3]*M_hat[i*3+0][3]])
-        # # 5th row
-        # a_mat[i*9+4,:] = np.array([M_hat[i*3+1][0]*M_hat[i*3+1][0],2*M_hat[i*3+1][0]*M_hat[i*3+1][1],
-        #     2*M_hat[i*3+1][0]*M_hat[i*3+1][2],2*M_hat[i*3+1][0]*M_hat[i*3+1][3],M_hat[i*3+1][1]*M_hat[i*3+1][1],
-        #     2*M_hat[i*3+1][1]*M_hat[i*3+1][2], 2*M_hat[i*3+1][1]*M_hat[i*3+1][3],M_hat[i*3+1][2]*M_hat[i*3+1][2],
-        #     2*M_hat[i*3+1][2]*M_hat[i*3+1][3],M_hat[i*3+1][3]*M_hat[i*3+1][3]])
-        # # 6th row
-        # a_mat[i*9+5,:] = np.array([M_hat[i*3+1][0]*M_hat[i*3+2][0],M_hat[i*3+1][1]*M_hat[i*3+2][0]+M_hat[i*3+1][0]*M_hat[i*3+2][1],
-        #     M_hat[i*3+1][2]*M_hat[i*3+2][0]+M_hat[i*3+1][0]*M_hat[i*3+2][2],M_hat[i*3+1][3]*M_hat[i*3+2][0]+M_hat[i*3+1][0]*M_hat[i*3+2][3],
-        #     M_hat[i*3+1][1]*M_hat[i*3+2][1],M_hat[i*3+1][2]*M_hat[i*3+2][1]+M_hat[i*3+1][1]*M_hat[i*3+2][2], 
-        #     M_hat[i*3+1][3]*M_hat[i*3+2][1]+ M_hat[i*3+1][1]*M_hat[i*3+2][3],M_hat[i*3+1][2]*M_hat[i*3+2][2],
-        #     M_hat[i*3+1][3]*M_hat[i*3+2][2]+M_hat[i*3+1][2]*M_hat[i*3+2][3],M_hat[i*3+1][3]*M_hat[i*3+2][3]])
-        # # 7th row
-        # a_mat[i*9+6,:] = np.array([M_hat[i*3+2][0]*M_hat[i*3+0][0],M_hat[i*3+2][1]*M_hat[i*3+0][0]+M_hat[i*3+2][0]*M_hat[i*3+0][1],
-        #     M_hat[i*3+2][2]*M_hat[i*3+0][0]+M_hat[i*3+2][0]*M_hat[i*3+0][2],M_hat[i*3+2][3]*M_hat[i*3+0][0]+M_hat[i*3+2][0]*M_hat[i*3+0][3],
-        #     M_hat[i*3+2][1]*M_hat[i*3+0][1],M_hat[i*3+2][2]*M_hat[i*3+0][1]+M_hat[i*3+2][1]*M_hat[i*3+0][2], 
-        #     M_hat[i*3+2][3]*M_hat[i*3+0][1]+ M_hat[i*3+2][1]*M_hat[i*3+0][3],M_hat[i*3+2][2]*M_hat[i*3+0][2],
-        #     M_hat[i*3+2][3]*M_hat[i*3+0][2]+M_hat[i*3+2][2]*M_hat[i*3+0][3],M_hat[i*3+2][3]*M_hat[i*3+0][3]])
-        # # 8th row
-        # a_mat[i*9+7,:] = np.array([M_hat[i*3+2][0]*M_hat[i*3+1][0],M_hat[i*3+2][1]*M_hat[i*3+1][0]+M_hat[i*3+2][0]*M_hat[i*3+1][1],
-        #     M_hat[i*3+2][2]*M_hat[i*3+1][0]+M_hat[i*3+2][0]*M_hat[i*3+1][2],M_hat[i*3+2][3]*M_hat[i*3+1][0]+M_hat[i*3+2][0]*M_hat[i*3+1][3],
-        #     M_hat[i*3+2][1]*M_hat[i*3+1][1],M_hat[i*3+2][2]*M_hat[i*3+1][1]+M_hat[i*3+2][1]*M_hat[i*3+1][2], 
-        #     M_hat[i*3+2][3]*M_hat[i*3+1][1]+ M_hat[i*3+2][1]*M_hat[i*3+1][3],M_hat[i*3+2][2]*M_hat[i*3+1][2],
-        #     M_hat[i*3+2][3]*M_hat[i*3+1][2]+M_hat[i*3+2][2]*M_hat[i*3+1][3],M_hat[i*3+2][3]*M_hat[i*3+1][3]])
-        # # 9th row
-        # a_mat[i*9+8,:] = np.array([M_hat[i*3+2][0]*M_hat[i*3+2][0],2*M_hat[i*3+2][0]*M_hat[i*3+2][1],
-        #     2*M_hat[i*3+2][0]*M_hat[i*3+2][2],2*M_hat[i*3+2][0]*M_hat[i*3+2][3],M_hat[i*3+2][1]*M_hat[i*3+2][1],
-        #     2*M_hat[i*3+2][1]*M_hat[i*3+2][2], 2*M_hat[i*3+2][1]*M_hat[i*3+2][3],M_hat[i*3+2][2]*M_hat[i*3+2][2],
-        #     2*M_hat[i*3+2][2]*M_hat[i*3+2][3],M_hat[i*3+2][3]*M_hat[i*3+2][3]])
+        for j in range(9):
+            a_mat[i*9+j, :] = flattriu(foldmat(np.dot(
+                M_hat[i*3+(j // 3), :].reshape(-1, 1), M_hat[i*3+ (j % 3), :].reshape(1, -1))))
 
         # Assemble b_mat
-        b_mat[i*9:i*9+9] = np.array([1,0,0,0,1,0,0,0,1])
+        b_mat[i*9:i*9+9] = np.eye(3).ravel()
+
+    #assert np.all(a_mat[:] == a_mat_v[:]), 'matrices produced by different methods should be same'
     # Get least squares solution to the problem
     # http://docs.scipy.org/doc/numpy/reference/generated/numpy.linalg.lstsq.html
     # lst_sol[0] is the required matrix, lst_sol[1] is sum of residuals, lst_sol[2] is the rank of coefficient matrix
-    lst_sol = np.linalg.lstsq(a_mat,b_mat)
-    return lst_sol
+    lst_sol, _, _, _ = np.linalg.lstsq(a_mat,b_mat)
+    A_At = triu2mat(lst_sol)
+    return A_At
 
 
 if __name__ == '__main__':
