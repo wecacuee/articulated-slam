@@ -106,6 +106,21 @@ def analyze_motion(M_mat,w_mat_mean):
         print "The joint is of revolute type"
     else:
         print "The joint is not purely revolute"
+
+    # Also verifying whether the translation is not full rank --> Motion along a line or on a plane
+    Umat, Emat , Vmat = np.linalg.svd(trans_est, full_matrices=True)
+    if (Emat[2]>1e-4):
+        print "Full 3D translation motion"
+    elif ((Emat[1]>1e-4) and (Emat[2]<1e-4)) :
+        # Motion on a plane, for now just determine normal from two vectors and verify by taking cross product with third translation vector
+        # Eventually follow SVD to determine normal from here http://www.ltu.se/cms_fs/1.51590!/svd-fitting.pdf
+        print "Motion on a plane with normal given by", Umat[:,2]
+    else:
+        print "Motion along a single axes"
+
+
+
+    
         
 
 
