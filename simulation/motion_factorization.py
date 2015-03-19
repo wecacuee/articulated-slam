@@ -178,7 +178,7 @@ def estimate_A_costeria(M_hat):
         # Assemble a_mat
         # 1st row
         a_mat[i*9+0, :] = flattriu(foldmat(M_hat[i*3+0, :] * M_hat[i*3+0, :].T))
-        a_mat[i*9+1, :] = flattriu(foldmat(M_hat[i*3+1, :] * M_hat[i*3+0, :].T))
+        a_mat[i*9+1, :] = flattriu(foldmat(M_hat[i*3+0, :] * M_hat[i*3+1, :].T))
         a_mat[i*9+2, :] = flattriu(foldmat(M_hat[i*3+0, :] * M_hat[i*3+2, :].T))
         a_mat[i*9+3, :] = flattriu(foldmat(M_hat[i*3+1, :] * M_hat[i*3+0, :].T))
         a_mat[i*9+4, :] = flattriu(foldmat(M_hat[i*3+1, :] * M_hat[i*3+1, :].T))
@@ -258,7 +258,7 @@ if __name__ == '__main__':
     # Pass in a bunch of commands and see how the rotation joint changes things
     # Here first 3 parameters are responsible for rotation and the next 3 for translation
     #joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,1,1,0],[0,np.pi/3,0,0,0,0],[0,np.pi/2,0,0,0,1]])
-    joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,0,0,0],[0,np.pi/3,0,0,0,0],[0,np.pi/2,0,0,0,0]])
+    joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,0,0,0],[0,np.pi/3,0,0,0,0],[0,7*np.pi/8,0,0,0,0]])
     origin = np.zeros(3)
     # Processing each motion command
     for curr_motion in joint_motion_data:
@@ -270,12 +270,14 @@ if __name__ == '__main__':
         print data
         # Collect all the data into factorization matrix
         w_mat = assemble_wmat(data,w_mat)
+        print w_mat
+        print "rank(W) = %d" % np.linalg.matrix_rank(w_mat)
         # Plotting the resulting linkage
-        fig = None;ax = None
-        (fig,ax) = uk.plot_points(sampled_pts,fig,ax)
+        # fig = None;ax = None
+        # (fig,ax) = uk.plot_points(sampled_pts,fig,ax)
 
     # Estimate shape and motion 
-    estimate_motion_shape_kanade(w_mat)
-    #estimate_motion_shape_costeria(w_mat)
+    #estimate_motion_shape_kanade(w_mat)
+    estimate_motion_shape_costeria(w_mat)
 
 
