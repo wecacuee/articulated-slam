@@ -15,7 +15,6 @@
 #include <boost/units/io.hpp>
 #include <boost/units/systems/angle/degrees.hpp>
 #include <boost/units/conversion.hpp>
-#include <pcl_ros/point_cloud.h>
 #include "brics_actuator/JointPositions.h"
 
 #include <pcl/ModelCoefficients.h>

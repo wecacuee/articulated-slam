@@ -28,9 +28,12 @@
    <!-- For the choices made for recording asus xtion data: http://wiki.ros.org/openni_launch/Tutorials/BagRecordingPlayback -->
   <!-- Defining a property to not record data by default-->
   <arg name="record_data" default="False"/>
+  
+  <!-- Defining a property for write path of the recorded data-->
+  <arg name="record_path" default="/home/surenkum/work/thesis/data/ros_recorded/data_recorded" />
   <group if="$(arg record_data)">
    <node pkg="rosbag" type="record" name="record" output="screen" 
-    args="-O /home/surenkum/work/thesis/data/ros_recorded/data_recorded camera/depth_registered/image_raw camera/depth_registered/camera_info camera/rgb/image_raw camera/rgb/camera_info">
+    args="-O $(arg record_path) camera/depth_registered/image_raw camera/depth_registered/camera_info camera/rgb/image_raw camera/rgb/camera_info">
     </node>
   </group>
 
