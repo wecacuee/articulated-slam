@@ -9,6 +9,7 @@ Given parameters corresponding to a particular shape and a shape type, this code
 Right now, the sampling is manual for testing purposes but maybe in future, we should make it automated
 '''
 def sample_points(shape_pars,shape_type):
+    samples=None
     if shape_type=='ellipse':
         # Sample the extreme points on a elliptical surface
         # takes 3 shape parameters as argument: Length of major axis along x,y and z
@@ -20,9 +21,16 @@ def sample_points(shape_pars,shape_type):
         samples = np.matrix([[0,0,0],[shape_pars[0],0,0],[shape_pars[0],shape_pars[1],0],
             [0,shape_pars[1],0],[0,0,shape_pars[2]],[shape_pars[0],0,shape_pars[2]],
             [shape_pars[0],shape_pars[1],shape_pars[2]],[0,shape_pars[1],shape_pars[2]]])
-        elif shape_type=='cylinder':
-            else:
-                print "Not a valid shape type"
+    elif shape_type=='cylinder':
+        # Sampling 4 points from one circle and 4 points from another circle end
+        # Assume that the major axes lies along the x axis for now
+
+        # Need two shape parameters : shape_pars[0] corresponds to circle radius and shape_pars[1] corresponds to length
+        samples = np.matrix([[0,-shape_pars[0],0],[0,shape_pars[0],0],[0,0,-shape_pars[0]],
+            [0,0,shape_pars[0]],[shape_pars[1],-shape_pars[0],0],[shape_pars[1],shape_pars[0],0],
+            [shape_pars[1],0,-shape_pars[0]],[shape_pars[1],0,shape_pars[0]]])
+    else:
+        print "Not a valid shape type"
         print "Allowed shape types are cuboid, ellipse and cylinder"
 
     return samples
