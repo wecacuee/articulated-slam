@@ -515,6 +515,14 @@ For general motion such as a book that can be rotated and translated anywhere in
 Analysis by method such as ours is essential in order to decompose the scene into types of motion that a robot can influence on the scene.
 For example: Understanding the way a drawer can be opened, fridge door can be opened, what can be moved around in the scene
 
+Other important use cases of motion estimation
+\begin{itemize}
+\item Estimation a joint can induce prior over objects such as revolute joint can induce prior over refrigerator and door
+\item Visual object identification such as drawer can induce a prior over motion estimation
+\item Object tracking 
+\item For grasping? -- such as how to open a door?
+\end{itemize}
+
 \section{Factorization Approach} In this section, we extend the factorization approach as described in \cite{costeira1998multibody} to 3-D track data available from a depth camera. Assuming for now that a single object moves relative to a static camera and we track features from frame to frame. Following the notation in the paper, lets represent a point on the object as $p_i^T = [X_i,Y_i,Z_i]^T$ in the camera frame, in the current frame $f$, the position of the point in homogeneous coordinates can be represented as 
 \begin{align}
 s_{fi}^C = \begin{bmatrix} 
@@ -591,28 +599,24 @@ a =1
 
 \begin{equation}
 \begin{bmatrix}
-m_{11}^2 & 2m_{11}m_{12} & 2m_{11}m_{13} & 2m_{11}m_{14}& m_{12}^2&2m_{12}m_{13}&2m_{12}m_{14}&m_{13}^2&2m_{13}m_{14}&m_{14}^2 \\
- m_{21}m_{11} & m_{21}m_{12}+m_{22}m_{11}  & m_{21}m_{13}+ m_{23}m_{11}&m_{21}m_{14}+m_{24}m_{11} & m_{22} m_{12}& m_{22}m_{13}+m_{23}m_{12}& m_{22}m_{14} +m_{24} m_{12} & m_{23}m_{13}  & m_{23}m_{14}+m_{24}m_{13} &m_{24}m_{14}\\
- m_{11}m_{31}& m_{11}m_{32} + m_{12}m_{31} & m_{13}m_{31}+m_{11}m_{33} &  m_{14}m_{31}+ m_{11}m_{34} &  m_{12}m_{32}  &  m_{13}m_{32}+ m_{12}m_{33}&  m_{14}m_{32} + m_{12}m_{34}& m_{13}m_{33} & m_{14}m_{33}+m_{13}m_{34} & m_{14}m_{34}\\
-m_{21}m_{11} & m_{22}m_{11}+m_{21}m_{12} & m_{23}m_{11}+m_{21}m_{13} & m_{24}m_{11}+m_{21}m_{14}&  m_{22}m_{12} &m_{23}m_{12}+ m_{22}m_{13} & m_{24}m_{12}+m_{22}m_{14}& m_{23}m_{13} & m_{24}m_{13} +  m_{23}m_{14} & m_{24}m_{14}\\
- m_{21}^2 & 2m_{21}m_{22} & 2m_{21}m_{23} & 2m_{21}m_{24} & m_{22}^2 & 2m_{22}m_{23} &2m_{22}m_{24} & m_{23}^2 & 2m_{23}m_{24} &m_{24}^2\\
-m_{21}m_{31} & m_{22}m_{31}+ m_{21}m_{32} & m_{23}m_{31}+m_{21}m_{33} & m_{24}m_{31}+ m_{21}m_{34} & m_{22}m_{32} & m_{23}m_{32}+ m_{22}m_{33}& m_{24}m_{32} + m_{22}m_{34}&  m_{23}m_{33} & m_{24}m_{33} +m_{23}m_{34} &m_{24}m_{34}\\
- m_{31}m_{11} & m_{32}m_{11} + m_{31}m_{12} & m_{33}m_{11}+m_{31}m_{13} & m_{34}m_{11} + m_{31}m_{14}  & m_{32}m_{12} & m_{33}m_{12}+ m_{32}m_{13}& m_{34}m_{12} + m_{32}m_{14} &  m_{33}m_{13} & m_{34}m_{13}  + m_{33}m_{14} & m_{34}m_{14}\\
-m_{31}m_{21} & m_{32}m_{21} + m_{31}m_{22} & m_{33}m_{21} +m_{31}m_{23} & m_{34}m_{21}+ m_{31}m_{24 } & m_{32}m_{22}& m_{33}m_{22}+ m_{32}m_{23} & m_{34}m_{22}+ m_{32}m_{24} & m_{33}m_{23}& m_{34}m_{23}  + m_{33}m_{24} & m_{34}m_{24}\\
- m_{31}^2 & 2m_{31}m_{32}& 2m_{31}m_{33} & 2m_{31}m_{34} & m_{32}^2 & 2m_{32}m_{33} & 2m_{32}m_{34} & m_{33}^2 & 2m_{33}m_{34} & m_{34}^2]
+m_{00}^2 & 2m_{00}m_{01} & 2m_{00}m_{02} & m_{01}^2 & 2m_{01}m_{02} & m_{02}^2 \\
+ m_{10}m_{00} & m_{10}m_{01}+ m_{11}m_{00}  & m_{10}m_{02} + m_{12}m_{00}& m_{11}m_{01} & m_{11}m_{02}  + m_{12}m_{01} & m_{12}m_{02}\\
+ m_{20}m_{00} &  m_{20}m_{01}+ m_{21}m_{00 }&   m_{20}m_{02} + m_{22}m_{00} &  m_{21}m_{01} & m_{21}m_{02} + m_{22}m_{01} & m_{22}m_{02}\\
+m_{00}m_{10} & m_{00}m_{11} + m_{01}m_{10} & m_{00}m_{12} + m_{02}m_{10} & m_{01}m_{11} & m_{01}m_{12} + m_{02}m_{11} & m_{02}m_{12}\\
+ m_{10}^2 & 2m_{10}m_{11} & 2m_{10}m_{12} &  m_{11}^2 & 2m_{11}m_{12} & m_{12}^2\\
+ m_{20}m_{10} & m_{20}m_{11}+ m_{21}m_{10} &  m_{20}m_{12}+ m_{22}m_{10} &  m_{21}m_{11}& m_{21}m_{12} + m_{22}m_{11} & m_{22}m_{12}\\
+ m_{00}m_{20} & m_{00}m_{21} + m_{01}m_{20} & m_{00}m_{22} + m_{02}m_{20} & m_{01}m_{21} & m_{01}m_{22} + m_{02}m_{21} & m_{02}m_{22}\\
+m_{10}m_{20} & m_{10}m_{21} + m_{11}m_{20} & m_{10}m_{22} + m_{12}m_{20} & m_{11}m_{21} & m_{11}m_{22} + m_{12}m_{21} & m_{12}m_{22}\\
+ m_{20}^2 & 2m_{20}m_{21}& 2m_{20}m_{22} & m_{21}^2 & 2m_{21}m_{22} & m_{22}^2
  
 \end{bmatrix} \\
 \begin{bmatrix}
+a_{00}\\
+a_{01}\\
+a_{02}\\
 a_{11}\\
 a_{12}\\
-a_{13}\\
-a_{14}\\
-a_{22}\\
-a_{23}\\
-a_{24}\\
-a_{33}\\
-a_{34}\\
-a_{44}
+a_{22}
 \end{bmatrix} = 
 \begin{bmatrix}
 1\\
@@ -630,6 +634,45 @@ a_{44}
 
 \end{tiny}
 
+
+%\begin{equation}
+%\begin{bmatrix}
+%m_{11}^2 & 2m_{11}m_{12} & 2m_{11}m_{13} & 2m_{11}m_{14}& m_{12}^2&2m_{12}m_{13}&2m_{12}m_{14}&m_{13}^2&2m_{13}m_{14}&m_{14}^2 \\
+% m_{21}m_{11} & m_{21}m_{12}+m_{22}m_{11}  & m_{21}m_{13}+ m_{23}m_{11}&m_{21}m_{14}+m_{24}m_{11} & m_{22} m_{12}& m_{22}m_{13}+m_{23}m_{12}& m_{22}m_{14} +m_{24} m_{12} & m_{23}m_{13}  & m_{23}m_{14}+m_{24}m_{13} &m_{24}m_{14}\\
+% m_{11}m_{31}& m_{11}m_{32} + m_{12}m_{31} & m_{13}m_{31}+m_{11}m_{33} &  m_{14}m_{31}+ m_{11}m_{34} &  m_{12}m_{32}  &  m_{13}m_{32}+ m_{12}m_{33}&  m_{14}m_{32} + m_{12}m_{34}& m_{13}m_{33} & m_{14}m_{33}+m_{13}m_{34} & m_{14}m_{34}\\
+%m_{21}m_{11} & m_{22}m_{11}+m_{21}m_{12} & m_{23}m_{11}+m_{21}m_{13} & m_{24}m_{11}+m_{21}m_{14}&  m_{22}m_{12} &m_{23}m_{12}+ m_{22}m_{13} & m_{24}m_{12}+m_{22}m_{14}& m_{23}m_{13} & m_{24}m_{13}+m_{23}m_{14} & m_{24}m_{14}\\
+% m_{21}^2 & 2m_{21}m_{22} & 2m_{21}m_{23} & 2m_{21}m_{24} & m_{22}^2 & 2m_{22}m_{23} &2m_{22}m_{24} & m_{23}^2 & 2m_{23}m_{24} &m_{24}^2\\
+%m_{21}m_{31} & m_{22}m_{31}+ m_{21}m_{32} & m_{23}m_{31}+m_{21}m_{33} & m_{24}m_{31}+ m_{21}m_{34} & m_{22}m_{32} & m_{23}m_{32}+ m_{22}m_{33}& m_{24}m_{32} + m_{22}m_{34}&  m_{23}m_{33} & m_{24}m_{33} +m_{23}m_{34} &m_{24}m_{34}\\
+% m_{31}m_{11} & m_{32}m_{11} + m_{31}m_{12} & m_{33}m_{11}+m_{31}m_{13} & m_{34}m_{11} + m_{31}m_{14}  & m_{32}m_{12} & m_{33}m_{12}+ m_{32}m_{13}& m_{34}m_{12} + m_{32}m_{14} &  m_{33}m_{13} & m_{34}m_{13}  + m_{33}m_{14} & m_{34}m_{14}\\
+%m_{31}m_{21} & m_{32}m_{21} + m_{31}m_{22} & m_{33}m_{21} +m_{31}m_{23} & m_{34}m_{21}+ m_{31}m_{24 } & m_{32}m_{22}& m_{33}m_{22}+ m_{32}m_{23} & m_{34}m_{22}+ m_{32}m_{24} & m_{33}m_{23}& m_{34}m_{23}  + m_{33}m_{24} & m_{34}m_{24}\\
+% m_{31}^2 & 2m_{31}m_{32}& 2m_{31}m_{33} & 2m_{31}m_{34} & m_{32}^2 & 2m_{32}m_{33} & 2m_{32}m_{34} & m_{33}^2 & 2m_{33}m_{34} & m_{34}^2]
+% 
+%\end{bmatrix} \\
+%\begin{bmatrix}
+%a_{11}\\
+%a_{12}\\
+%a_{13}\\
+%a_{14}\\
+%a_{22}\\
+%a_{23}\\
+%a_{24}\\
+%a_{33}\\
+%a_{34}\\
+%a_{44}
+%\end{bmatrix} = 
+%\begin{bmatrix}
+%1\\
+%0\\
+%0\\
+%0\\
+%1\\
+%0\\
+%0\\
+%0\\
+%1
+%\end{bmatrix}
+%\label{eq:least_sq_aat}
+%\end{equation}
 
 %\vspace{\belowdisplayskip}\hfill\rule[-6pt]{0.4pt}{6.4pt}%
 %\rule{\dimexpr(0.5\textwidth-0.5\columnsep-1pt)}{0.4pt}

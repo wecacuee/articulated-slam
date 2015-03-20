@@ -1,0 +1,16 @@
+# No pyc files
+*.pyc
+
+# No files ending in ~
+*~
+
+# Removing other tex related files
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.synctex.gz
+
+# Adding ignore commands for some of the cpp code
+*.swo
