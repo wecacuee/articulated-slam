@@ -51,6 +51,7 @@ def estimate_motion_shape_kanade(w_mat):
         A_mat = np.linalg.cholesky(A_A_t)
         # Getting the shape matrix
         S_mat = np.dot(np.linalg.inv(A_mat),S_hat)
+        print "Shape matrix is ", S_mat
         # Getting the rotation matrix
         M_mat = np.dot(M_hat,A_mat)
         ua.analyze_motion(M_mat,w_mat_mean)
@@ -191,20 +192,26 @@ def estimate_A_costeria(M_hat):
 if __name__ == '__main__':
     # To test the functions in utils_kin.py
     # Definining the articulated body in initial position
-    #sampled_pts = sample_shapes.sample_points(np.array([1,5]),'cylinder')
-    sampled_pts = sample_shapes.sample_points(np.array([1,1,1]),'ellipse')
-    first_joint = uk.Joint('f', np.zeros(6), 1,sampled_pts)
+    sampled_pts = sample_shapes.sample_points(np.array([1,5]),'cylinder')
+    #sampled_pts = sample_shapes.sample_points(np.array([1,1,1]),'ellipse')
+    #first_joint = uk.Joint('f', np.zeros(6), 1,sampled_pts)
+    first_joint = uk.Joint('p', np.zeros(4), 1,sampled_pts)
     chain = uk.JointChain(first_joint)
 
     # Initialize w_mat the matrix that is used for factorization of shape and motion
     w_mat = None
+    
+    # Test cases for prismatic joint, make sure the axes are same throughout
+    joint_motion_data = np.array([[1,1,0,0],[1,1,0,-1],[1,1,0,-1],[1,1,0,0.5],[1,1,0,1],[1,1,0,-1]])
+    
+    
     # Pass in a bunch of commands and see how the rotation joint changes things
     # Here first 3 parameters are responsible for rotation and the next 3 for translation
 
     # Test case for full translation and rotation
     #joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,1,1,0],[0,np.pi/4,0,0,1,0],[0,np.pi/3,0,0,0,0],[0,np.pi/2,0,0,0,1]])
     # Test case for translation along a plane (assume x y plane for now) and rotation
-    joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,1,1,0],[0,np.pi/4,0,0,1,0],[0,np.pi/3,0,0,0,0],[0,np.pi/2,0,1,0,0]])
+    #joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,0,1,1],[0,np.pi/4,0,0,2,2],[0,np.pi/3,0,0,3,3],[0,np.pi/2,0,0,0,0]])
     # Test case for translation along a line (assume x axes for now) and rotation
     #joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,1,0,0],[0,np.pi/4,0,2,0,0],[0,np.pi/3,0,1,0,0],[0,np.pi/2,0,0,0,0]])
     # Test case for rotation only joint
@@ -218,14 +225,14 @@ if __name__ == '__main__':
         # Getting all the points on the articulated chain
         sampled_pts, last_origin = chain.articulate(np.zeros(3))
         data = uk.matrix_pts(sampled_pts)
-        #print data
+        print data
         # Collect all the data into factorization matrix
         w_mat = assemble_wmat(data,w_mat)
         #print w_mat
         # print "rank(W) = %d" % np.linalg.matrix_rank(w_mat)
         # Plotting the resulting linkage
-        fig = None;ax = None
-        (fig,ax) = uk.plot_points(sampled_pts,fig,ax)
+        #fig = None;ax = None
+        #(fig,ax) = uk.plot_points(sampled_pts,fig,ax)
 
     # Estimate shape and motion 
     estimate_motion_shape_kanade(w_mat)

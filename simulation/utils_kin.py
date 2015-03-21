@@ -78,10 +78,13 @@ def articulated_links(joint,jointvars,length,sampled_pts,origin):
     # length - length of current link, origin - starting point of current
     # link in kinematic chain
 
+    # Can not work with joint variables being integers
+    jointvars = jointvars.astype('float')
     # Defining the geometry of the links
 
     # Rotating these links by rotation matrix
     if (joint=='r'):
+        assert(len(jointvars)==3), "Need 3 parameters for defining a rotation matrix"
         # Joint is revolute and joint variable is the rotation
         if sampled_pts is None:
             # Generating points on current link
@@ -96,6 +99,7 @@ def articulated_links(joint,jointvars,length,sampled_pts,origin):
     elif (joint=='p'):
         # Joint is prismatic, we need the axes of motion and magnitude of motion
         # jointvars first three variables are axis and fourth is the translation motion
+        assert(len(jointvars)==4), "Need 4 parameters -- 3 for direction cosines and 1 for translation"
         if sampled_pts is None:
             # Generating points on current link
             l1_pt = np.matrix(np.tile(np.linspace(0,length,10*length),(3,1)))
@@ -104,19 +108,21 @@ def articulated_links(joint,jointvars,length,sampled_pts,origin):
             l1_pt = sampled_pts
 
         norm_vec = np.sqrt(jointvars[0]**2+jointvars[1]**2+jointvars[2]**2)
+        assert(norm_vec>1e-5), "Axes of prismatic joint can not be all zero"
         dc = np.zeros([3,1])
         # Direction cosines of the prismatic joint
         dc[0] = jointvars[0]/norm_vec
         dc[1] = jointvars[1]/norm_vec
         dc[2] = jointvars[2]/norm_vec
         # Getting the points transformed according to direction cosines
-        l1_pt[:,0] = (l1_pt[:,0]+jointvars[3])*dc[0]
-        l1_pt[:,1]= (l1_pt[:,1]+jointvars[3])*dc[1]
-        l1_pt[:,2] =(l1_pt[:,2]+jointvars[3])*dc[2]
+        l1_pt[:,0] = l1_pt[:,0]+(jointvars[3]*dc[0])
+        l1_pt[:,1]= l1_pt[:,1]+(jointvars[3]*dc[1])
+        l1_pt[:,2] =l1_pt[:,2]+(jointvars[3]*dc[2])
         # Translation outwards
         # For inward translation it would be be 1-k
-    
+
     elif (joint=='f'):
+        assert(len(jointvars)==6), "Need 6 parameters -- 3 for rotation and 3 for translation"
         # Allow full motion range : Combination of translation and rotation
         # Sampling points if points are not sampled 
         if sampled_pts is None:
