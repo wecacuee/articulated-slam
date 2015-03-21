@@ -1,5 +1,6 @@
 # No pyc files
 *.pyc
+*.py.swp
 
 # No files ending in ~
 *~

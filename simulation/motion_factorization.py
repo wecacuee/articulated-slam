@@ -191,6 +191,7 @@ def estimate_A_costeria(M_hat):
 if __name__ == '__main__':
     # To test the functions in utils_kin.py
     # Definining the articulated body in initial position
+    #sampled_pts = sample_shapes.sample_points(np.array([1,5]),'cylinder')
     sampled_pts = sample_shapes.sample_points(np.array([1,1,1]),'ellipse')
     first_joint = uk.Joint('f', np.zeros(6), 1,sampled_pts)
     chain = uk.JointChain(first_joint)
@@ -201,9 +202,9 @@ if __name__ == '__main__':
     # Here first 3 parameters are responsible for rotation and the next 3 for translation
 
     # Test case for full translation and rotation
-    #joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,1,1,0],[0,np.pi/4,0,0,1,0],[0,np.pi/3,0,0,0,0],[0,np.pi/2,0,0,0,1]])
+    joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,1,1,0],[0,np.pi/4,0,0,1,0],[0,np.pi/3,0,0,0,0],[0,np.pi/2,0,0,0,1]])
     # Test case for translation along a plane (assume x y plane for now) and rotation
-    joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,1,1,0],[0,np.pi/4,0,0,1,0],[0,np.pi/3,0,0,0,0],[0,np.pi/2,0,1,0,0]])
+    #joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,1,1,0],[0,np.pi/4,0,0,1,0],[0,np.pi/3,0,0,0,0],[0,np.pi/2,0,1,0,0]])
     # Test case for translation along a line (assume x axes for now) and rotation
     #joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,1,0,0],[0,np.pi/4,0,2,0,0],[0,np.pi/3,0,1,0,0],[0,np.pi/2,0,0,0,0]])
     # Test case for rotation only joint
@@ -223,11 +224,11 @@ if __name__ == '__main__':
         #print w_mat
         # print "rank(W) = %d" % np.linalg.matrix_rank(w_mat)
         # Plotting the resulting linkage
-        # fig = None;ax = None
-        # (fig,ax) = uk.plot_points(sampled_pts,fig,ax)
+        fig = None;ax = None
+        (fig,ax) = uk.plot_points(sampled_pts,fig,ax)
 
     # Estimate shape and motion 
     estimate_motion_shape_kanade(w_mat)
-    estimate_motion_shape_costeria(w_mat)
+    #estimate_motion_shape_costeria(w_mat)
 
 
