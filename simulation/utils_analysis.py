@@ -105,8 +105,8 @@ def analyze_motion(M_mat,w_mat_mean):
     trans_est = np.zeros((3,(w_mat_mean.shape[0]/3)-1))
     for i, R_rel in enumerate(analyze_rotation(M_mat)):
         # Removing the part of rotation from the mean track estimates to figure out the rotation and translation part
-        trans_est[:,i-1] = np.squeeze(np.asarray(w_mat_mean[i*3:(i+1)*3]-np.dot(R_rel,w_mat_mean[0:3])))
-        print "Translation w.r.t to the first frame is ",trans_est[:,i-1]
+        trans_est[:,i] = np.squeeze(np.asarray(w_mat_mean[(i+1)*3:(i+2)*3]-np.dot(R_rel,w_mat_mean[0:3])))
+        print "Translation w.r.t to the first frame is ",trans_est[:,i]
     # Checking whether the joint can be modeled as a revolute joint only
     if (np.max(np.mean(np.abs(trans_est),1))<1e-2):
         print "The joint is of revolute type"

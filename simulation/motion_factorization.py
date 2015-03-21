@@ -202,9 +202,9 @@ if __name__ == '__main__':
     # Here first 3 parameters are responsible for rotation and the next 3 for translation
 
     # Test case for full translation and rotation
-    joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,1,1,0],[0,np.pi/4,0,0,1,0],[0,np.pi/3,0,0,0,0],[0,np.pi/2,0,0,0,1]])
+    #joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,1,1,0],[0,np.pi/4,0,0,1,0],[0,np.pi/3,0,0,0,0],[0,np.pi/2,0,0,0,1]])
     # Test case for translation along a plane (assume x y plane for now) and rotation
-    #joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,1,1,0],[0,np.pi/4,0,0,1,0],[0,np.pi/3,0,0,0,0],[0,np.pi/2,0,1,0,0]])
+    joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,1,1,0],[0,np.pi/4,0,0,1,0],[0,np.pi/3,0,0,0,0],[0,np.pi/2,0,1,0,0]])
     # Test case for translation along a line (assume x axes for now) and rotation
     #joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,1,0,0],[0,np.pi/4,0,2,0,0],[0,np.pi/3,0,1,0,0],[0,np.pi/2,0,0,0,0]])
     # Test case for rotation only joint
