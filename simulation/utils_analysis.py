@@ -90,7 +90,7 @@ def analyze_rotation(M_mat):
         R_rel = M_mat[i*3:(i+1)*3,:]*np.transpose(M_mat[0:3,:])
         # Getting euler angles of this rotation matrix
         (z,y,x) = mat2euler(R_rel)
-        print "Rotation w.r.t to the first frame in Euler angles is ",z,y,x
+        print "Rotation w.r.t to the first frame in Euler angles is ",'%.2f' %z,'%.2f'%y,'%.2f'%x
         yield R_rel
 
 '''
@@ -99,10 +99,12 @@ rotation and/or translation (in case of full 6-D motion) of all the frames relat
 Input: Expects the motion matrix as estimated by the factorization process and mean of the measurement matrix
 '''
 def analyze_motion(M_mat,w_mat_mean):
+    # Set printing options
+    np.set_printoptions(precision=3)
     # To store the results from the translation estimation part
     trans_est = np.zeros((3,(w_mat_mean.shape[0]/3)-1))
     for i, R_rel in enumerate(analyze_rotation(M_mat)):
-        # Removing the part of rotation from the mean track estimates to figure outthe rotation and translation part
+        # Removing the part of rotation from the mean track estimates to figure out the rotation and translation part
         trans_est[:,i-1] = np.squeeze(np.asarray(w_mat_mean[i*3:(i+1)*3]-np.dot(R_rel,w_mat_mean[0:3])))
         print "Translation w.r.t to the first frame is ",trans_est[:,i-1]
     # Checking whether the joint can be modeled as a revolute joint only
