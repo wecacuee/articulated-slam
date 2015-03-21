@@ -122,7 +122,7 @@ def analyze_motion(M_mat,w_mat_mean):
         # Eventually follow SVD to determine normal from here http://www.ltu.se/cms_fs/1.51590!/svd-fitting.pdf
         print "Motion on a plane with normal given by", Umat[:,2]
     else:
-        print "Motion along a single axes"
+        print "Motion along a single axes with the axes given by ", Umat[:,0]
 
 
 
