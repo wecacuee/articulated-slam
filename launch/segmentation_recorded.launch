@@ -26,6 +26,8 @@
 
  <!-- Launch the current node-->
  <node pkg="aae" type="segment" name="segment" output="screen">
+<!-- Load all the configuration parameters from the .yaml file-->
+<rosparam file="$(find aae)/config/parameters.yaml" command="load"/>
   </node>
  
 <!-- Play the recorded ros file-->
@@ -33,7 +35,7 @@
 <!-- Declare the filename argument-->
 <arg name="fname" default="/home/surenkum/work/thesis/data/ros_recorded/data_recorded_door.bag"/>
  <node pkg="rosbag" type="play" name="ros_play" output="screen" 
-  args="--clock $(arg fname)">
+  args="--clock $(arg fname) --start 20"> <!-- start parameter is used to start the processing of recorded data from certain time -->
   </node>
 
 </launch>

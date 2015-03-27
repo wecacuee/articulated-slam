@@ -1,0 +1,2 @@
+# Give the poses that the robot must go through
+arm_initialize: False

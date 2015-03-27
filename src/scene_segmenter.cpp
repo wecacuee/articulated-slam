@@ -33,7 +33,19 @@ void Scene_Segmenter::initParams(){
   robot_arm = node.advertise<brics_actuator::JointPositions> ("/arm_1/arm_controller/position_command",1);
   // Created a subscriber here
   sub = node.subscribe("/camera/depth_registered/points", 1, &Scene_Segmenter::voxel_filtering, this);
-  arm_initialized = false;
+  // Getting the parameter from yaml file if the arm needs to be initialized
+  bool arm_config; // This parameter is to decide whether the configuration files
+  // requires one to initialize the arm
+  node.getParam("/segment/arm_initialize",arm_config);
+  if (arm_config){
+    arm_initialized = false;
+    ROS_INFO_STREAM("The arm will be moved to the viewing position");
+  }
+  else{
+    arm_initialized = true;
+    ROS_INFO_STREAM("The arm will not be moved");
+  }
+
 
 }
 
@@ -50,7 +62,8 @@ void Scene_Segmenter::move_arm(std::vector<float>& arm_position){
     armJointPositions[i].joint_uri = jointName.str();
     armJointPositions[i].value = arm_position[i];
     armJointPositions[i].unit = boost::units::to_string(boost::units::si::radians);
-    std::cout << "Joint " << armJointPositions[i].joint_uri << " = " << armJointPositions[i].value << " " << armJointPositions[i].unit << std::endl;
+    std::cout << "Joint " << armJointPositions[i].joint_uri << " = " << armJointPositions[i].value
+      << " " << armJointPositions[i].unit << std::endl;
 
   }
   command.positions = armJointPositions;
@@ -104,7 +117,8 @@ void Scene_Segmenter::voxel_filtering(const sensor_msgs::PointCloud2ConstPtr& cl
 
     // Get the points associated with the planar surface
     extract.filter (*cloud_plane);
-    //std::cout << "PointCloud representing the planar component: " << cloud_plane->points.size () << " data points." << std::endl;
+    //std::cout << "PointCloud representing the planar component: " << cloud_plane->points.size ()
+    //<< " data points." << std::endl;
 
     *cloud_filtered = *cloud_plane;
     
