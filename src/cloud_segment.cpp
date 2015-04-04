@@ -2,6 +2,11 @@
 #include<signal.h>
 
 /* Creating a custom SIGINT call*/
+/**
+ * @brief Creating a custom SIGINT call
+ *
+ * @param sig sigint call
+ */
 void mySigintHandler(int sig){
 
   ROS_INFO("I got orders to shutdown now");

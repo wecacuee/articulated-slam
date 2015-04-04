@@ -103,8 +103,13 @@ include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
 #   src/${PROJECT_NAME}/aae.cpp
 # )
 
+## include all the source code files
+file(GLOB target_files
+    "src/*.cpp"
+    )
+
 ## Declare a cpp executable
-add_executable(segment src/scene_segmenter.cpp src/cloud_segment.cpp )
+add_executable(segment ${target_files})
 #add_executable(segment src/cloud_segment.cpp )
 
 ## Add cmake target dependencies of the executable/library
