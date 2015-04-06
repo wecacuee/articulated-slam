@@ -34,6 +34,8 @@ void Scene_Segmenter::initParams(){
     // Initialized all the publisher here
     pub = node.advertise<sensor_msgs::PointCloud2> ("/segmented_plane", 1);
     sensor_pose.display_motion = node.advertise<sensor_msgs::PointCloud2> ("/motion_outliers", 1);
+    sensor_pose.display_transformed = node.advertise<sensor_msgs::PointCloud2> ("/motion_transformed", 1);
+    sensor_pose.display_prev = node.advertise<sensor_msgs::PointCloud2> ("/display_prev", 1);
     robot_arm = node.advertise<brics_actuator::JointPositions> ("/arm_1/arm_controller/position_command",1);
     
     // Initialize all the subscriber here

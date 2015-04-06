@@ -11,9 +11,14 @@ ROS package to segment articulated objects from a scene
 [] Do floor segmentation and try Euclidean clustering and visualization
 
 # Usage
+
+Make the python file get_data.py executable and run the code to get data
+
+chmod +x get_data.py && ./get_data.py
+
 For recorded bag use 
 
-roslaunch aae segmentation_recorded.launch fname:=/home/surenkum/work/thesis/data/ros_recorded/data_recorded.bag
+roslaunch aae segmentation_recorded.launch 
 
 where fname is the full path of rosbag recorded file
 

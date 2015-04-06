@@ -8,8 +8,11 @@ Camera_Pose::Camera_Pose(void){
     // To check if previous cloud has been set -- used for calculating the differential motion
     initialized = false;
     // Initializing a boost shared pointer for storing the previous cloud
+    // Following the boost guidelines for assigning a pointer
     cloudrgbptr dummy_ptr(new cloudrgb());
     cloud_prev = dummy_ptr;
+    cloudrgbptr dummy_ptr_1(new cloudrgb());
+    cloud_prev_icp = dummy_ptr_1;
     // Default method of evaluating the difference between clouds is dist_thresh
     diff_method = "dist_thresh"; // Available methods: "diff_octree", "dist_thresh"
     diff_thresh = 0.5;
@@ -21,30 +24,28 @@ Camera_Pose::Camera_Pose(void){
  * @param cloud The input cloud from the current frame
  */
 void Camera_Pose::get_pose(const sensor_msgs::PointCloud2ConstPtr& cloud){
+
     // For removing NaN indices    
-    std::vector <int> indices1,indices2;
+    std::vector <int> indices;
+    // To get the raw input cloud
+    cloudrgbptr cloud_in(new cloudrgb());
+    cloudrgbptr cloud_aligned(new cloudrgb()); // Required due to ICP
+    pcl::fromROSMsg(*cloud,*cloud_in); 
+    // Raw input cloud seems to have NaNs and InFs -- doesn't work with ICP
+    cloudrgbptr cloud_in_icp(new cloudrgb());
+    // removeNaNFromPointCloud is a terrible function because your point cloud is no more organized 
+    pcl::removeNaNFromPointCloud(*cloud_in,*cloud_in_icp,indices);
     //ros::Time start_time = ros::Time::now();
+
     // If the previous cloud has not been set then the tranformation is I
     if (initialized){
-        // To get the raw input cloud
-        cloudrgbptr cloud_in(new cloudrgb());
-        pcl::fromROSMsg(*cloud,*cloud_in);
-
-        
-        // Raw input cloud seems to have NaNs and InFs -- doesn't work with ICP
-        cloudrgbptr cloud_in_icp(new cloudrgb());
-        cloudrgbptr cloud_prev_icp(new cloudrgb());
-        // removeNaNFromPointCloud is a terrible function because your point cloud is no more organized 
-        pcl::removeNaNFromPointCloud(*cloud_in,*cloud_in_icp,indices1);
-        pcl::removeNaNFromPointCloud(*cloud_prev,*cloud_prev_icp,indices2);
-
-        // Get ICP
+        // Get Pose using ICP
         pcl::IterativeClosestPoint<pcl::PointXYZRGB,pcl::PointXYZRGB> icp;
         icp.setInputSource(cloud_in_icp);
         icp.setInputTarget(cloud_prev_icp);
         // Setting other paramters of ICP
         icp.setMaximumIterations(3);
-        icp.align(*cloud_prev_icp);
+        icp.align(*cloud_aligned);
         // Check if ICP actually converged
         if (icp.hasConverged()){
             // Getting the pose estimate
@@ -59,18 +60,27 @@ void Camera_Pose::get_pose(const sensor_msgs::PointCloud2ConstPtr& cloud){
         else{
             ROS_INFO_STREAM("ICP didn't converge for current frame");
         }
-        
-        // Resetting the previous cloud to the current cloud input
-        copyPointCloud(*cloud_in,*cloud_prev);
+
         //ros::Time end_time = ros::Time::now();
-        //std::cout<<"Time difference measuresed is "<<end_time-start_time<<std::endl;
+        //std::cout<<"Time difference measuresed is "<<end_time-start_time<<std::endl;    // Converting to ROS sensor_msgs::PointCloud2 for display
+        sensor_msgs::PointCloud2 transformed_cloud_ros;
+
+        //Convert the pcl cloud back to rosmsg
+        pcl::toROSMsg(*cloud_prev, transformed_cloud_ros);
+        //Set the header of the cloud
+        transformed_cloud_ros.header.frame_id = cloud_prev->header.frame_id;
+        // Publish the data
+        //You may have to set the header frame id of the cloud_processed also
+        display_prev.publish (transformed_cloud_ros);
+
     }
     else{
         initialized = true;
-        // Set the input cloud for the previous frame
-        pcl::fromROSMsg(*cloud,*cloud_prev);
-
     }
+
+    // Resetting the previous cloud to the current cloud input
+    copyPointCloud(*cloud_in,*cloud_prev);
+    copyPointCloud(*cloud_in_icp,*cloud_prev_icp);
 }
 
 /**
@@ -79,17 +89,31 @@ void Camera_Pose::get_pose(const sensor_msgs::PointCloud2ConstPtr& cloud){
  */
 void Camera_Pose::subtract_clouds(const cloudrgbptr inp_cloud){
 
-    // Following the tutorial : http://www.pointclouds.org/documentation/tutorials/octree_change.php
-
     // Verifying that the clouds have same width and height
     assert(inp_cloud->width==cloud_prev->width);
     assert(inp_cloud->height==cloud_prev->height);
+    // Align the clouds by using the determined camera pose
+    cloudrgbptr transformed_cloud(new cloudrgb());
+    // Ref: http://docs.pointclouds.org/1.7.1/transforms_8hpp_source.html
+    pcl::transformPointCloud(*cloud_prev_icp,*transformed_cloud,pose_estimates.back());
+    // Converting to ROS sensor_msgs::PointCloud2 for display
+    sensor_msgs::PointCloud2 transformed_cloud_ros;
+
+    //Convert the pcl cloud back to rosmsg
+    pcl::toROSMsg(*transformed_cloud, transformed_cloud_ros);
+    //Set the header of the cloud
+    transformed_cloud_ros.header.frame_id = cloud_prev->header.frame_id;
+    // Publish the data
+    //You may have to set the header frame id of the cloud_processed also
+    display_transformed.publish (transformed_cloud_ros);
+
 
     // PCL point type to store the outlier data
     cloudrgbptr motion_outliers;
     motion_outliers.reset (new pcl::PointCloud<pcl::PointXYZRGB>(*inp_cloud) );
 
     if (diff_method.compare("diff_octree")==0){
+        // Following the tutorial : http://www.pointclouds.org/documentation/tutorials/octree_change.php
         ROS_INFO_STREAM("Using diff octree to compare two point clouds");
         // To store index of points that are outliers
         std::vector<int> newPointIdxVector;
@@ -139,14 +163,14 @@ void Camera_Pose::subtract_clouds(const cloudrgbptr inp_cloud){
     else{
         ROS_INFO_STREAM("No valid point cloud comparision method found");
     }
-    
+
     // Converting to ROS sensor_msgs::PointCloud2 for display
     sensor_msgs::PointCloud2 cloud_processed;
 
     //Convert the pcl cloud back to rosmsg
     pcl::toROSMsg(*motion_outliers, cloud_processed);
     //Set the header of the cloud
-    cloud_processed.header.frame_id = cloud_prev->header.frame_id;
+    cloud_processed.header.frame_id = inp_cloud->header.frame_id;
     // Publish the data
     //You may have to set the header frame id of the cloud_processed also
     display_motion.publish (cloud_processed);

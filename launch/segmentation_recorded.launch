@@ -36,9 +36,22 @@
 	<!-- Play the recorded ros file-->
 	<!-- For the choices made for recording asus xtion data: http://wiki.ros.org/openni_launch/Tutorials/BagRecordingPlayback -->
 	<!-- Declare the filename argument-->
-	<arg name="fname" default="/home/surenkum/work/thesis/data/ros_recorded/data_recorded_door.bag"/>
+	<arg name="fname" default="$(find aae)/ros_recorded/data_recorded_door.bag"/>
 	<node pkg="rosbag" type="play" name="ros_play" output="screen" 
 		args="--clock $(arg fname) --start 10"> <!-- start parameter is used to start the processing of recorded data from certain time -->
-	</node>
+    </node>
+  
+  <!-- Record the neccesary topics-->
+   <!-- For the choices made for recording asus xtion data: http://wiki.ros.org/openni_launch/Tutorials/BagRecordingPlayback -->
+  <!-- Defining a property to not record data by default-->
+  <arg name="record_data" default="False"/>
+  
+  <!-- Defining a property for write path of the recorded data-->
+  <arg name="record_path" default="$(find aae)/ros_recorded/data_recorded" />
+  <group if="$(arg record_data)">
+   <node pkg="rosbag" type="record" name="record" output="screen" 
+       args="-O $(arg record_path) /motion_outliers /motion_transformed /display_prev /camera_rgb/camera_info">
+    </node>
+  </group>
 
 </launch>
