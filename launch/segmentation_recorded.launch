@@ -50,7 +50,7 @@
   <arg name="record_path" default="$(find aae)/ros_recorded/data_recorded" />
   <group if="$(arg record_data)">
    <node pkg="rosbag" type="record" name="record" output="screen" 
-       args="-O $(arg record_path) /motion_outliers /motion_transformed /display_prev /camera_rgb/camera_info">
+       args="-O $(arg record_path) /motion_outliers /motion_transformed /display_prev /camera/rgb/camera_info /tf">
     </node>
   </group>
 
