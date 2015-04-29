@@ -40,11 +40,6 @@ class RigidMotions(object):
         for T in self.trajectory:
             yield self.rb.get_landmarks(T)
 
-class Trajectory(object):
-    """ A list of transforms """
-    def __init__(self, transforms):
-        self._transforms = transforms
-
 def static_trajectory(Tinit, n):
     """ Static trajectory for n frames """
     for i in xrange(n):
