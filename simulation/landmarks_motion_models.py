@@ -65,7 +65,7 @@ class Static_Landmark(Motion_Models):
         # Asserting that we have a model
         assert(self.model_par is not None),'Do not call this functin until we have sufficient data to estimate a model'
         # Keeping the same parameters for now
-        #self.model_par = self.model_par # To Do: Update the parameters location online
+        self.model_par = self.model_par # To Do: Update the parameters location online
         print "Updated Model paramters are", self.model_par
     def predict_model(self):
         # Asserting that we have a model
@@ -92,8 +92,8 @@ if __name__=="__main__":
     print model1.model_par,model1.predict_model(),model1.model_data
     data1 = np.array([1.2,3.2])
     model1.process_inp_data(data1)
-    print model1.model_par,model1.predict_model(),model1.model_data
+    print model1.model_par
     data2 = np.array([1.1,2.5])
     model1.process_inp_data(data2)
-    print model1.model_par,model1.predict_model(),model1.model_data
+    print model1.model_par
 
