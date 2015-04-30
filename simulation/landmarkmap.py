@@ -205,7 +205,7 @@ def T_from_angle_pos(theta, pos):
                      [-np.sin(theta), np.cos(theta), pos[1]],
                     [0,            0,               1]])
 
-def get_robot_observation(lmmap, robtraj, maxangle, maxdist, lmvis=None):
+def get_robot_observations(lmmap, robtraj, maxangle, maxdist, lmvis=None):
     """ Return a tuple of r, theta and ids for each frame"""
     for ldmks, posdir in itertools.izip(lmmap.get_landmarks(), 
                                        robtraj):
@@ -222,7 +222,7 @@ def get_robot_observation(lmmap, robtraj, maxangle, maxdist, lmvis=None):
         dir = posdir[1]
         angles = np.arccos(dir.dot((selected_ldmks - pos))/dists)
         ldmks_idx = np.where(in_view_ldmks)
-        yield (dists, angles, ldmks_idx)
+        yield (dists, angles, ldmks_idx[0])
 
 def map_from_conf(map_conf):
     """ Generate LandmarkMap from configuration """
@@ -284,7 +284,7 @@ if __name__ == '__main__':
                                np.pi/100)
 
     # to get the landmarks with ids that are being seen by robot
-    for r, theta, id in get_robot_observation(lmmap, robtraj, 
+    for r, theta, id in get_robot_observations(lmmap, robtraj, 
                                               # angle on both sides of robot dir
                                               45*np.pi/180, 
                                               # max distance in pixels
