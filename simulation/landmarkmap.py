@@ -119,11 +119,19 @@ def robot_trajectory(positions, nframes, angular_vel):
         dir = (tp - fp) / vnorm(tp-fp)
 
         if prev_dir is not None:
-            from_dir = prev_dir
+            #import pdb;pdb.set_trace()
             to_dir = dir
-            while np.abs(1-dir.dot(to_dir)) < 1e-5:
+            dir = prev_dir
+            # Checks if dir is still on the same side of to_dir as prev_dir
+            # Uses the fact that cross product is a measure of sine of
+            # differences in orientation. As long as sine of the two
+            # differences is same, the product is +ve and the robot must
+            # keep rotating otherwise we have rotated too far and we must
+            # stop.
+            while np.cross(dir, to_dir) * np.cross(prev_dir, to_dir) > 0:
                 dir = R2D_angle(angular_vel).dot(dir)
                 yield (pos, dir)
+            dir = to_dir
 
         for i in range(nf+1):
             pos = fp + (tp - fp) * i / nf
@@ -197,6 +205,39 @@ def T_from_angle_pos(theta, pos):
                      [-np.sin(theta), np.cos(theta), pos[1]],
                     [0,            0,               1]])
 
+def get_robot_observation(lmmap, robtraj, maxangle, maxdist, lmvis=None):
+    """ Return a tuple of r, theta and ids for each frame"""
+    for ldmks, posdir in itertools.izip(lmmap.get_landmarks(), 
+                                       robtraj):
+        robview = RobotView(posdir[0], posdir[1], maxangle, maxdist)
+        if lmvis is not None:
+            img = lmvis.genframe(ldmks, robview)
+            img = lmvis.drawrobot(robview, img)
+            cv2.imshow(lmvis._name, img)
+            cv2.waitKey(30)
+        in_view_ldmks = robview.in_view(ldmks)
+        selected_ldmks = ldmks[:, in_view_ldmks]
+        pos = posdir[0].reshape(2,1)
+        dists = np.sqrt(np.sum((selected_ldmks - pos)**2, 0))
+        dir = posdir[1]
+        angles = np.arccos(dir.dot((selected_ldmks - pos))/dists)
+        ldmks_idx = np.where(in_view_ldmks)
+        yield (dists, angles, ldmks_idx)
+
+def map_from_conf(map_conf):
+    """ Generate LandmarkMap from configuration """
+    rmlist = []
+    for rmconf in map_conf:
+        ldmks = landmarks_from_rectangle(rmconf['nsamples'], rmconf['shape'])
+        traj = dyn_trajectory(T_from_angle_pos(rmconf['inittheta'],
+                                               rmconf['initpos']),
+                              T_from_angle_pos(rmconf['deltheta'],
+                                               rmconf['delpos']),
+                              nframes)
+        rm = RigidMotions(RigidBody2D(ldmks), traj)
+        rmlist.append(rm)
+
+    return LandmarkMap(rmlist)
 
 if __name__ == '__main__':
     """ Run to see visualization of a dynamic map"""
@@ -237,19 +278,18 @@ if __name__ == '__main__':
                      delpos=[0, 0])
                ]
 
-    rmlist = []
-    for rmconf in map_conf:
-        ldmks = landmarks_from_rectangle(rmconf['nsamples'], rmconf['shape'])
-        traj = dyn_trajectory(T_from_angle_pos(rmconf['inittheta'],
-                                               rmconf['initpos']),
-                              T_from_angle_pos(rmconf['deltheta'],
-                                               rmconf['delpos']),
-                              nframes)
-        rm = RigidMotions(RigidBody2D(ldmks), traj)
-        rmlist.append(rm)
-
-    lmmap = LandmarkMap(rmlist)
+    lmmap = map_from_conf(map_conf)
     lmv = LandmarksVisualizer([0,0], [110, 140])
     robtraj = robot_trajectory(np.array([[20, 130], [50,100], [35,50]]), [250, 250],
                                np.pi/100)
-    lmv.visualizemap_with_robot(lmmap, robtraj)
+
+    # to get the landmarks with ids that are being seen by robot
+    for r, theta, id in get_robot_observation(lmmap, robtraj, 
+                                              # angle on both sides of robot dir
+                                              45*np.pi/180, 
+                                              # max distance in pixels
+                                              40,
+                                              # Do not pass visualizer to
+                                              # disable visualization
+                                              lmv): 
+        print r, theta, id
