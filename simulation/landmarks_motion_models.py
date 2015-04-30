@@ -58,7 +58,7 @@ class Static_Landmark(Motion_Models):
         assert(self.num_data>=self.min_data_samples),"Can not call this function until we have sufficient data to estimate the model"
         # Fitting a static model using maximum likelihood
         print "Fitting the motion model"
-        self.model_par = self.model_data[-1,:]
+        self.model_par = self.model_data[-1,:].copy()
         print "Estimated Model paramters are", self.model_par
     def update_model_pars(self):
         print "Input for Updated Model paramters are", self.model_par
