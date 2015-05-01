@@ -53,20 +53,27 @@ class Static_Landmark(Motion_Models):
         # asserting that we have atleast the minimum required observation for estimation
         assert(self.num_data>=self.min_data_samples),"Can not call this function until we have sufficient data to estimate the model"
         # Fitting a static model using maximum likelihood
-        print "Fitting the motion model"
         self.model_par = self.model_data[-1,:].copy()
-        print "Estimated Model paramters are", self.model_par
+        print "Estimated Model paramters for static model are", self.model_par
     def update_model_pars(self):
         # Asserting that we have a model
         assert(self.model_par is not None),'Do not call this function until we have sufficient data to estimate a model'
         # Keeping the same parameters for now
         self.model_par = self.model_par # To Do: Update the parameters location online
-        print "Updated Model paramters are", self.model_par
-    def predict_model(self):
+    def predict_model(self,x_k = None):
         # Asserting that we have a model
         assert(self.model_par is not None),'Do not call this function until we have sufficient data to estimate a model'
-        # Predicting the location of the static landmark by adding gaussian noise
-        return np.random.multivariate_normal(self.model_par,noise_cov)
+        # State model is x[k+1] = x[k] + w_1; y[k+1] = y[k] +w_2 , where w_1 and w_2 are noise in x and y dir
+        if x_k is None:
+            # If no previous state is passed, assume its the last data point
+            x_k = self.model_data[-1,:]
+        mean_x = x_k[0] 
+        mean_y = x_k[1]
+        # Forward Sample -- Includes noise
+        # np.random.multivariate_normal(self.model_par,noise_cov)
+        
+        # Returning just the mean state for now
+        return np.array([mean_x,mean_y])
 
 
 # Landmark motion model that is moving in a circular motion with uniform velocity
@@ -78,11 +85,10 @@ class Revolute_Landmark(Motion_Models):
         # Fitting a prismatic model using maximum likelihood
         # Model consists of x_0,y_0,r,theta_0,w_l : center x, center y, radius,start_angle, angular velocity
         # Model is x_k = x_0+r\cos(\theta_0+n*w_l), y_k = y_0+r\sin(\theta_0+n*w_l) where n = 0,...,t are time steps
-        print "Fitting the motion model"
         x0 = np.array([0,0,0,0,0])
         res = minimize(self.ml_model,x0,options={'xtol':1e-8,'disp': True})
         self.model_par = res.x
-        print "Estimated Model paramters are", self.model_par
+        print "Estimated Model paramters for revolute are", self.model_par
 
     # Defining the maximum likelihood model
     def ml_model(self,x):
@@ -97,14 +103,30 @@ class Revolute_Landmark(Motion_Models):
         # Keeping the same parameters for now
         self.model_par = self.model_par # To Do: Update the parameters location online
         print "Updated Model paramters are", self.model_par
-    def predict_model(self):
+    def predict_model(self,x_k = None):
         # Asserting that we have a model
         assert(self.model_par is not None),'Do not call this function until we have sufficient data to estimate a model'
-        # Predicting the location of the static landmark by adding gaussian noise
+        if x_k is None:
+            # If no previous state is passed, assume its the last data point
+            x_k = self.model_data[-1,:]
+        
+        # State model is x[k+1] = x[k]*cos(w)-y[k]*sin(w)-x_0*cos(w)+y_0*sin(w)+x_0 + w_1;
+        # y[k+1] = x[k]*sin(w)+y[k]*cos(w)-x_0*sin(w)-y_0*cos(w)+y_0 + w_2 ,
+        # where w_1 and w_2 are noise in x and y dir
+        w = self.model_par[4]
+        x_0 = self.model_par[0]
+        y_0 = self.model_par[1]
+        mean_x = x_k[0]*np.cos(w)-x_k[1]*np.sin(w)-x_0*np.cos(w)+y_0*np.sin(w)+x_0
+        mean_y = x_k[0]*np.sin(w)+x_k[1]*np.cos(w)-x_0*np.sin(w)-y_0*np.cos(w)+y_0
+        # Forward Sample -- Includes noise
+        # np.random.multivariate_normal(np.array([mean_x,mean_y]),noise_cov)
+        '''
         mean_x = self.model_par[2]*np.cos(self.model_par[3]+self.model_par[4]*self.num_data)+self.model_par[0]
         mean_y = self.model_par[2]*np.sin(self.model_par[3]+self.model_par[4]*self.num_data)+self.model_par[1]
-        print "Mean Prediction is", mean_x,mean_y
-        return np.random.multivariate_normal(np.array([mean_x,mean_y]),noise_cov)
+        '''
+        # Returning just the mean state for now
+        return np.array([mean_x,mean_y])
+
 
 
 # Landmark motion model that is moving along a line with specified velocity
@@ -115,13 +137,17 @@ class Prismatic_Landmark(Motion_Models):
         assert(self.num_data>=self.min_data_samples),"Can not call this function until we have sufficient data to estimate the model"
         # Fitting a prismatic model using maximum likelihood
         # Model consists of x_0,y_0,\theta,v_l : Starting x, starting y, slope, velocity along line
-        # Model is x_k = n*v_l\cos(\theta)+x_0, y_k = n*v_l\cos(\theta)+y_0 where n = 0,...,t are time steps
+        # Model is x_k = n*v_l\cos(\theta)+x_0, y_k = n*v_l\sin(\theta)+y_0 where n = 0,...,t are time steps
         print "Fitting the motion model"
         v_l_guess = np.sqrt((self.model_data[1,0]-self.model_data[0,0])**2+(self.model_data[1,1]-self.model_data[0,1])**2)
         x0 = np.array([self.model_data[0,0],self.model_data[0,1],0,v_l_guess])
         res = minimize(self.ml_model,x0,options={'xtol':1e-8,'disp': True})
+
+        # Vikas: Please verify what should we use as minimum
+        # We need a lower threshold on linear velocity because otherwise a static landmark is a prismatic with zero velocity in any direction
+
         self.model_par = res.x
-        print "Estimated Model paramters are", self.model_par
+        print "Estimated Model paramters for prismatic are", self.model_par
 
     # Defining the maximum likelihood model
     def ml_model(self,x):
@@ -136,25 +162,41 @@ class Prismatic_Landmark(Motion_Models):
         # Keeping the same parameters for now
         self.model_par = self.model_par # To Do: Update the parameters location online
         print "Updated Model paramters are", self.model_par
-    def predict_model(self):
+    def predict_model(self,x_k = None):
         # Asserting that we have a model
         assert(self.model_par is not None),'Do not call this function until we have sufficient data to estimate a model'
-        # Predicting the location of the static landmark by adding gaussian noise
-        mean_x = self.num_data*self.model_par[3]*np.cos(self.model_par[2])+self.model_par[0]
-        mean_y = self.num_data*self.model_par[3]*np.sin(self.model_par[2])+self.model_par[1]
-        return np.random.multivariate_normal(np.array([mean_x,mean_y]),noise_cov)
+        # State model is x[k+1] = x[k] + v_l*cos(theta)+ w_1;
+        # y[k+1] = y[k] + v_l*sin(theta)+ w_2 , where w_1 and w_2 are noise in x and y dir
+        if x_k is None:
+            # If no previous state is passed, assume its the last data point
+            x_k = self.model_data[-1,:]
+        v_l = self.model_par[3]
+        theta = self.model_par[2]
+        mean_x = x_k[0] + v_l*np.cos(theta)
+        mean_y = x_k[1] + v_l*np.sin(theta)
+        # Forward Sample -- Includes noise
+        # np.random.multivariate_normal(self.model_par,noise_cov)
+        
+        # Returning just the mean state for now
+        return np.array([mean_x,mean_y])
 
 
 if __name__=="__main__":
     # Lets simulate some data from static sensors
-    data = np.array([1,0])
-    noise_cov = np.diag([0.05,0.05])
+    data = np.array([3,2])
+    data1 = np.array([4,2])
+    data2 = np.array([5,2])
+    noise_cov = np.diag([0.01,0.01])
+    
     model1 = Revolute_Landmark(3,noise_cov)
     model1.process_inp_data(data)
-    data1 = np.array([1/np.sqrt(2),1/np.sqrt(2)])
     model1.process_inp_data(data1)
-    print model1.model_par,model1.model_data
-    data2 = np.array([0,1])
     model1.process_inp_data(data2)
-    print model1.model_par,model1.model_data,model1.predict_model()
+    print model1.model_par,model1.predict_model()
+
+    model2 = Prismatic_Landmark(2,noise_cov)
+    model2.process_inp_data(data)
+    model2.process_inp_data(data1)
+    model2.process_inp_data(data2)
+    print model2.model_par,model2.model_data,model2.predict_model()
 
