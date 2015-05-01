@@ -58,22 +58,53 @@ class Static_Landmark(Motion_Models):
         print "Estimated Model paramters are", self.model_par
     def update_model_pars(self):
         # Asserting that we have a model
-        assert(self.model_par is not None),'Do not call this functin until we have sufficient data to estimate a model'
+        assert(self.model_par is not None),'Do not call this function until we have sufficient data to estimate a model'
         # Keeping the same parameters for now
         self.model_par = self.model_par # To Do: Update the parameters location online
         print "Updated Model paramters are", self.model_par
     def predict_model(self):
         # Asserting that we have a model
-        assert(self.model_par is not None),'Do not call this functin until we have sufficient data to estimate a model'
+        assert(self.model_par is not None),'Do not call this function until we have sufficient data to estimate a model'
         # Predicting the location of the static landmark by adding gaussian noise
         return np.random.multivariate_normal(self.model_par,noise_cov)
 
 
-'''
 # Landmark motion model that is moving in a circular motion with uniform velocity
-class Move_Revolute(Motion_Models):
-    def fit_model()
-'''
+class Revolute_Landmark(Motion_Models):
+    # Model paramters for a static landmark is just the location of the landmark
+    def fit_model(self):
+        # asserting that we have atleast the minimum required observation for estimation
+        assert(self.num_data>=self.min_data_samples),"Can not call this function until we have sufficient data to estimate the model"
+        # Fitting a prismatic model using maximum likelihood
+        # Model consists of x_0,y_0,r,theta_0,w_l : center x, center y, radius,start_angle, angular velocity
+        # Model is x_k = x_0+r\cos(\theta_0+n*w_l), y_k = y_0+r\sin(\theta_0+n*w_l) where n = 0,...,t are time steps
+        print "Fitting the motion model"
+        x0 = np.array([0,0,0,0,0])
+        res = minimize(self.ml_model,x0,options={'xtol':1e-8,'disp': True})
+        self.model_par = res.x
+        print "Estimated Model paramters are", self.model_par
+
+    # Defining the maximum likelihood model
+    def ml_model(self,x):
+        sum_func = 0
+        for i in range(self.min_data_samples):
+            sum_func = sum_func+(self.model_data[i,0]-((x[2]*np.cos(x[3]+i*x[4]))+x[0]))**2+(self.model_data[i,1]-((x[2]*np.sin(x[3]+i*x[4]))+x[1]))**2
+        return sum_func
+        
+    def update_model_pars(self):
+        # Asserting that we have a model
+        assert(self.model_par is not None),'Do not call this function until we have sufficient data to estimate a model'
+        # Keeping the same parameters for now
+        self.model_par = self.model_par # To Do: Update the parameters location online
+        print "Updated Model paramters are", self.model_par
+    def predict_model(self):
+        # Asserting that we have a model
+        assert(self.model_par is not None),'Do not call this function until we have sufficient data to estimate a model'
+        # Predicting the location of the static landmark by adding gaussian noise
+        mean_x = self.model_par[2]*np.cos(self.model_par[3]+self.model_par[4]*self.num_data)+self.model_par[0]
+        mean_y = self.model_par[2]*np.sin(self.model_par[3]+self.model_par[4]*self.num_data)+self.model_par[1]
+        print "Mean Prediction is", mean_x,mean_y
+        return np.random.multivariate_normal(np.array([mean_x,mean_y]),noise_cov)
 
 
 # Landmark motion model that is moving along a line with specified velocity
@@ -101,13 +132,13 @@ class Prismatic_Landmark(Motion_Models):
         
     def update_model_pars(self):
         # Asserting that we have a model
-        assert(self.model_par is not None),'Do not call this functin until we have sufficient data to estimate a model'
+        assert(self.model_par is not None),'Do not call this function until we have sufficient data to estimate a model'
         # Keeping the same parameters for now
         self.model_par = self.model_par # To Do: Update the parameters location online
         print "Updated Model paramters are", self.model_par
     def predict_model(self):
         # Asserting that we have a model
-        assert(self.model_par is not None),'Do not call this functin until we have sufficient data to estimate a model'
+        assert(self.model_par is not None),'Do not call this function until we have sufficient data to estimate a model'
         # Predicting the location of the static landmark by adding gaussian noise
         mean_x = self.num_data*self.model_par[3]*np.cos(self.model_par[2])+self.model_par[0]
         mean_y = self.num_data*self.model_par[3]*np.sin(self.model_par[2])+self.model_par[1]
@@ -116,15 +147,14 @@ class Prismatic_Landmark(Motion_Models):
 
 if __name__=="__main__":
     # Lets simulate some data from static sensors
-    data = np.array([0,0])
+    data = np.array([1,0])
     noise_cov = np.diag([0.05,0.05])
-    model1 = Prismatic_Landmark(2,noise_cov)
+    model1 = Revolute_Landmark(3,noise_cov)
     model1.process_inp_data(data)
-    print model1.model_par,model1.model_data
-    data1 = np.array([1,0])
+    data1 = np.array([1/np.sqrt(2),1/np.sqrt(2)])
     model1.process_inp_data(data1)
-    print model1.model_par,model1.model_data,model1.predict_model()
-    data2 = np.array([2,0])
-    model1.process_inp_data(data2)
     print model1.model_par,model1.model_data
+    data2 = np.array([0,1])
+    model1.process_inp_data(data2)
+    print model1.model_par,model1.model_data,model1.predict_model()
 
