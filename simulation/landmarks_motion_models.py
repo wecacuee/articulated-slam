@@ -3,7 +3,6 @@ Given trajectories, estimate the motion models currently being followed by the l
 """
 import numpy as np
 from scipy.optimize import minimize
-import pdb
 
 # Abstract class for storing and estimating various motion models
 class Motion_Models:
@@ -115,7 +114,7 @@ class Revolute_Landmark(Motion_Models):
         assert(self.model_par is not None),'Do not call this function until we have sufficient data to estimate a model'
         # Keeping the same parameters for now
         self.model_par = self.model_par # To Do: Update the parameters location online
-        print "Updated Model paramters are", self.model_par
+        #print "Updated Model paramters are", self.model_par
     def predict_model(self,x_k = None):
         # Asserting that we have a model
         assert(self.model_par is not None),'Do not call this function until we have sufficient data to estimate a model'
@@ -182,7 +181,7 @@ class Prismatic_Landmark(Motion_Models):
         assert(self.model_par is not None),'Do not call this function until we have sufficient data to estimate a model'
         # Keeping the same parameters for now
         self.model_par = self.model_par # To Do: Update the parameters location online
-        print "Updated Model paramters are", self.model_par
+        #print "Updated Model paramters are", self.model_par
     def predict_model(self,x_k = None):
         # Asserting that we have a model
         assert(self.model_par is not None),'Do not call this function until we have sufficient data to estimate a model'
