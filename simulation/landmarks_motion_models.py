@@ -86,7 +86,11 @@ class Revolute_Landmark(Motion_Models):
         # Model consists of x_0,y_0,r,theta_0,w_l : center x, center y, radius,start_angle, angular velocity
         # Model is x_k = x_0+r\cos(\theta_0+n*w_l), y_k = y_0+r\sin(\theta_0+n*w_l) where n = 0,...,t are time steps
         x0 = np.array([0,0,0,0,0])
-        res = minimize(self.ml_model,x0,options={'xtol':1e-8,'disp': True})
+
+        # Vikas: Please verify if this constraint is reasonable
+        # x[2] is radius -- maximum radius 10, x[4] is angular velocity -- minimum 0.1 rad/delta T
+        cons = ({'type':'ineq','fun': lambda x:10.0-x[2]},{'type':'ineq','fun': lambda x: np.abs(x[4])-0.1})
+        res = minimize(self.ml_model,x0,method='SLSQP',constraints = cons)
         self.model_par = res.x
         print "Estimated Model paramters for revolute are", self.model_par
 
@@ -141,10 +145,14 @@ class Prismatic_Landmark(Motion_Models):
         print "Fitting the motion model"
         v_l_guess = np.sqrt((self.model_data[1,0]-self.model_data[0,0])**2+(self.model_data[1,1]-self.model_data[0,1])**2)
         x0 = np.array([self.model_data[0,0],self.model_data[0,1],0,v_l_guess])
-        res = minimize(self.ml_model,x0,options={'xtol':1e-8,'disp': True})
-
+        
         # Vikas: Please verify what should we use as minimum
         # We need a lower threshold on linear velocity because otherwise a static landmark is a prismatic with zero velocity in any direction
+        # Adding a minimum value of absolute of velocity
+        cons = ({'type':'ineq','fun':lambda x: np.abs(x[3])-0.1})
+
+        res = minimize(self.ml_model,x0,method = 'SLSQP',constraints=cons)
+
 
         self.model_par = res.x
         print "Estimated Model paramters for prismatic are", self.model_par
@@ -184,8 +192,8 @@ class Prismatic_Landmark(Motion_Models):
 if __name__=="__main__":
     # Lets simulate some data from static sensors
     data = np.array([3,2])
-    data1 = np.array([4,2])
-    data2 = np.array([5,2])
+    data1 = np.array([2+1/np.sqrt(2),2+1/np.sqrt(2)])
+    data2 = np.array([2,3])
     noise_cov = np.diag([0.01,0.01])
     
     model1 = Revolute_Landmark(3,noise_cov)
@@ -194,9 +202,11 @@ if __name__=="__main__":
     model1.process_inp_data(data2)
     print model1.model_par,model1.predict_model()
 
+    
     model2 = Prismatic_Landmark(2,noise_cov)
     model2.process_inp_data(data)
     model2.process_inp_data(data1)
     model2.process_inp_data(data2)
     print model2.model_par,model2.model_data,model2.predict_model()
+    
 
