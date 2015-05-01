@@ -46,6 +46,10 @@ class Motion_Models:
     def predict_model(self): # Update parameters of the model
         raise NotImplementedError("Subclass must implement its method")
 
+    # Derivative of forward motion model evaluated at a particular state
+    def model_linear_matrix(self):
+        raise NotImplementedError("Subclass must implement its method")
+
 # Landmark motion model that is static
 class Static_Landmark(Motion_Models):
     # Model paramters for a static landmark is just the location of the landmark
@@ -55,11 +59,13 @@ class Static_Landmark(Motion_Models):
         # Fitting a static model using maximum likelihood
         self.model_par = self.model_data[-1,:].copy()
         print "Estimated Model paramters for static model are", self.model_par
+    
     def update_model_pars(self):
         # Asserting that we have a model
         assert(self.model_par is not None),'Do not call this function until we have sufficient data to estimate a model'
         # Keeping the same parameters for now
         self.model_par = self.model_par # To Do: Update the parameters location online
+    
     def predict_model(self,x_k = None):
         # Asserting that we have a model
         assert(self.model_par is not None),'Do not call this function until we have sufficient data to estimate a model'
@@ -74,6 +80,9 @@ class Static_Landmark(Motion_Models):
         
         # Returning just the mean state for now
         return np.array([mean_x,mean_y])
+    
+    def model_linear_matrix(self):
+        return np.array([[1,0],[0,1]])
 
 
 # Landmark motion model that is moving in a circular motion with uniform velocity
@@ -130,6 +139,10 @@ class Revolute_Landmark(Motion_Models):
         '''
         # Returning just the mean state for now
         return np.array([mean_x,mean_y])
+    
+    def model_linear_matrix(self):
+        w = self.model_par[4]
+        return np.array([[np.cos(w),-np.sin(w)],[np.sin(w),np.cos(w)]])
 
 
 
@@ -187,6 +200,9 @@ class Prismatic_Landmark(Motion_Models):
         
         # Returning just the mean state for now
         return np.array([mean_x,mean_y])
+    
+    def model_linear_matrix(self):
+        return np.array([[1,0],[0,1]])
 
 
 if __name__=="__main__":
@@ -201,12 +217,13 @@ if __name__=="__main__":
     model1.process_inp_data(data1)
     model1.process_inp_data(data2)
     print model1.model_par,model1.predict_model()
+    print "New prediction ", model1.predict_model(np.array([3,2]))
 
     
     model2 = Prismatic_Landmark(2,noise_cov)
     model2.process_inp_data(data)
     model2.process_inp_data(data1)
     model2.process_inp_data(data2)
-    print model2.model_par,model2.model_data,model2.predict_model()
+    print model2.model_par,model2.model_data,model2.predict_model(),model2.model_linear_matrix()
     
 
