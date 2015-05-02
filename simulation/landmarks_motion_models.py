@@ -7,7 +7,7 @@ from scipy.optimize import minimize
 # Abstract class for storing and estimating various motion models
 class Motion_Models:
     # Constructor for each motion model
-    def __init__(self,min_data_samples,noise_var):
+    def __init__(self,min_data_samples,noise_cov):
         # To store the minimum number of observations needed before pars can be estimated
         self.min_data_samples = min_data_samples 
         self.noise_cov = noise_cov # To store the noise covariance of motion models
@@ -96,11 +96,15 @@ class Revolute_Landmark(Motion_Models):
         x0 = np.array([0,0,0,0,0])
 
         # Vikas: Please verify if this constraint is reasonable
-        # x[2] is radius -- maximum radius 10, x[4] is angular velocity -- minimum 0.1 rad/delta T
-        cons = ({'type':'ineq','fun': lambda x:10.0-x[2]},{'type':'ineq','fun': lambda x: np.abs(x[4])-0.1})
+        # x[2] is radius -- maximum radius 10, min radius 1
+        # x[4] is angular velocity -- minimum 0.1 rad/delta T
+        cons = ({'type':'ineq','fun': lambda x:10.0-x[2]},
+                {'type':'ineq','fun': lambda x:x[2]-1},
+                {'type':'ineq','fun': lambda x: np.abs(x[4])-0.1})
         res = minimize(self.ml_model,x0,method='SLSQP',constraints = cons)
         self.model_par = res.x
         print "Estimated Model paramters for revolute are", self.model_par
+        #print "Input data was",self.model_data
 
     # Defining the maximum likelihood model
     def ml_model(self,x):
@@ -207,8 +211,8 @@ class Prismatic_Landmark(Motion_Models):
 if __name__=="__main__":
     # Lets simulate some data from static sensors
     data = np.array([3,2])
-    data1 = np.array([2+1/np.sqrt(2),2+1/np.sqrt(2)])
-    data2 = np.array([2,3])
+    data1 = np.array([2+np.cos(np.pi/6),2+np.sin(np.pi/6)])
+    data2 = np.array([2+np.cos(np.pi/3),2+np.sin(np.pi/3)])
     noise_cov = np.diag([0.01,0.01])
     
     model1 = Revolute_Landmark(3,noise_cov)
