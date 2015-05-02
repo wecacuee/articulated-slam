@@ -187,18 +187,25 @@ class LandmarksVisualizer(object):
         pos = robview._pos
         dir = robview._dir
         maxangle = robview._maxangle
-        maxdist = robview._maxdist
+        #maxdist = robview._maxdist
+        maxdist = 5
         pt1 = np.maximum(np.minimum(self._imgdims[:2], pos.ravel()), [0, 0])
         pt2 = pos + R2D_angle(maxangle).dot(dir) * maxdist
         pt2 = np.maximum(np.minimum(self._imgdims[:2], pt2.ravel()), [0, 0])
-        cv2.line(img, tuple(np.int64(pt1) * self._scale),
-                      tuple(np.int64(pt2) * self._scale), 
-                      (0, 0, 255))
         pt3 = pos + R2D_angle(-maxangle).dot(dir) * maxdist
         pt3 = np.maximum(np.minimum(self._imgdims[:2], pt3.ravel()), [0, 0])
+        black = (0,0,0)
+        red = (0, 0, 255)
+        cv2.fillConvexPoly(img, np.int64([[pt1, pt2, pt3]]) * self._scale,
+                          color=red)
+        cv2.line(img, tuple(np.int64(pt1) * self._scale),
+                      tuple(np.int64(pt2) * self._scale), 
+                      black)
         cv2.line(img, tuple(np.int64(pt1) * self._scale),
                       tuple(np.int64(pt3) * self._scale), 
-                      (0, 0, 255))
+                      black)
+        cv2.line(img, tuple(np.int64(pt2) * self._scale),
+                 tuple(np.int64(pt3) * self._scale), black)
         return img
 
     def visualizemap_with_robot(self, map, robottraj_iter):

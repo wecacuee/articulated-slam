@@ -149,6 +149,14 @@ class Revolute_Landmark(Motion_Models):
         w = self.model_par[4]
         return np.array([[np.cos(w),-np.sin(w)],[np.sin(w),np.cos(w)]])
 
+    def get_revolute_par(self):
+        # Model consists of x_0,y_0,r,theta_0,w_l : center x, center y, radius,start_angle, angular velocity
+        x = self.model_par
+        center = x[0:2]
+        radius = x[2]
+        theta_0 = x[3]
+        omega = x[4]
+        return (center, radius, theta_0, omega)
 
 
 # Landmark motion model that is moving along a line with specified velocity
@@ -209,6 +217,13 @@ class Prismatic_Landmark(Motion_Models):
     
     def model_linear_matrix(self):
         return np.array([[1,0],[0,1]])
+
+    def get_prismatic_par(self):
+        # Model consists of x_0,y_0,\theta,v_l : Starting x, starting y, slope, velocity along line
+        x = self.model_par
+        x0 = x[0:2]
+        delx = x[3] * np.array([np.cos(x[2]), np.sin(x[2])])
+        return x0, delx
 
 
 if __name__=="__main__":
