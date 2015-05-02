@@ -792,6 +792,12 @@ Dropping the notation for scene part, In current formulation, we assume a unifor
 The probability of the current observation $z_k$ at time step $k$, conditioned over a specific motion model and all the previous observation can be represented by various method. In the current work, we filter the states using Extended Kalman Filter, for which this probability is the probability of observation residual w.r.t a normal distribution distributed with zero mean and innovation covariance \cite{yaakov2001estimation}.
 \subsection{No Prior Information}
 
+\section{Results}
+\begin{figure*}
+  \usetikzlibrary{calc}
+  \input{resultsfig.tex}
+\end{figure*}
+
 \bibliographystyle{unsrt}
 \bibliography{articulation_estimation}
 
