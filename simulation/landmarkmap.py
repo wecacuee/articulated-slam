@@ -140,29 +140,40 @@ def robot_trajectory(positions, nframes, angular_vel):
 
 
 class LandmarksVisualizer(object):
-    def __init__(self, min, max):
+    def __init__(self, min, max, frame_period=30, scale=1):
+        self._scale = scale
         self._name = "c"
         dims = np.asarray(max) - np.asarray(min)
-        nrows = dims[1]
-        ncols = dims[0]
+        nrows = dims[1] * scale
+        ncols = dims[0] * scale
         self._imgdims = (nrows, ncols, 3)
+        self.frame_period = frame_period
         cv2.namedWindow(self._name, flags=cv2.WINDOW_NORMAL)
         cv2.waitKey(-1)
 
-    def genframe(self, landmarks, robview=None):
+    def genframe(self, landmarks, robview=None, colors=None):
         img = np.ones(self._imgdims) * 255
-        radius = 0
+        if landmarks.shape[1] > 10:
+            radius = 0 * self._scale
+        else:
+            radius = 4 * self._scale
         red = (0, 0, 255)
         blue = (255, 0, 0)
-        if robview is not None:
-            in_view_ldmks = robview.in_view(landmarks)
-        else:
-            in_view_ldmks = np.zeros(landmarks.shape[1])
+        if colors is None:
+            if robview is not None:
+                in_view_ldmks = robview.in_view(landmarks)
+            else:
+                in_view_ldmks = np.zeros(landmarks.shape[1])
+            colors = [(red if in_view_ldmks[i] else blue) for i in
+                      range(landmarks.shape[1])]
         for i in range(landmarks.shape[1]):
-            pt1 = np.int8(landmarks[:, i])
-            pt2 = pt1 + radius
-            cv2.rectangle(img, tuple(pt1), tuple(pt2),
-                          red if in_view_ldmks[i] else blue)
+            pt1 = np.int64(landmarks[:, i]) * self._scale
+            if radius == 0:
+                pt2 = pt1 + radius
+                cv2.rectangle(img, tuple(pt1), tuple(pt2),
+                              colors[i])
+            else:
+                cv2.circle(img, tuple(pt1), radius, colors[i], thickness=-1)
         return img
 
     def visualizeframe(self, landmarks):
@@ -180,13 +191,13 @@ class LandmarksVisualizer(object):
         pt1 = np.maximum(np.minimum(self._imgdims[:2], pos.ravel()), [0, 0])
         pt2 = pos + R2D_angle(maxangle).dot(dir) * maxdist
         pt2 = np.maximum(np.minimum(self._imgdims[:2], pt2.ravel()), [0, 0])
-        cv2.line(img, tuple(np.int8(pt1)),
-                      tuple(np.int8(pt2)), 
+        cv2.line(img, tuple(np.int64(pt1) * self._scale),
+                      tuple(np.int64(pt2) * self._scale), 
                       (0, 0, 255))
         pt3 = pos + R2D_angle(-maxangle).dot(dir) * maxdist
         pt3 = np.maximum(np.minimum(self._imgdims[:2], pt3.ravel()), [0, 0])
-        cv2.line(img, tuple(np.int8(pt1)),
-                      tuple(np.int8(pt3)), 
+        cv2.line(img, tuple(np.int64(pt1) * self._scale),
+                      tuple(np.int64(pt3) * self._scale), 
                       (0, 0, 255))
         return img
 
@@ -197,7 +208,7 @@ class LandmarksVisualizer(object):
             img = self.genframe(lmks, robview)
             img = self.drawrobot(robview, img)
             cv2.imshow(self._name, img)
-            cv2.waitKey(30)
+            cv2.waitKey(self.frame_period)
 
 
 def T_from_angle_pos(theta, pos):
@@ -214,7 +225,7 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, lmvis=None):
             img = lmvis.genframe(ldmks, robview)
             img = lmvis.drawrobot(robview, img)
             cv2.imshow(lmvis._name, img)
-            cv2.waitKey(30)
+            cv2.waitKey(lmvis.frame_period)
         in_view_ldmks = robview.in_view(ldmks)
         selected_ldmks = ldmks[:, in_view_ldmks]
         pos = posdir[0].reshape(2,1)
@@ -222,13 +233,22 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, lmvis=None):
         dir = posdir[1]
         angles = np.arccos(dir.dot((selected_ldmks - pos))/dists)
         ldmks_idx = np.where(in_view_ldmks)
-        yield (dists, angles, ldmks_idx[0])
+        rob_theta = np.arctan2(dir[1], dir[0])
+        yield (dists, angles, ldmks_idx[0], [float(pos[0]), float(pos[1]),
+                                             rob_theta], ldmks)
 
-def map_from_conf(map_conf):
+def map_from_conf(map_conf, nframes):
     """ Generate LandmarkMap from configuration """
     rmlist = []
     for rmconf in map_conf:
-        ldmks = landmarks_from_rectangle(rmconf['nsamples'], rmconf['shape'])
+        if 'nsamples' in rmconf and 'shape' in rmconf:
+            ldmks = landmarks_from_rectangle(rmconf['nsamples'], rmconf['shape'])
+        elif 'ldmks' in rmconf:
+            ldmks = rmconf['ldmks']
+        else:
+            raise RuntimeException('No way to compute ldmks')
+
+
         traj = dyn_trajectory(T_from_angle_pos(rmconf['inittheta'],
                                                rmconf['initpos']),
                               T_from_angle_pos(rmconf['deltheta'],
@@ -278,13 +298,13 @@ if __name__ == '__main__':
                      delpos=[0, 0])
                ]
 
-    lmmap = map_from_conf(map_conf)
+    lmmap = map_from_conf(map_conf, nframes)
     lmv = LandmarksVisualizer([0,0], [110, 140])
     robtraj = robot_trajectory(np.array([[20, 130], [50,100], [35,50]]), [250, 250],
                                np.pi/100)
 
     # to get the landmarks with ids that are being seen by robot
-    for r, theta, id in get_robot_observations(lmmap, robtraj, 
+    for r, theta, id, rs in get_robot_observations(lmmap, robtraj, 
                                               # angle on both sides of robot dir
                                               45*np.pi/180, 
                                               # max distance in pixels
@@ -292,4 +312,4 @@ if __name__ == '__main__':
                                               # Do not pass visualizer to
                                               # disable visualization
                                               lmv): 
-        print r, theta, id
+        print r, theta, id, rs
