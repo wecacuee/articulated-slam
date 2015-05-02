@@ -6,6 +6,7 @@
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{tikz}
 
 % Include other packages here, before hyperref.
 
@@ -68,7 +69,19 @@ The proposed approach proposes robust and physically inspired models of spatio-t
 
 \section{SLAM for Dynamic World}
 
-\section{Results}
+\section{Preliminary experiment and Results}
+We test our algorithm in a simulated environment of 3 landmarks generated with each of the motion models: static, prismatic and revolute. We assume that robot egomotion is known and we use bearing and distance observations from the robot to estimate different motion models over time. In Figure~\ref{fig:results}, the landmarks are colored on basis of estimated motion model, while trajectories are drawn when a particular motion model has probability above a threshold. Our experiments show that our EKF based motion model and parameter estimation works as expected.
+
+\begin{figure*}[t]
+  \usetikzlibrary{calc}
+  \centering
+  \input{../resultsfig.tex}
+  \caption{Frames at different time intervals of our simulation.
+  Color of a landmark at a particular frame is the weighted sum of colors
+  assigned to each motion model. The weights used are the probability of the
+  landmark following that particular motion model and estimated by our algorithm. We also show the predicted trajectory of a landmark according to the estimated motion model.}
+  \label{fig:results}
+\end{figure*}
 
 {\small
 \bibliographystyle{ieee}
