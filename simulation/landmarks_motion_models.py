@@ -96,11 +96,13 @@ class Revolute_Landmark(Motion_Models):
         x0 = np.array([0,0,0,0,0])
 
         # Vikas: Please verify if this constraint is reasonable
-        # x[2] is radius -- maximum radius 10, min radius 1
+        # x[2] is radius -- maximum radius 100, min radius 1
+        maxradius, minradius = 100.0, 1.0
         # x[4] is angular velocity -- minimum 0.1 rad/delta T
-        cons = ({'type':'ineq','fun': lambda x:10.0-x[2]},
-                {'type':'ineq','fun': lambda x:x[2]-1},
-                {'type':'ineq','fun': lambda x: np.abs(x[4])-0.1})
+        minangvel = 0.1
+        cons = ({'type':'ineq','fun': lambda x:maxradius-x[2]},
+                {'type':'ineq','fun': lambda x:x[2]-minradius},
+                {'type':'ineq','fun': lambda x: np.abs(x[4])-minangvel})
         res = minimize(self.ml_model,x0,method='SLSQP',constraints = cons)
         self.model_par = res.x
         print "Estimated Model paramters for revolute are", self.model_par

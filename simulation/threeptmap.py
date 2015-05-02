@@ -26,8 +26,8 @@ if __name__ == '__main__':
     lmmap = landmarkmap.map_from_conf(map_conf, nframes)
     lmvis = landmarkmap.LandmarksVisualizer([0,0], [100, 100], frame_period=-1,
                                          scale=10)
-    robtraj = landmarkmap.robot_trajectory(np.array([[10, 90], [30,60]]), [10],
-                               np.pi/100)
+    robtraj = landmarkmap.robot_trajectory(np.array([[10, 90], [11,89]]),
+                                           [10000], np.pi/100)
 
     ldmk_estimater = dict(); # id -> ekf_slam.Estimate_Mm()
     rev_color, pris_color, stat_color = [np.array(l) for l in (
@@ -37,21 +37,29 @@ if __name__ == '__main__':
     # max distance in pixels
     maxdist = 120
     # to get the landmarks with ids that are being seen by robot
-    for rs, thetas, ids, rob_state, ldmks in landmarkmap.get_robot_observations(
+    rob_obs_iter = landmarkmap.get_robot_observations(
         lmmap, robtraj, maxangle, maxdist, 
                                               # Do not pass visualizer to
                                               # disable visualization
-                                              lmvis=None): 
+                                              lmvis=None)
+    for i, (rs, thetas, ids, rob_state, ldmks) in enumerate(rob_obs_iter): 
         colors = []
+        mm_probs = []
         for r, theta, id in zip(rs, thetas, ids):
             motion_class = ldmk_estimater.setdefault(id, ekf_slam.Estimate_Mm())
             obs = [r, theta]
             motion_class.process_inp_data(obs, rob_state)
-            color = tuple(np.int64((motion_class.prior[0]*rev_color 
+            color = np.int64((motion_class.prior[0]*rev_color 
                      + motion_class.prior[1]*pris_color
-                     + motion_class.prior[2]*stat_color)))
+                     + motion_class.prior[2]*stat_color))
+            color = color - np.min(color)
             colors.append(color)
-        print rs, thetas, ids, rob_state, colors
+            mm_probs.append(motion_class.prior)
+        print '+++++++++++++ i = %d +++++++++++' % i
+        print 'Robot state:', rob_state
+        print 'Observations:', zip(rs, thetas)
+        #colors
+        print 'motion_class.priors', mm_probs
 
         posdir = map(np.array, ([rob_state[0], rob_state[1]],
                                 [np.cos(rob_state[2]), np.sin(rob_state[2])]))
