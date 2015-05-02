@@ -1,14 +1,14 @@
  \begin{tikzpicture}[imgstyle/.style={draw,thick,anchor=south west,inner sep=1pt}]
-   %\path[use as bounding box, draw] (0,0) rectangle (\textwidth, 7);
-\node[imgstyle] (img1) at (0,0) {\includegraphics[width=0.32\textwidth]{media/frame0000.png}};
-\node[imgstyle] (img2) at (0.333\textwidth,0) {\includegraphics[width=0.32\textwidth]
+ %\path[use as bounding box, draw] (0,-1) rectangle (\imgwidth, 0.34\imgwidth);
+\node[imgstyle] (img1) at (0,0) {\includegraphics[width=0.32\imgwidth]{media/frame0000.png}};
+\node[imgstyle] (img2) at (0.333\imgwidth,0) {\includegraphics[width=0.32\imgwidth]
 {media/frame0003.png}};
-\node[imgstyle] (img3) at (0.666\textwidth,0) {\includegraphics[width=0.32\textwidth]{media/frame0009.png}};
+\node[imgstyle] (img3) at (0.666\imgwidth,0) {\includegraphics[width=0.32\imgwidth]{media/frame0009.png}};
 \begin{scope}[x={(img1.south east)}, y={(img1.north west)}]
 \node (r) at (0.3, 0.1) {Robot};
 \node (lmks) at (0.7, 0.6) {Landmarks};
 \end{scope}
-\path ($(img1.south) + (1, -0.5)$) node (ld) {Legend:};
+\path ($(img1.south) + (-0.5, -0.5)$) node (ld) {Legend:};
 \path 
 (ld)
  ++ (1.8, 0) node [circle,fill=green] {} + (1, 0) node {Prismatic}

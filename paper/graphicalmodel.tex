@@ -1,0 +1,58 @@
+\begin{tikzpicture}
+\tikzstyle{main}=[circle, minimum size = 10mm, thick, draw =black!80, node distance = 10mm]
+\tikzstyle{connect}=[-latex, thick]
+\tikzstyle{box}=[rectangle, draw=black!100]
+\coordinate (org_1) at (0,0);
+  \node[main] (x_k_1)[right=of org_1] {$x_{k-1}$ };
+  \node[main] (x_k) [right=of x_k_1] { $x_{k}$ };
+  \node[main] (x_k_2) [right=of x_k] {$x_{k+1}$};
+\coordinate[right=of x_k_2] (end_1);
+
+  \node[main, fill = black!20] (u_k_1)[above=of x_k_1.west] {$u_{k-1}$ };
+\node[main, fill = black!20] (u_k)[above=of x_k.west] {$u_{k}$ };
+\node[main, fill = black!20] (u_k_2)[above=of x_k_2.west] {$u_{k+1}$ };
+
+\node[main, fill = black!20] (z_k_1)[below=of x_k_1.east] {$z_{k-1}$ };
+\node[main, fill = black!20] (z_k)[below=of x_k.east] {$z_{k}$ };
+\node[main, fill = black!20] (z_k_2)[below=of x_k_2.east] {$z_{k+1}$ };
+
+
+\node[main] (m_k_1)[below=of z_k_1.west] {$m_{k-1}$ };
+\coordinate [left=of m_k_1](org_2);
+\node[main] (m_k)[below=of z_k.west] {$m_{k}$ };
+\node[main] (m_k_2)[below=of z_k_2.west] {$m_{k+1}$ };
+\coordinate [right=of m_k_2](end_2);
+
+\node[main] (v_k_1)[below=of m_k_1.east] {$v_{k-1}$ };
+\node[main] (v_k)[below=of m_k.east] {$v_{k}$ };
+\node[main] (v_k_2)[below=of m_k_2.east] {$v_{k+1}$ };
+
+
+  \path 
+ (org_1) edge [connect] (x_k_1)
+(x_k_1) edge [connect] (x_k)
+(x_k) edge [connect] (x_k_2)
+(x_k_2) edge [connect] (end_1)
+
+(u_k_1) edge [connect] (x_k_1)
+(u_k) edge [connect] (x_k)
+(u_k_2) edge [connect] (x_k_2)
+
+(x_k_1) edge [connect] (z_k_1)
+(x_k) edge [connect] (z_k)
+(x_k_2) edge [connect] (z_k_2)
+
+(m_k_1) edge [connect] (z_k_1)
+(m_k) edge [connect] (z_k)
+(m_k_2) edge [connect] (z_k_2)
+
+
+ (org_2) edge [connect] (m_k_1)
+(m_k_1) edge [connect] (m_k)
+(m_k) edge [connect] (m_k_2)
+(m_k_2) edge [connect] (end_2)
+
+(v_k_1) edge [connect] (m_k_1)
+(v_k) edge [connect] (m_k)
+(v_k_2) edge [connect] (m_k_2);
+\end{tikzpicture}
