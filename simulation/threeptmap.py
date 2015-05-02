@@ -3,7 +3,7 @@ import landmarkmap
 import ekf_slam
 import cv2
 
-if __name__ == '__main__':
+def threeptmap():
     nframes = 10
     map_conf = [dict(ldmks=np.array([[10, 10]]).T,
                      inittheta=0,
@@ -28,14 +28,23 @@ if __name__ == '__main__':
                                          scale=3)
     robtraj = landmarkmap.robot_trajectory(np.array([[10, 90], [40,60]]),
                                            [10], np.pi/100)
-
-    ldmk_estimater = dict(); # id -> ekf_slam.Estimate_Mm()
-    rev_color, pris_color, stat_color = [np.array(l) for l in (
-        [255, 0, 0], [0, 255, 0], [0, 0, 255])]
     # angle on both sides of robot dir
     maxangle = 45*np.pi/180
     # max distance in pixels
     maxdist = 120
+
+    return nframes, lmmap, lmvis, robtraj, maxangle, maxdist
+
+if __name__ == '__main__':
+    import sys
+    if len(sys.argv) >= 2 and sys.argv[1] == "100":
+        nframes, lmmap, lmvis, robtraj, maxangle, maxdist = landmarkmap.hundred_ldmk_map()
+    else:
+        nframes, lmmap, lmvis, robtraj, maxangle, maxdist = threeptmap()
+
+    ldmk_estimater = dict(); # id -> ekf_slam.Estimate_Mm()
+    rev_color, pris_color, stat_color = [np.array(l) for l in (
+        [255, 0, 0], [0, 255, 0], [0, 0, 255])]
     # to get the landmarks with ids that are being seen by robot
     rob_obs_iter = landmarkmap.get_robot_observations(
         lmmap, robtraj, maxangle, maxdist, 

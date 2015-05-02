@@ -154,24 +154,32 @@ class LandmarksVisualizer(object):
     def genframe(self, landmarks, robview=None, colors=None):
         img = np.ones(self._imgdims) * 255
         if landmarks.shape[1] > 10:
-            radius = 0 * self._scale
+            radius = 1 * self._scale
         else:
             radius = 4 * self._scale
         red = (0, 0, 255)
         blue = (255, 0, 0)
-        if colors is None:
-            if robview is not None:
-                in_view_ldmks = robview.in_view(landmarks)
-            else:
-                in_view_ldmks = np.zeros(landmarks.shape[1])
-            colors = [(red if in_view_ldmks[i] else blue) for i in
+        black = (0., 0., 0.)
+        if robview is not None:
+            in_view_ldmks = robview.in_view(landmarks)
+        else:
+            in_view_ldmks = np.zeros(landmarks.shape[1])
+
+        if colors is not None and len(colors) > 0:
+            assert len(colors) == np.sum(in_view_ldmks), '%d <=> %d' % (len(colors), np.sum(in_view_ldmks))
+            extcolors = np.empty((landmarks.shape[1], 3))
+            extcolors[in_view_ldmks, :] = np.array(colors)
+            extcolors[~in_view_ldmks, :] = black
+            colors = [tuple(a) for a in list(extcolors)]
+        else:
+            colors = [(blue if in_view_ldmks[i] else black) for i in
                       range(landmarks.shape[1])]
         for i in range(landmarks.shape[1]):
             pt1 = np.int64(landmarks[:, i]) * self._scale
-            if radius == 0:
+            if landmarks.shape[1] > 10:
                 pt2 = pt1 + radius
-                cv2.rectangle(img, tuple(pt1), tuple(pt2),
-                              colors[i])
+                cv2.rectangle(img, tuple(pt1), tuple(pt2), colors[i],
+                              thickness=-1)
             else:
                 cv2.circle(img, tuple(pt1), radius, colors[i], thickness=-1)
         return img
@@ -268,8 +276,7 @@ def map_from_conf(map_conf, nframes):
 
     return LandmarkMap(rmlist)
 
-if __name__ == '__main__':
-    """ Run to see visualization of a dynamic map"""
+def hundred_ldmk_map():
     nframes = 600
     # The map consists of 5 rectangular rigid bodies with given shape and
     # initial position. Static bodies have deltheta=0, delpos=[0,0]
@@ -308,16 +315,21 @@ if __name__ == '__main__':
                ]
 
     lmmap = map_from_conf(map_conf, nframes)
-    lmv = LandmarksVisualizer([0,0], [110, 140])
+    lmv = LandmarksVisualizer([0,0], [110, 140], frame_period=10, scale=3)
     robtraj = robot_trajectory(np.array([[20, 130], [50,100], [35,50]]), [250, 250],
                                np.pi/100)
+    # angle on both sides of robot dir
+    maxangle = 45*np.pi/180
+    # max distance in pixels
+    maxdist = 40
+    return nframes, lmmap, lmv, robtraj, maxangle, maxdist
 
+if __name__ == '__main__':
+    """ Run to see visualization of a dynamic map"""
+    nframes, lmmap, lmv, robtraj, maxangle, maxdist = hundred_ldmk_map()
     # to get the landmarks with ids that are being seen by robot
     for r, theta, id, rs in get_robot_observations(lmmap, robtraj, 
-                                              # angle on both sides of robot dir
-                                              45*np.pi/180, 
-                                              # max distance in pixels
-                                              40,
+                                                   maxangle, maxdist,
                                               # Do not pass visualizer to
                                               # disable visualization
                                               lmv): 
