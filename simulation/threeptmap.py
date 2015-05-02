@@ -26,7 +26,7 @@ if __name__ == '__main__':
     lmmap = landmarkmap.map_from_conf(map_conf, nframes)
     lmvis = landmarkmap.LandmarksVisualizer([0,0], [100, 100], frame_period=-1,
                                          scale=10)
-    robtraj = landmarkmap.robot_trajectory(np.array([[10, 90], [11,89]]),
+    robtraj = landmarkmap.robot_trajectory(np.array([[10, 90], [20,80]]),
                                            [10000], np.pi/100)
 
     ldmk_estimater = dict(); # id -> ekf_slam.Estimate_Mm()

@@ -167,7 +167,8 @@ class Prismatic_Landmark(Motion_Models):
         # Vikas: Please verify what should we use as minimum
         # We need a lower threshold on linear velocity because otherwise a static landmark is a prismatic with zero velocity in any direction
         # Adding a minimum value of absolute of velocity
-        cons = ({'type':'ineq','fun':lambda x: np.abs(x[3])-0.1})
+        minabsvel = 1
+        cons = ({'type':'ineq','fun':lambda x: np.abs(x[3])-minabsvel})
 
         res = minimize(self.ml_model,x0,method = 'SLSQP',constraints=cons)
 

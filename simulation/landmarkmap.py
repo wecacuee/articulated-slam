@@ -231,9 +231,11 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, lmvis=None):
         pos = posdir[0].reshape(2,1)
         dists = np.sqrt(np.sum((selected_ldmks - pos)**2, 0))
         dir = posdir[1]
-        angles = np.arccos(dir.dot((selected_ldmks - pos))/dists)
-        ldmks_idx = np.where(in_view_ldmks)
+        #angles = np.arccos(dir.dot((selected_ldmks - pos))/dists)
+        obsvecs = selected_ldmks - pos
         rob_theta = np.arctan2(dir[1], dir[0])
+        angles = np.arctan2(obsvecs[1, :], obsvecs[0, :]) - rob_theta
+        ldmks_idx = np.where(in_view_ldmks)
         yield (dists, angles, ldmks_idx[0], [float(pos[0]), float(pos[1]),
                                              rob_theta], ldmks)
 
