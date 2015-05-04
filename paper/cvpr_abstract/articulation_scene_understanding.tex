@@ -25,14 +25,14 @@
 
 % Pages are numbered in submission mode, and unnumbered in camera-ready
 %\ifcvprfinal\pagestyle{empty}\fi
-\setcounter{page}{4321}
+\setcounter{page}{1}
 \begin{document}
 
 %%%%%%%%% TITLE
 \title{Articulated Motion Models for Scene Understanding}
 
 \author{Suren Kumar\\
-State University of New York at Buffalo \\
+SUNY Buffalo \\
 Buffalo, NY \\
 {\tt\small surenkum@buffalo.edu}
 % For a paper whose authors are all at the same institution,
@@ -41,11 +41,15 @@ Buffalo, NY \\
 % just like the second author.
 % To save space, use either the email address or home page, not both
 \and
-Vikas Dhiman\\
+Vikas Dhiman, Jason J. Corso\\
 University of Michigan\\
 Ann Arbor, MI\\
-{\tt\small dhiman@umich.edu}
-}
+{\tt\small \{dhiman@,jjcorso@eecs\}.umich.edu}
+\and
+Venkat N. Krovi\\
+SUNY Buffalo \\
+Buffalo, NY \\
+{\tt\small vkrovi@buffalo.edu}}
 
 \maketitle
 %\thispagestyle{empty}
@@ -64,7 +68,7 @@ Imagine a robot moving in a typical living room environment which encounters ind
 \section{Motion Models in Literature}
 There is significant interest in modelling motion for object tracking in computer vision literature \cite{cifuentes2012motion}. However the modelling of motion is often done in image space with simplistic models such as move left/move right which does not explain the motion of objects in physical world. Yan and Pollefeys \cite{yan2006automatic} proposed a model to detect the articulated structure of a object by using Structure from motion and then clustering trajectories to find articulation. But their approach only models revolute joint and doesn't model the temporal structure. 
 
-There has been tremendous interest in robotics community to learn the kinematic structure such as the type of articulation from depth data \cite{sturm2010vision,katz2013interactive,katz2014interactive}. However the primary limitations of these methods is limitation of the work space. All of these methods don't model the appearance/dis-appearance of objects from the scene because they do not make any map of the world. Furthermore, these approaches are restrictive in terms of the joint models they consider which don't include joints like motion on a plane.
+There has been tremendous interest in robotics community to learn the kinematic structure such as the type of articulation from depth data \cite{sturm2010vision,katz2013interactive,katz2014interactive}. However the primary limitations of these methods is the restricted work space. All of these methods don't model the appearance/dis-appearance of objects from the scene because they do not make any map of the world. Furthermore, these approaches are restrictive in terms of the joint models they consider which don't include joints like motion on a plane.
 
 SLAM deals with dynamic environment in two different ways, 1) State Augmentation, 2) Outlier Rejection. State augmentation approach adds the state of the moving objects to the overall state being estimated \cite{wang2003online}. State augmentation approaches \cite{wang2003online,kundu2011realtime} assume the separation of measurement into stationary and moving objects and map is still built from static features.  On the other hand outlier rejection aims to detect and remove the objects/landmarks from the mapping and localization estimation. However, both these approaches fail to model the motion of moving features/landmarks in a robust manner which precludes the possibility of using moving landmarks for both localization and mapping.  The generic and common method used to model the motion is that of constant velocity model in 3D euclidean coordinates \cite{wang2003online}, Special Euclidean group SE(3) of transformation \cite{kundu2011realtime}. This velocity model is insufficient to model the physical reality such as motion of a door, movement of a chair on the floor etc.
 
