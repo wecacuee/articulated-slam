@@ -7,6 +7,13 @@
 \begin{scope}[x={(img1.south east)}, y={(img1.north west)}]
 \node (r) at (0.3, 0.1) {Robot};
 \node (lmks) at (0.7, 0.6) {Landmarks};
+\node (t1) at (0.9, 0.1) {t=0};
+\end{scope}
+\begin{scope}[x={(img2.south east)}, y={(img2.north west)}]
+\node (t1) at (0.9, 0.1) {t=3};
+\end{scope}
+\begin{scope}[x={(img3.south east)}, y={(img3.north west)}]
+\node (t1) at (0.9, 0.1) {t=9};
 \end{scope}
 \path ($(img1.south) + (-0.5, -0.5)$) node (ld) {Legend:};
 \path 

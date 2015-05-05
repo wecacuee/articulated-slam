@@ -101,9 +101,6 @@ The proposed approach uses robust and physically inspired models of spatio-tempo
 \end{figure*}
 
 \section{SLAM for Dynamic World}
-\begin{figure}
-
-\end{figure}
 Figure \ref{fig:graphical_model} shows the graphical model of the most general SLAM problem, where $x_k$, $u_k$, $z_k$, $m_k$, $v_k$ represents the robot state, input to the robot, observation by robot, state of the world and action of various agents in the environment.
 
 % Basic SLAM algorithms \textit{assume the map $m_{k-1} \equiv m_k \equiv m$ to be static} and model the combination of robot state and map $x_k,m$ as the state of the estimation problem. The estimation problem only requires motion model $P(x_k|x_{k-1},u_k)$ and observation model $P(z_k|x_k,m)$. The observation model assumes the observations to be conditionally independent given the the map and the current vehicle state. The goal of the estimation process is to produce unbiased and consistent estimates (expectation of mean squared error should match filter-calculated covariance) \cite{yaakov2001estimation}.
@@ -144,7 +141,7 @@ Equation \ref{eq:measurement_update} together with equation \ref{eq:time_update}
 % 
 % In feature based mapping, motion of each feature can be assumed to be independent given the location of the feature at previous time step. In dense mapping, a scene/map be decomposed into $n$ different parts such as chair, door etc. whose shape is known. The parts of the scene $m_k = \{b^i_k\},  1\leq i \leq n$ are assumed to move independently and hence the motion of the map can be represented as collection of independent motion of the parts. The true motion model for the  each part of the scene is assumed to be one of the motion models $C \in \{C_j\}^{p}_{j=1}$ as represented in Section \ref{sec:articulation_classification}. 
 % 
-Dropping the notation for scene part, In current formulation, we assume a uniform prior $\mu_j(0) = P(C_j), \sum_{j=1}^{p}\mu_j(0) = 1$ over different motion models for each scene part. However, this prior can be modified appropriately by object detection such as doors are more likely to have revolute joints etc.. Motion model probability is updated as more and more observations are received \cite{yaakov2001estimation} as 
+Dropping the notation for scene part, in current formulation, we assume a uniform prior $\mu_j(0) = P(C_j), \sum_{j=1}^{p}\mu_j(0) = 1$ over different motion models for each scene part. However, this prior can be modified appropriately by object detection such as doors are more likely to have revolute joints etc.. Motion model probability is updated as more and more observations are received \cite{yaakov2001estimation} as 
 \begin{align*}
 & \mu_j(k) \equiv P(C_j|\mathbf{Z}_{0:k})  = 
 %\frac{P(z_k|\mathbf{Z}_{0:k-1}, C_j)P(C_j|\mathbf{Z}_{0:k-1})}{P(z_k|\mathbf{Z}_{0:k-1})} \nonumber \\
