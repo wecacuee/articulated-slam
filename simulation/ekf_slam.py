@@ -113,11 +113,14 @@ class Estimate_Mm:
                 # Step 1: Propagate State
                 self.means[i] = self.mm[i].predict_model(self.means[i])
                 # Step 2: Propagate Covariance
-                self.covs[i] = np.dot(np.dot(self.mm[i].model_linear_matrix(),self.covs[i]),
-                        self.mm[i].model_linear_matrix())+self.noise_motion
+
+                model_lin_mat = self.mm[i].model_linear_matrix()
+                self.covs[i] = model_lin_mat.dot(self.covs[i]).dot(model_lin_mat.T)+self.noise_motion
+
                 # Step 3.0: Compute Innovation Covariance
                 H_t = observation_jac(robot_state,self.means[i])
-                inno_cov = np.dot(np.dot(H_t,self.covs[i]),np.transpose(H_t))+self.noise_obs
+                inno_cov = H_t.dot(self.covs[i]).dot(H_t.T)+self.noise_obs
+
                 # Step 3: Compute Kalman Gain
                 K_t = np.dot(np.dot(self.covs[i],np.transpose(H_t)),np.linalg.inv(inno_cov))
                 # Step 4: Update State
