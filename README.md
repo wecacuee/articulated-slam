@@ -1,14 +1,22 @@
 # Purpose
 ROS package to segment articulated objects from a scene
 
-#ToDO:
-[SK] Write code for classification of joints in simulation code
+#ToDO 2015May16
 
-[] Literature survey
+[ ] Debug : Why non-postive semi definite matrix
 
-[] Add code for doing 3D corner detection and tracking from RGBD stream
+[ ] Temporal models: Prismatic models can have zero velocity.
 
-[] Do floor segmentation and try Euclidean clustering and visualization
+[ ] 2D to 3D. Model general 2D motion as a parameteric model. Prismatic and
+revolute are subsets of it with some constraints. The rest of the 2D motion
+space with complementary constraints is our general 2D motion.
+
+[ ] 3D simulation/results
+
+[ ] Select only one motion model deterministically
+[ ] Mapping with noise
+
+[ ] SLAM Localization and Mapping
 
 # Usage
 
