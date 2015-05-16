@@ -3,7 +3,7 @@ ROS package to segment articulated objects from a scene
 
 #ToDO 2015May16
 
-[ ] Debug : Why non-postive semi definite matrix
+[X] Debug : Why non-postive semi definite matrix
 
 [ ] Temporal models: Prismatic models can have zero velocity.
 
