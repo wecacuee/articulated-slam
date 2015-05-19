@@ -79,6 +79,7 @@
 \usepackage{amssymb}  % assumes amsmath package installed
 \usepackage{lipsum,amsmath,multicol}
 \usepackage{tikz}
+\usepackage{pgf}
 \usetikzlibrary{fit,positioning}
 
 %\usepackage[numbers]{natbib}
@@ -792,11 +793,80 @@ Dropping the notation for scene part, In current formulation, we assume a unifor
 The probability of the current observation $z_k$ at time step $k$, conditioned over a specific motion model and all the previous observation can be represented by various method. In the current work, we filter the states using Extended Kalman Filter, for which this probability is the probability of observation residual w.r.t a normal distribution distributed with zero mean and innovation covariance \cite{yaakov2001estimation}.
 \subsection{No Prior Information}
 
+
+\section{Temporal Structure} Articulation estimation provides us with better structure for the motion estimation problem however one still needs to estimate the evolution of parameters of these models over time e.g: Position of the object along an axis for prismatic joint. Temporal propagation of articulated bodies will require knowledge of dynamics model parameters (mass, friction etc.) apart from the external excitation (motor torque, force) applied  to the system. Several approaches have been proposed for estimating these parameters that use the knowledge of some ground truth trajectories to estimate inertial and friction parameters \cite{endres2013learning} but they assume apriori access to the object. Furthermore, the external excitation can not be predicted as it can vary depending on the intention of agents. 
+
+The goal of our approach is to enforce a structure on the evolution of articulated motion without using any prior information specific to the current articulated body. We take our inspiration from neuroscience literature which posits that humans produce trajectories that are smooth in nature \cite{flash1985coordination} to plan movements from one point to another point in environment. This smoothness assumption can be leveraged by using motion models that use only limited number of derivatives. To concertize, lets assume that $x$ is the articulated model parameter (extension of a prismatic joint, angle of door along a hinge ). The system model for a finite order motion model in continuous time domain with $\mathbb{X}(t) = [x,x^{1},.,.,x^{n-1}]$ as the state can be written as
+\begin{align}
+\begin{bmatrix}
+x^{1} \\
+x^{2} \\
+. \\
+.\\
+x^{n}
+\end{bmatrix} = 
+\begin{bmatrix}
+0 & 1  & . & . & 0\\
+0 & 0  & . & . & 0\\
+0 & 0  & . & . & 0\\
+0& 0 & . & . & 1\\
+0 & 0  & . & . & 0\\
+\end{bmatrix}
+\begin{bmatrix}
+x \\
+x^{1} \\
+. \\
+.\\
+x^{n-1}
+\end{bmatrix}
++\begin{bmatrix}
+0 \\
+0 \\
+.\\
+.\\
+1
+\end{bmatrix} \eta
+\end{align}
+where $x^{n}$ denotes $n^{th}$ order derivative of the state variable and $\eta$ is the noise. This state propagation model can be converted to discrete time model as 
+\begin{align}
+\mathbb{X}(t+\delta t)& = A \mathbb{X}(t) + B \eta\\
+A& = 
+\begin{bmatrix}
+ 1 & \delta  t & \frac{{\delta  t}^2}{2} &  . & . \\
+0 & 1 & \delta  t &  . & . \\
+0 & 0 & 1  &  . & . \\
+0 & 0 & 1  &  . & . \\
+0 & 0 & .  &  . & . \\
+0&  0&    0 &     0 &    1
+\end{bmatrix}
+\end{align}
+where $A$ is simply matrix exponential $\exp\{A^c\delta t\}$ of the matrix representation $A^c$  in continuous time equation.
+
+Following the  \cite{flash1985coordination}, we assume jerk to be the noise in the system models. Using this method of providing temporal structure to the motion, we can write the motion of a prismatic joint with state $\mathbb{X}(k) = [x[k],y[k],v[k],\dot{v}[k],\ddot{v}[k],\dddot{v}[k]]$ as 
+\begin{align}
+\mathbb{X}(k+1) = 
+\begin{bmatrix}
+1 & 0 & \cos{\theta} & 0 & 0\\
+0 & 1 & \sin{\theta} & 0 & 0\\
+0 & 0 & 1 & \delta t &\frac{{\delta  t}^2}{2}\\
+0 & 0 & 0 & 1 &\delta t \\
+0 & 0 & 0 & 0 &1 \\
+\end{bmatrix} \mathbb{X}(k)+
+\begin{bmatrix}
+0\\
+0\\
+0\\
+0\\
+1
+\end{bmatrix}\eta
+\end{align}
+where $\theta$ is the direction of prismatic axis in 2D. The covariance of noise $\eta$ in jerk needs to be continuously updated \cite{castella1980adaptive} to enable one to track all the possible range of smooth motions that can be performed by an articulated object.
+
 \section{Results}
-\begin{figure*}
-  \usetikzlibrary{calc}
-  \input{resultsfig.tex}
-\end{figure*}
+%\begin{figure*}
+%  \usetikzlibrary{calc}
+%  \input{resultsfig.tex}
+%\end{figure*}
 
 \bibliographystyle{unsrt}
 \bibliography{articulation_estimation}

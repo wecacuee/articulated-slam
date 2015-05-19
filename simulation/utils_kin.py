@@ -164,6 +164,8 @@ def plot_points(data,fig = None,ax=None,inp_color = None):
         # Checking if there are a prismatic joint that needs to be denoted
     # Label the axis
     ax.set_xlabel('X'),ax.set_ylabel('Y'),ax.set_zlabel('Z')
+    ax.set_xlim([-2,5]),ax.set_ylim([-2.5,1]),ax.set_zlim([-1,1])
+    plt.savefig("test.png")
     plt.show()
 
     return (fig,ax)
