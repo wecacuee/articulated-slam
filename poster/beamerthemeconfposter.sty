@@ -9,7 +9,7 @@
 
 \ProvidesPackage{beamerthemeconfposter}
 \RequirePackage{tikz}		% for drawing the nice rounded boxes
-\usetikzlibrary{arrows,backgrounds}
+\usetikzlibrary{arrows,backgrounds,calc}
 \RequirePackage[T1]{fontenc}
 \RequirePackage{lmodern}
 \RequirePackage{textcomp}
@@ -192,11 +192,15 @@
 \setbeamertemplate{headline}{
  \leavevmode
   \begin{columns}
-   \begin{column}{0.15\linewidth}
+   \begin{column}{0.10\paperwidth}
      \centering 
-     %\includegraphics[width=0.066\paperwidth]{graphics/COE.pdf}%
+     \includegraphics[width=0.130\paperwidth]{ub.pdf}%
    \end{column}
-   \begin{column}{0.85\linewidth}
+   \begin{column}{0.10\paperwidth}
+     \centering 
+     \includegraphics[width=0.056\paperwidth]{umich.pdf}%
+   \end{column}
+   \begin{column}{0.50\paperwidth}
     \vskip1cm
     \centering
     \usebeamercolor{title in headline}{\color{umblue}\Huge{\textbf{\inserttitle}}\\[0.5ex]}
@@ -204,7 +208,14 @@
     \usebeamercolor{institute in headline}{\color{fg}\large{\insertinstitute}\\[1ex]}
     \vskip1cm
    \end{column}
-   \vspace{1cm}
+   \begin{column}{0.20\paperwidth}
+     \centering 
+     \begin{tikzpicture}
+       \node (text) at (0, 0) [inner sep=-0.6in,align=center] {\large IEEE 2015 Conference on\\\large Computer Vision and Pattern \\\large Recognition };
+       \node at ($(text.south east) + (0, -0.1in)$) [anchor=north west,inner sep=0] {\includegraphics[width=0.066\paperwidth]{cvpr2015logo.jpg}};
+     \end{tikzpicture}
+   \end{column}
+   %\vspace{1cm}
   \end{columns}
  \vspace{0.5in}
  \hspace{0.5in}\begin{beamercolorbox}[wd=47in,colsep=0.15cm]{cboxb}\end{beamercolorbox}
@@ -254,7 +265,7 @@
   \usebeamerfont{block body}
   \vskip-0.8cm
   \begin{beamercolorbox}[sep=0.5cm, rounded=true,center]{block alerted title}
-  \setlength{\inboxwd}{\linewidth}
+  \setlength{\inboxwd}{\paperwidth}
   \addtolength{\inboxwd}{-1cm}
   \begin{beamercolorbox}[rounded=true,wd={\inboxwd},center]{block alerted body}
   \setlength{\iinboxwd}{\inboxwd}

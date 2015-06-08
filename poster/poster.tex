@@ -8,14 +8,13 @@
 \documentclass[final]{beamer}
 \usepackage{beamerposter}
 \usepackage{graphicx}			% allows us to import images
+%\beamertemplategridbackground[1in]
 
 \usepackage{bm}
 \usepackage{tikz}
 
-\usetikzlibrary{trees,shadows}
+\usetikzlibrary{trees,shadows,fit,positioning,calc}
 
-\tikzset{/tikz/x=2.5cm}
-\tikzset{/tikz/y=2.5cm}
 
 %-----------------------------------------------------------
 % Define the column width and poster size
@@ -27,17 +26,16 @@
 
 \newlength{\sepwid}
 \newlength{\onecolwid}
-\newlength{\twocolwid}
-\newlength{\threecolwid}
-\setlength{\paperwidth}{48in}
-\setlength{\paperheight}{36in}
-\setlength{\sepwid}{0.024\paperwidth}
-\setlength{\onecolwid}{0.22\paperwidth}
-\setlength{\twocolwid}{0.464\paperwidth}
-\setlength{\threecolwid}{0.708\paperwidth}
+
+% A0 paper dimensions
+\setlength{\paperwidth}{38.8in}
+\setlength{\paperheight}{24.0in}
+
+\setlength{\sepwid}{0.060\paperwidth}
+\setlength{\onecolwid}{0.30\paperwidth}
 \setlength{\topmargin}{-0.5in}
 \usetheme{confposter}
-\usepackage{exscale}
+%\usepackage{exscale}
 
 %\input{preamble}
 
@@ -70,9 +68,9 @@
 % Name and authors of poster/paper/research
 %-----------------------------------------------------------
 
-\title{3D object localization in road scenes using graphical models}
-\author{Vikas Dhiman \and Manmohan Chandrakar \and Jason J Corso}
-\institute{University of Michigan}
+\title{Articulated Motion Models for Scene Understanding}
+\author{Suren Kumar$^1$ \and Vikas Dhiman$^2$ \and Jason J Corso$^2$ \and Venkat N. Krovi$^1$}
+\institute{$^1$University at Buffalo  \hspace{1in} $^2$University of Michigan}
 
 %-----------------------------------------------------------
 % Start the poster itself
@@ -81,133 +79,90 @@
 \begin{document}
 
 \begin{frame}[t]
+  \centering
   \begin{columns}[t]												% the [t] option aligns the column's content at the top
-  \begin{column}{\sepwid}\end{column}			% empty spacer column
+  %\begin{column}{\sepwid}\end{column}			% empty spacer column
+  \hspace{-\sepwid}
     \begin{column}{\onecolwid}
       \begin{block}{Introduction}
-        To accomplish fully or partial autonomous driving we need 3D
-        localization of traffic participants in the scene. 
-        Since laser scanners and stable wide--baseline stereo setups are
-        expensive, we focus on solving the problem using monocular video, GPS
-        and maps as our input. Given the video we extract detection bounding
-        boxes, ground plane and point tracks.
-        We formulate the problem of 3D localization in a probabilistic graphical
-        model specifically a factor graph model. We use additional heuristic
-        constraints like collision constraint, that leads to a global consistent solution.
-        Using these multiple sources of information that provide, possibly conflicting, evidence about
-        the location of traffic participant, a consistent meaningful solution must be estimated. 
-        We formulate the problem in factor graph
-        formalism and use off-the-shelf methods for inference.
-
-        % Related work
-        %One of the central goals of 3D scene understanding is to localize the 3D positions and orientations of objects in complex scenes.
-        Using
-        stereo imagery, several visual cues are combined in \cite{Geiger_etal_2014} to
-        simultaneously determine object locations and a rough intersection topology.
-        Similar to us, other works have also considered monocular frameworks. Notably,
-        occlusions are explicitly handled in \cite{Wojek_etal_2013} by considering
-        partial object detectors. A detailed part-based representation of objects based
-        on annotated CAD models is used for monocular scene understanding in
-        \cite{Zia_etal_2013,Zia_etal_2014}, which also allows reasoning about mutual
-        occlusions between objects. In contrast to these works, our monocular framework
-        uses a physical modeling of occlusion in continuous space, which makes it more
-        general, extensible and amenable for continuous optimization.
+        Imagine a robot moving in a typical living room environment which encounters indoor objects such as doors, drawers and chairs etc. We posit that in order for the robot to understand, map or interact with such objects, the robot needs to be able to understand the articulation. 
       \end{block}
 
       \begin{block}{Modeling}
         \begin{figure}
           \centering
           \newcommand{\imagewidth}{\onecolwid}
-          %\input{Source/scenelayoutoverlayCity0961}
-          \caption{A sample road scene with the unknowns of each car modeled as random variables. 
-          The relating energies are shown in Figure~\ref{fig:graphmodel}}
-        \end{figure}
-
-        \begin{figure}
-          \centering
-          %\input{Source/graphical_model_multiple}%
-          \caption{Graphical model showing the factor nodes among different
-            cars in the same frame. We assume occlusion relationships between
-            different cars are known and hence the occlusion modeling can be done
-            locally. In this example, the occlusion relationship affects the
-            following pair of cars 6-2, 2-5, 5-1. Cars 3 and 4 are not occluded
-            and hence affected by only unary terms within the frame. We also avoid 
-            collision modeling between unoccluded cars to encourage sparsity.
-          }
-          \label{fig:graphmodel}
+          \scalebox{2.0}{\tiny \input{../paper/graphicalmodel}}
+          \caption{Graphical Model of the general SLAM problem. The known nodes are darker than the unknown nodes.
+}
         \end{figure}
 
       \end{block}
     \end{column}
+  \hspace{-\sepwid}
 
-  \begin{column}{\sepwid}\end{column}			% empty spacer column
+  %\begin{column}{\sepwid}\end{column}			% empty spacer column
 
       
     \begin{column}{\onecolwid}
-      %\begin{block}{}
-        \begin{figure}
-          \centering
-          %\input{Source/graphicalmodelTP}
-        \end{figure}
-      %\end{block}
+      \begin{block}{Time update}
 
-        Assume conditional independence according to graphical model in
-        Figure~\ref{fig:graphmodel}, the negative log likelihood of required
-        random variables is given by
-      \begin{block}{Point tracks with occlusion}
-        We model continuous point tracks energy with explicit occlusion reasoning as
-        the expected re-projection error over the association probability,
+        The time update models the evolution of state according to the motion model. To write equation concisely, let $A =\{ \mathbf{Z}_{0:k-1},\mathbf{U}_{0:k},\mathbf{V}_{0:k},x_0,m_0 \}$
+        \begin{multline}
+          P(x_k,m_k|A) = 
+          % &\int \int P(x_k,x_{k-1},m_k,m_{k-1}|A) dx_{k-1} dm_{k-1} \nonumber \\
+          % &\int \int P(x_k|x_{k-1},m_k,m_{k-1},A)P(x_{k-1},m_k,m_{k-1}|A) dx_{k-1}dm_{k-1} \nonumber \\
+          % &\int \int P(x_k|x_{k-1},u_k)P(x_{k-1},m_k,m_{k-1}|A) dx_{k-1}dm_{k-1} \nonumber \\
+          % &\int \int P(x_k|x_{k-1},u_k)P(m_k|x_{k-1},m_{k-1},A)P(x_{k-1},m_{k-1}|A)  dx_{k-1}dm_{k-1} \nonumber \\
+          \int \int P(x_k|x_{k-1},u_k)P(m_k|m_{k-1},v_{k-1})\\P(x_{k-1},m_{k-1}|A) dx_{k-1}dm_{k-1}
+          \label{eq:time_update}
+        \end{multline}
 
 
       \end{block}
+      \begin{block} {Measurement Update} Measurement update uses the bayes formula to update the state of the estimation problem given a new observation $z_k$ at time step $k$. To write the equations concisely, let $B =\{ \mathbf{Z}_{0:k},\mathbf{U}_{0:k},\mathbf{V}_{0:k},x_0,m_0 \}$
+        \begin{align}
+          P(x_k,m_k|B) %&= \frac{P(z_k|x_k,m_k,A)P(x_k,m_k|A)}{P(z_k|A)} \nonumber\\
+          &=\frac{P(z_k|x_k,m_k)P(x_k,m_k|A)}{P(z_k|A)}
+          \label{eq:measurement_update}
+        \end{align}
+
+      \end{block}
+
+      \begin{block}{Dynamic World Representation} 
+        Dropping the notation for scene part, in current formulation, we assume a uniform prior $\mu_j(0) = P(C_j), \sum_{j=1}^{p}\mu_j(0) = 1$ over different motion models for each scene part. However, this prior can be modified appropriately by object detection such as doors are more likely to have revolute joints etc.. Motion model probability is updated as more and more observations are received \cite{yaakov2001estimation} as 
+        \begin{align*}
+          & \mu_j(k) \equiv P(C_j|\mathbf{Z}_{0:k})  = 
+          %\frac{P(z_k|\mathbf{Z}_{0:k-1}, C_j)P(C_j|\mathbf{Z}_{0:k-1})}{P(z_k|\mathbf{Z}_{0:k-1})} \nonumber \\
+          %&\mu_j(k) = 
+          \frac{P(z_k|\mathbf{Z}_{0:k-1}, C_j)\mu_j(k-1)}{\sum_{j=1}^{p} P(z_k|\mathbf{Z}_{0:k-1}, C_j)\mu_j(k-1) }
+        \end{align*}
+      \end{block}
+
+
+
 
     \end{column}
 
-  \begin{column}{\sepwid}\end{column}			% empty spacer column
+  %\begin{column}{\sepwid}\end{column}			% empty spacer column
 
+  \hspace{-\sepwid}
     \begin{column}{\onecolwid}
 
-      \begin{block}{Object detection with occlusion}
-        To account for occlusion we weight the error along each side of the
-        bounding box with a visibility fraction that is proportional to
-        unoccluded area around that side:
-        
-      \end{block}
-
-      %\begin{block}{Object detection with continuous occlusion}
-      %  The detection scores GMM with occlusion is given by replacing the covariance
-      %  matrix
-      %  %
-      %  \begin{multline}
-      %    S'(\bb{i}) =\\
-      %    \sum_j A_j \exp(-(\bb{i}-\mu^{(d)}_j)^\top \Sigma'^{(d)-1}_j
-      %    (\bb{i}-\mu^{(d)}_j))
-      %  \end{multline}
-
-      %  The energy of detection scores is simply take to be the inverse of the detection score.
-      %  \begin{align}
-      %    \Energy{detect}(\{ \relp{i}{t} \}_i, \{ \relp{i}{t-1} \}_i, \{\dimsn{i}\}_i ) = \frac{1}{S'(\bb{i})}
-      %  \end{align}
-      %\end{block}
-
-
-
-      \begin{block}{Other Energies}
-      \end{block}
       \begin{block}{Experiments and Results}
-        We perform experiments on KITTI \cite{geiger2013vision} dataset.
-        %\includegraphics[width=\onecolwid]{results/Visualization/City/2011_09_26_drive_0009/single_window_contPtTracks_size_bboxOcc_yawTstepWiseInference/0000000061.png}\\
-        %\includegraphics[width=\onecolwid]{results/Visualization/City/2011_09_26_drive_0009/single_window_lane_size_bboxOcc_yawTstepWiseInference/0000000061.png}\\
-
-        
-      \end{block}
-    \end{column}
-
-  \begin{column}{\sepwid}\end{column}			% empty spacer column
-
-    \begin{column}{\onecolwid}
-      \begin{block}{}
-        %\includegraphics[width=\onecolwid]{results/Visualization/City/2011_09_26_drive_0009/single_window_contPtTracks_size_bboxOcc_yawTstepWiseInference/0000000063.png}
+        \begin{figure}
+          \newlength{\imgwidth}
+          \setlength{\imgwidth}{\textwidth}
+          \centering
+          \tikzset{/tikz/x=0.08\linewidth}
+          \tikzset{/tikz/y=0.08\linewidth}
+          \input{../paper/resultsfig}%
+          \caption{ Frames at different time intervals of our simulation.
+      Color of a landmark at a particular frame is the weighted sum of colors
+      assigned to each motion model. The weights used are the probability of the
+    landmark following that particular motion model and estimated by our algorithm. We also show the predicted trajectory of a landmark according to the estimated motion model.}
+          \label{fig:graphmodel}
+        \end{figure}
       \end{block}
       \begin{block}{Conclusion}
         We use Probablistic graphical models to deduce consistent solutions from multiple sources. The results do not match our expectations and hence need further investigation.
