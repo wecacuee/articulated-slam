@@ -95,11 +95,10 @@ class Revolute_Landmark(Motion_Models):
         # Model is x_k = x_0+r\cos(\theta_0+n*w_l), y_k = y_0+r\sin(\theta_0+n*w_l) where n = 0,...,t are time steps
         x0 = np.array([0,0,0,0,0])
 
-        # Vikas: Please verify if this constraint is reasonable
         # x[2] is radius -- maximum radius 100, min radius 1
-        maxradius, minradius = 100.0, 1.0
+        maxradius, minradius = 100.0, 0.01
         # x[4] is angular velocity -- minimum 0.1 rad/delta T
-        minangvel = 0.1
+        minangvel = 0.01
         cons = ({'type':'ineq','fun': lambda x:maxradius-x[2]},
                 {'type':'ineq','fun': lambda x:x[2]-minradius},
                 {'type':'ineq','fun': lambda x: np.abs(x[4])-minangvel})

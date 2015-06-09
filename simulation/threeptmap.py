@@ -38,7 +38,7 @@ def threeptmap():
 if __name__ == '__main__':
     import sys
     if len(sys.argv) >= 2 and sys.argv[1] == "100":
-        nframes, lmmap, lmvis, robtraj, maxangle, maxdist = landmarkmap.hundred_ldmk_map()
+        nframes, lmmap, lmvis, robtraj, maxangle, maxdist = landmarkmap.hundred_ldmk_map(1)
     else:
         nframes, lmmap, lmvis, robtraj, maxangle, maxdist = threeptmap()
 
@@ -51,6 +51,7 @@ if __name__ == '__main__':
                                               # Do not pass visualizer to
                                               # disable visualization
                                               lmvis=None)
+    frame_period = lmvis.frame_period
     for fidx, (rs, thetas, ids, rob_state, ldmks) in enumerate(rob_obs_iter): 
         print '+++++++++++++ fidx = %d +++++++++++' % fidx
         print 'Robot state:', rob_state
@@ -109,4 +110,8 @@ if __name__ == '__main__':
             cv2.imwrite(filename, img)
 
         cv2.imshow(lmvis._name, img)
-        cv2.waitKey(lmvis.frame_period)
+        keyCode = cv2.waitKey(frame_period)
+        if keyCode in [1048608, 32]: # space
+            frame_period = lmvis.frame_period if frame_period == -1 else -1
+        elif keyCode != -1:
+            print 'Keycode = %d' % keyCode

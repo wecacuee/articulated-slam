@@ -77,8 +77,10 @@ class Estimate_Mm:
     def __init__(self):
         # Initialize motion models
         # Noise in all the noise models for motion propagation
-        self.noise_motion = np.diag([0.01,0.01])
-        self.noise_obs = np.diag([0.01,0.01])
+        # self.noise_motion = np.diag([0.01,0.01])
+        # self.noise_obs = np.diag([0.01,0.01])
+        self.noise_motion = np.diag([0.01,0.01]) * 100
+        self.noise_obs = np.diag([0.01,0.01]) * 100
         # Minimum number of observations in order to estimate all the model
         self.min_samples = 3
         # To keep track of the number of samples that have been processed
@@ -99,6 +101,9 @@ class Estimate_Mm:
     # robot_state is the position of the robot from where this data was sensed
     def process_inp_data(self,inp_data,robot_state):
         self.num_data = self.num_data+1
+	lk_prob = np.zeros(len(self.mm))
+        residual = list()
+        inno_covariances = list()
         # Pass this data to all the models
         for i in range(len(self.mm)):
             # All the motion models work in x,y but we get bearing and range from sensor
@@ -124,8 +129,9 @@ class Estimate_Mm:
                 # Step 3: Compute Kalman Gain
                 K_t = np.dot(np.dot(self.covs[i],np.transpose(H_t)),np.linalg.inv(inno_cov))
                 # Step 4: Update State
-                residual = inp_data-observation_model(robot_state,self.means[i])
-                self.means[i] = self.means[i]+np.dot(K_t,residual)
+                residual.append( inp_data -
+                        observation_model(robot_state,self.means[i]) )
+                self.means[i] = self.means[i]+np.dot(K_t,residual[-1])
                 # Step 5: Update State Covariance
                 self.covs[i] = np.dot(np.identity(2)-np.dot(K_t,H_t),self.covs[i])
 
@@ -133,9 +139,13 @@ class Estimate_Mm:
                 # tracking and navigation
 
                 # Likelihood function and probability
-                lk_prob = sp.multivariate_normal.pdf(residual,mean = np.array([0,0]),
+                lk_prob[i] = sp.multivariate_normal.pdf(residual[-1],mean = np.array([0,0]),
                         cov = inno_cov)
-                self.prior[i] = self.prior[i]*lk_prob
+                inno_covariances.append(np.linalg.det(inno_cov))
+
+        if (self.num_data>self.min_samples):
+            for i in range(len(self.mm)):
+                self.prior[i] = self.prior[i]*lk_prob[i]
 
         # Updating the model probabilities to sum to 1
         self.prior = self.prior/np.sum(self.prior)
