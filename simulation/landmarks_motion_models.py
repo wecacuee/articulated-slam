@@ -3,6 +3,8 @@ Given trajectories, estimate the motion models currently being followed by the l
 """
 import numpy as np
 from scipy.optimize import minimize
+from scipy.misc import comb
+import itertools
 
 # Abstract class for storing and estimating various motion models
 class Motion_Models:
@@ -83,6 +85,66 @@ class Static_Landmark(Motion_Models):
     def model_linear_matrix(self):
         return np.array([[1,0],[0,1]])
 
+def revolute_params_analytic(points):
+    """
+    >>> c = np.ones(2) * 0.5
+    >>> r = 1
+    >>> thetas = np.array([10, 20, 30]) * np.pi / 180
+    >>> points = r * np.vstack((np.cos(thetas), np.sin(thetas))) + c.reshape(-1, 1)
+    >>> [round(f, 2) for f in revolute_params_analytic(points)]
+    [0.5, 0.5, 1.0, 0.17, 0.17]
+
+    >>> c = np.random.rand(2)
+    >>> r = np.random.rand(1)
+    >>> omega = np.random.rand(1) * np.pi * 1/3
+    >>> theta0 = np.random.rand(1) * np.pi * 1/3
+    >>> thetas = theta0 + np.array([0, omega, 2*omega])
+    >>> points = r * np.vstack((np.cos(thetas), np.sin(thetas))) + c.reshape(-1, 1)
+    >>> out = revolute_params_analytic(points)
+    >>> expected = np.hstack((c, r, theta0, omega))
+    >>> np.allclose(out, expected)
+    True
+    """
+    # | x_i - c |^2 = r^2, for all i
+    # for all i, minimize ||c' c - 2 x_i' c - r^2 ||
+    # 
+    ## for 2D
+    # take any pair of points
+    # xm_ij = (x_i + x_j)/2
+    # (x_i - xm_ij)' (c - xm_ij) = 0
+    # (x_j - xm_ij)' (c - xm_ij) = 0
+    # [x_i' - xm_ij'] c = (x_i -xm_ij)' xm_ij
+    # [x_j' - xm_ij']   = (x_j -xm_ij)' xm_ij
+
+    #
+    ## for 3D
+    # take any triplets of points
+    # xm_ijk = (xi + xj + xk)/3
+
+    ## for nD
+    # take any n points
+    d, n = points.shape
+    assert n >= d + 1, 'need n > d + 1, n = %d, d = %d' % (n, d)
+    nchoosed = comb(n,d)
+    A = np.zeros((nchoosed * d, d))
+    b = np.zeros(nchoosed * d)
+    for i, pt_idx_d_tuple in enumerate(itertools.combinations(range(n), d)):
+        mean_point = np.mean(points[:, pt_idx_d_tuple], axis=1)
+        for j, pt_idx in enumerate(pt_idx_d_tuple):
+            A[d*i + j, :] = points[:, pt_idx] - mean_point
+            b[d*i + j] = (points[:, pt_idx] - mean_point).dot(mean_point)
+
+
+    c = np.linalg.lstsq(A,b)[0]
+    cpts = points - c.reshape(-1,1)
+    r = np.mean(np.sqrt(np.sum(cpts**2, axis=0)))
+    thetas = np.arctan2(cpts[1,:], cpts[0,:]) # only valid for 2D
+    omega = np.mean(np.diff(thetas))
+    retvals = list(c)
+    retvals.extend([r, thetas[0], omega])
+    return retvals
+
+
 
 # Landmark motion model that is moving in a circular motion with uniform velocity
 class Revolute_Landmark(Motion_Models):
@@ -93,10 +155,14 @@ class Revolute_Landmark(Motion_Models):
         # Fitting a prismatic model using maximum likelihood
         # Model consists of x_0,y_0,r,theta_0,w_l : center x, center y, radius,start_angle, angular velocity
         # Model is x_k = x_0+r\cos(\theta_0+n*w_l), y_k = y_0+r\sin(\theta_0+n*w_l) where n = 0,...,t are time steps
-        x0 = np.array([0,0,0,0,0])
+        # x0 = np.array([0,0,0,0,0])
+        points = self.model_data[:self.min_data_samples, :].T
+        x0 = revolute_params_analytic(points)
+        if np.any(np.isinf(x0)) or np.any(np.isnan(x0)):
+            x0 = np.array([0, 0, 0, 0, 0])
 
         # x[2] is radius -- maximum radius 100, min radius 1
-        maxradius, minradius = 100.0, 0.01
+        maxradius, minradius = 1000.0, 0.1
         # x[4] is angular velocity -- minimum 0.1 rad/delta T
         minangvel = 0.01
         cons = ({'type':'ineq','fun': lambda x:maxradius-x[2]},
