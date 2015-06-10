@@ -12,6 +12,7 @@
 
 \usepackage{bm}
 \usepackage{tikz}
+\usepackage{times}
 
 \usetikzlibrary{trees,shadows,fit,positioning,calc}
 
@@ -86,6 +87,12 @@
     \begin{column}{\onecolwid}
       \begin{block}{Introduction}
         Imagine a robot moving in a typical living room environment which encounters indoor objects such as doors, drawers and chairs etc. We posit that in order for the robot to understand, map or interact with such objects, the robot needs to be able to understand the articulation. 
+
+        \begin{figure}
+          \includegraphics[width=\onecolwid,trim=0 1in 0 3in,clip]{media/parts_of_scenes}
+          \caption{World is composed of rigid bodies. These rigid bodies are connected to each other by limited types of joints $\{C_j\}$, for example, static, prismatic etc
+}
+        \end{figure}
       \end{block}
 
       \begin{block}{Modeling}
@@ -98,14 +105,7 @@
         \end{figure}
 
       \end{block}
-    \end{column}
-  \hspace{-\sepwid}
-
-  %\begin{column}{\sepwid}\end{column}			% empty spacer column
-
-      
-    \begin{column}{\onecolwid}
-      \begin{block}{Time update}
+      \begin{block}{Time Update}
 
         The time update models the evolution of state according to the motion model. To write equation concisely, let $A =\{ \mathbf{Z}_{0:k-1},\mathbf{U}_{0:k},\mathbf{V}_{0:k},x_0,m_0 \}$
         \begin{multline}
@@ -114,13 +114,29 @@
           % &\int \int P(x_k|x_{k-1},m_k,m_{k-1},A)P(x_{k-1},m_k,m_{k-1}|A) dx_{k-1}dm_{k-1} \nonumber \\
           % &\int \int P(x_k|x_{k-1},u_k)P(x_{k-1},m_k,m_{k-1}|A) dx_{k-1}dm_{k-1} \nonumber \\
           % &\int \int P(x_k|x_{k-1},u_k)P(m_k|x_{k-1},m_{k-1},A)P(x_{k-1},m_{k-1}|A)  dx_{k-1}dm_{k-1} \nonumber \\
-          \int \int P(x_k|x_{k-1},u_k)P(m_k|m_{k-1},v_{k-1})\\P(x_{k-1},m_{k-1}|A) dx_{k-1}dm_{k-1}
+          \int \int 
+          \underbrace{P(x_k|x_{k-1},u_k)}_{\text{Robot motion}}
+          \underbrace{P(m_k|m_{k-1},v_{k-1})}_{\text{World motion}}
+          \underbrace{P(x_{k-1},m_{k-1}|A)}_{\text{Previous state}} dx_{k-1}dm_{k-1}
           \label{eq:time_update}
         \end{multline}
 
+        \begin{itemize}
+          \item
+            Robot motion can be obtained from the kinematic/dynamic model 
+          \item 
+            World motion is approximated by finite order motion model
+        \end{itemize}
 
       \end{block}
-      \begin{block} {Measurement Update} Measurement update uses the bayes formula to update the state of the estimation problem given a new observation $z_k$ at time step $k$. To write the equations concisely, let $B =\{ \mathbf{Z}_{0:k},\mathbf{U}_{0:k},\mathbf{V}_{0:k},x_0,m_0 \}$
+    \end{column}
+  \hspace{-\sepwid}
+
+  %\begin{column}{\sepwid}\end{column}			% empty spacer column
+
+      
+    \begin{column}{\onecolwid}
+      \begin{block} {Measurement Update} Measurement update uses the Bayes formula to update the state of the estimation problem given a new observation $z_k$ at time step $k$. To write the equations concisely, let $B =\{ \mathbf{Z}_{0:k},\mathbf{U}_{0:k},\mathbf{V}_{0:k},x_0,m_0 \}$
         \begin{align}
           P(x_k,m_k|B) %&= \frac{P(z_k|x_k,m_k,A)P(x_k,m_k|A)}{P(z_k|A)} \nonumber\\
           &=\frac{P(z_k|x_k,m_k)P(x_k,m_k|A)}{P(z_k|A)}
@@ -130,7 +146,7 @@
       \end{block}
 
       \begin{block}{Dynamic World Representation} 
-        Dropping the notation for scene part, in current formulation, we assume a uniform prior $\mu_j(0) = P(C_j), \sum_{j=1}^{p}\mu_j(0) = 1$ over different motion models for each scene part. However, this prior can be modified appropriately by object detection such as doors are more likely to have revolute joints etc.. Motion model probability is updated as more and more observations are received \cite{yaakov2001estimation} as 
+        We assume a uniform prior $\mu_j(0) = P(C_j), \sum_{j=1}^{p}\mu_j(0) = 1$ over different motion models for each scene part. Note that, this prior can be modified appropriately by object detection such as doors are more likely to have revolute joints etc. 
         \begin{align*}
           & \mu_j(k) \equiv P(C_j|\mathbf{Z}_{0:k})  = 
           %\frac{P(z_k|\mathbf{Z}_{0:k-1}, C_j)P(C_j|\mathbf{Z}_{0:k-1})}{P(z_k|\mathbf{Z}_{0:k-1})} \nonumber \\
@@ -139,15 +155,48 @@
         \end{align*}
       \end{block}
 
-
-
-
-    \end{column}
-
-  %\begin{column}{\sepwid}\end{column}			% empty spacer column
-
-  \hspace{-\sepwid}
-    \begin{column}{\onecolwid}
+      \begin{block}{Temporal Modeling}
+        \begin{align}
+          \begin{bmatrix}
+            x^{1} \\
+            x^{2} \\
+            . \\
+            .\\
+            x^{n}
+          \end{bmatrix} &= 
+          \begin{bmatrix}
+            0 & 1  & . & . & 0\\
+            0 & 0  & . & . & 0\\
+            0 & 0  & . & . & 0\\
+            0& 0 & . & . & 1\\
+            0 & 0  & . & . & 0\\
+          \end{bmatrix}
+          \begin{bmatrix}
+            x \\
+            x^{1} \\
+            . \\
+            .\\
+            x^{n-1}
+          \end{bmatrix}
+          +\begin{bmatrix}
+            0 \\
+            0 \\
+            .\\
+            .\\
+            1
+          \end{bmatrix} 
+          \eta\\
+        y &=  \begin{bmatrix}
+          1 &
+          0 &
+          .&
+          .&
+           0
+          \end{bmatrix} 
+        \begin{bmatrix} x \\ x^{1} \\ . \\ .\\ x^{n-1} \end{bmatrix} + \omega
+        \end{align}
+        where $x^{n}$ denotes $n^{th}$ order derivative of the state variable and $\eta$ and $\omega$ are process and observation noise. 
+      \end{block}
 
       \begin{block}{Experiments and Results}
         \begin{figure}
@@ -164,13 +213,41 @@
           \label{fig:graphmodel}
         \end{figure}
       \end{block}
-      \begin{block}{Conclusion}
-        We use Probablistic graphical models to deduce consistent solutions from multiple sources. The results do not match our expectations and hence need further investigation.
+
+      
+    \end{column}
+
+  %\begin{column}{\sepwid}\end{column}			% empty spacer column
+
+  \hspace{-\sepwid}
+    \begin{column}{\onecolwid}
+
+      \begin{block}{Temporal Model Simulation}
+        \centering
+          \begin{figure}
+            \includegraphics[width=1.0\onecolwid]{media/temporal_model.pdf}
+            \caption{The ``Input Data'' is time varying parameter of the world
+            motion, which is approximated by a first order motion model and
+          it's trajectory is shown as ``State output''. The later plot show the
+        probability of the motion model explaining the observed model. The
+      probability decreases drastically after only a few frames.}
+          \end{figure}
+      \end{block}
+
+      \begin{block}{Conclusion and Future Work}
+        \begin{itemize}
+          \item We use constraints in the physical world to model dynamic world
+          \item Finite order motion models can explain any motion locally
+          \item We need further real world experiments to prove the effectiveness of our model
+        \end{itemize}
       \end{block}
       \begin{block}{References}
+        \nocite{yaakov2001estimation}
+        \nocite{cifuentes2012motion}
+        \nocite{yan2006automatic}
         {\small
-          \bibliographystyle{ieee}
-          \bibliography{continuousocclusion}
+        \bibliographystyle{plain}
+        \bibliography{../paper/cvpr_abstract/articulation_scene_understanding}
         }
       \end{block}
     \end{column}

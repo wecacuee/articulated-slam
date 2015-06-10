@@ -38,7 +38,7 @@ def threeptmap():
 if __name__ == '__main__':
     import sys
     if len(sys.argv) >= 2 and sys.argv[1] == "100":
-        nframes, lmmap, lmvis, robtraj, maxangle, maxdist = landmarkmap.hundred_ldmk_map(1)
+        nframes, lmmap, lmvis, robtraj, maxangle, maxdist = landmarkmap.hundred_ldmk_map(10)
     else:
         nframes, lmmap, lmvis, robtraj, maxangle, maxdist = threeptmap()
 
@@ -93,13 +93,15 @@ if __name__ == '__main__':
                     pt2 = center + radius * np.array([np.cos(angle+np.pi/180),
                                                np.sin(angle+np.pi/180)])
                     pt2 = tuple(np.int64(pt2)*lmvis._scale)
-                    cv2.line(img, pt1, pt2, color=rev_color, thickness=1*lmvis._scale)
+                    if np.all(pt1 <= img.shape) and np.all(pt2 <= img.shape):
+                        cv2.line(img, pt1, pt2, color=rev_color, thickness=1*lmvis._scale)
             elif motion_class.prior[1] > 0.9:
                 # prismatic
                 x0, delx = motion_class.mm[1].get_prismatic_par()
                 pt1 = tuple(np.int64(x0)*lmvis._scale)
                 pt2 = tuple(np.int64(x0+delx*10)*lmvis._scale)
-                cv2.line(img, pt1, pt2, color=pris_color, thickness=1*lmvis._scale)
+                if np.all(pt1 <= img.shape) and np.all(pt2 <= img.shape):
+                    cv2.line(img, pt1, pt2, color=pris_color, thickness=1*lmvis._scale)
         #colors
         print 'motion_class.priors', mm_probs
     
