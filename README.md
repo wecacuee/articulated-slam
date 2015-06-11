@@ -83,6 +83,8 @@ localization is important. (John leanord)
     Also think in direction of estimating the weight/force required to open
     door but just observing someone else operating it ... just like the fabric
     paper.
+* It is better to use change in direction of surface normals rather than
+relative movements of points of time to get revolute joints.
 
 #Paper ideas
 * Compare with Ashutosh Saxena' work of priors on object trajectories
