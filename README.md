@@ -51,6 +51,45 @@ To record video from rviz display use glc-capture and glc-play
 
 http://robot.wpi.edu/wiki/index.php/ROS:rviz-video
 
+#to read
+http://arxiv.org/pdf/1502.01659.pdf by Sudeep and Teller (MIT)
+* Possible contributions
+    - Moving camera/robot requires prediction and temporal modeling (SLAM
+    type approach)
+    - temporal modeling enables to duck a moving door/punch and avoid
+    collisions.
+    - RGBD based dense track ICP vs sparse feature tracking
+    - Detection and fitting of the object after it has estimated the joint and
+    is re-seen by the robot.
+
 
 #Codes and Datasets
 http://wiki.ros.org/articulation_tutorials
+
+#Ideas and TODO's from CVPR
+
+* Dataset for articulation estimation
+* Monocular 2D SFM (Line/Point/Objects) + articulation : combined derivation
+* Hierarchy everywhere
+* clustering of direction of  incremental motion to get prismatic and revolute
+joints. Better than ICP.
+* Convex relaxations (Read and use it always)
+* Difference between predicted and observed is important for which
+localization is important. (John leanord)
+* Temporal models: Preserve higher order coefficients (acceleration/jerk)
+    instead of lower order (position/velocity). Because in case of spring (or
+    human) motion velocity may be different but acceleration or jerk are
+    constant and different for spring as compared to human. Compare with DTW.
+    Also think in direction of estimating the weight/force required to open
+    door but just observing someone else operating it ... just like the fabric
+    paper.
+* It is better to use change in direction of surface normals rather than
+relative movements of points of time to get revolute joints.
+
+#Paper ideas
+* Compare with Ashutosh Saxena' work of priors on object trajectories
+(learning from demonstration) like mug trajectories). Lookup temporal modeling
+of their model. Perhaps they use DTW.
+* Applications: Dynamic SLAM, Object SLAM
+* Motion planning in dynamic environments: Merge or not merge, entering garage
+with closing doors. 

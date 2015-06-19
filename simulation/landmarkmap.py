@@ -13,13 +13,14 @@ import cv2
 def landmarks_from_rectangle(n, maxs):
     """Generate n landmarks within rectangle"""
     # Some random generator
-    assert n >= 4
-    landmarks = [[1,1],
-                [maxs[0]-1, 1],
-                [maxs[0]-1, maxs[1]-1],
-                [1, maxs[1]-1],
-                ]
-    for i in range(4,n):
+    landmarks = []
+    if n >= 4:
+	landmarks = [[1,1],
+		[maxs[0]-1, 1],
+		[maxs[0]-1, maxs[1]-1],
+		[1, maxs[1]-1],
+		]
+    for i in range(len(landmarks),n):
         landmarks.append(nprnd.rand(2) * maxs)
     return np.array(landmarks).T
 
@@ -217,13 +218,16 @@ class LandmarksVisualizer(object):
         return img
 
     def visualizemap_with_robot(self, map, robottraj_iter):
+	frame_period = self.frame_period
         for lmks, posdir in itertools.izip(map.get_landmarks(), 
                                            robottraj_iter):
             robview = RobotView(posdir[0], posdir[1], 45*np.pi/180, 40)
             img = self.genframe(lmks, robview)
             img = self.drawrobot(robview, img)
             cv2.imshow(self._name, img)
-            cv2.waitKey(self.frame_period)
+	    if cv2.waitKey(frame_period) >= 0:
+		frame_period = self.frame_period if self.frame_period == -1 else -1
+
 
 
 def T_from_angle_pos(theta, pos):
@@ -276,37 +280,37 @@ def map_from_conf(map_conf, nframes):
 
     return LandmarkMap(rmlist)
 
-def hundred_ldmk_map():
-    nframes = 600
+def hundred_ldmk_map(sample_per_block=20):
+    nframes = 150
     # The map consists of 5 rectangular rigid bodies with given shape and
     # initial position. Static bodies have deltheta=0, delpos=[0,0]
-    map_conf = [dict(nsamples=20,
+    map_conf = [dict(nsamples=sample_per_block,
                      shape=[50,50],
                      inittheta=0,
                      initpos=[60, 90],
                      deltheta=0,
                      delpos=[0,0]),
                 # prismatic
-                dict(nsamples=20,
+                dict(nsamples=sample_per_block,
                      shape=[50, 10],
                      inittheta=0,
                      initpos=[10, 80],
                      deltheta=0,
                      delpos=[50./(nframes/2), 0]),
-                dict(nsamples=20,
+                dict(nsamples=sample_per_block,
                      shape=[50, 50],
                      inittheta=0,
                      initpos=[60, 30],
                      deltheta=0,
                      delpos=[0, 0]),
                 # revolute
-                dict(nsamples=10,
+                dict(nsamples=sample_per_block,
                      shape=[25, 5],
                      inittheta=0,
                      initpos=[35, 30],
                      deltheta=2*np.pi/(nframes/2),
                      delpos=[0, 0]),
-                dict(nsamples=30,
+                dict(nsamples=sample_per_block,
                      shape=[10, 140],
                      inittheta=0,
                      initpos=[0, 0],
@@ -315,13 +319,14 @@ def hundred_ldmk_map():
                ]
 
     lmmap = map_from_conf(map_conf, nframes)
-    lmv = LandmarksVisualizer([0,0], [110, 140], frame_period=10, scale=3)
-    robtraj = robot_trajectory(np.array([[20, 130], [50,100], [35,50]]), [250, 250],
-                               np.pi/100)
+    lmv = LandmarksVisualizer([0,0], [110, 140], frame_period=80, scale=3)
+    robtraj = robot_trajectory(np.array([[20, 130], [50,100], [35,50]]), 
+	    [62, 62], # frame break points
+	    np.pi/25) # angular velocity
     # angle on both sides of robot dir
     maxangle = 45*np.pi/180
     # max distance in pixels
-    maxdist = 40
+    maxdist = 80
     return nframes, lmmap, lmv, robtraj, maxangle, maxdist
 
 if __name__ == '__main__':
