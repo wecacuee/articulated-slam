@@ -31,13 +31,17 @@ class temporal_model:
         # variable right
         self.model_pars = np.zeros(len(init_state))
         # Sigma for Gaussian smoothing to be used for derivative computation
-        self.gauss_sigma = 1
+        self.gauss_sigma = 1.0
         # Noise in the motion propagation step
         self.noise_motion = np.diag(0.1*np.ones(self.order))
         # Noise in the observation step
-        self.noise_obs = 1
+        self.noise_obs = 1.0
         # State covariance
         self.cov = np.diag(0.1*np.ones(self.order))
+        # Initial likelihood probability of the model
+        self.init_lk_prob = None
+        # Theshold for fraction by which the probability needs to decrease
+        self.prob_thresh = 0.1
 
 
     # Forward propagation model
@@ -45,7 +49,10 @@ class temporal_model:
         # Time step
         dt = self._dt
         # Generate a sample for last state by sampling from Gaussian with given noise variance
-        noise_input = self.noise_mu+self.noise_sigma*np.random.randn()
+        # Add noise only if we are trying to simulate the true generation process
+        # However, usually we are using this within a filtering framework, where only the deterministic part needs to be propagated
+        noise_input = 0.0
+        # noise_input = self.noise_mu+self.noise_sigma*np.random.randn()
         # Dummy variable for state prediction
         pred_state = np.zeros(len(self.state))
         for i in range(self.order):
@@ -131,7 +138,8 @@ class temporal_model:
             residual = inp_data-observation_model(self.state)
             self.state = self.state+np.dot(K_t,residual)
             # Step 5: Update State Covariance
-            self.cov = np.dot(np.identity(self.order)-np.dot(K_t,H_t),self.cov)
+            # Special treatment because K_t is an array but we need matrix multiplication
+            self.cov = np.dot(np.identity(self.order)-np.dot(K_t[np.newaxis].T,H_t[np.newaxis]),self.cov)
 
             # Update the model contribution -- 11.6.2-2 of Estimation with Applications to
             # tracking and navigation
@@ -139,7 +147,15 @@ class temporal_model:
             # Likelihood function and probability
             lk_prob = sp.multivariate_normal.pdf(residual,mean = np.array([0,0]),
                     cov = inno_cov)
-            print lk_prob
+            print lk_prob,self.state,inp_data
+            # Set the model's initial probability
+            if self.init_lk_prob is None:
+                self.init_lk_prob = lk_prob
+            else:
+                if (lk_prob/self.init_lk_prob < self.prob_thresh):
+                    print "The model is no longer valid"
+                    pdb.set_trace()
+
         return lk_prob 
 
 # Define the observation model for getting the kalman filtering step
@@ -157,20 +173,22 @@ def observation_jac(robot_state):
 
 
 if __name__=="__main__":
-    init_state = np.array([0,0])
+    init_state = np.array([0,0,0])
     dt = 1.0 # Time steps of dt sec
     const_vel = temporal_model(init_state,dt)
     # Reading the data from the excel file
     wb = xlrd.open_workbook('../temp/output_angles_ground_truth.xls')
     sh = wb.sheet_by_index(0)
     num_points = 30
-    inp_data = np.zeros(num_points)
-    lk_prob = np.zeros(num_points)
-    out_state = np.zeros(num_points)
+    inp_data = np.zeros(num_points+10)
+    lk_prob = np.zeros(num_points+10)
+    out_state = np.zeros(num_points+10)
     for i in range(1,num_points+1):
         inp_data[i-1] = sh.cell(0,i).value
+    inp_data[-10:] = inp_data[-11]
+    num_points = num_points+10
     # Passing this data to the algorithm
-    for i in range(num_points):
+    for i in range(inp_data.shape[0]):
         lk_prob[i] = const_vel.process_inp_data(inp_data[i])
         out_state[i] = const_vel.state[0]
 
