@@ -1,0 +1,4 @@
+Joint_vs_Separate
+True Center - [2,2], radius - 1
+Separate - {'radius': 1.0984106169480887, 'center': array([ 2.0465677 ,  1.88124861])}
+Joint -  center: [2.17586903  2.21206168] and radius:  0.83031544
