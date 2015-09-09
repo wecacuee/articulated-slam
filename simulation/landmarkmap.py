@@ -6,7 +6,6 @@ import itertools
 import numpy as np
 import numpy.random as nprnd
 from numpy.linalg import norm as vnorm
-
 import cv2
 
 
@@ -113,7 +112,7 @@ def R2D_angle(theta):
                      [-np.sin(theta),  np.cos(theta)]])
 
 def robot_trajectory(positions, nframes, angular_vel):
-    prev_dir = None 
+    prev_dir = None
     from_pos = positions[:-1]
     to_pos = positions[1:]
     for fp, tp, nf in zip(from_pos, to_pos, nframes):
@@ -135,7 +134,7 @@ def robot_trajectory(positions, nframes, angular_vel):
             dir = to_dir
 
         for i in range(nf+1):
-            pos = fp + (tp - fp) * i / nf
+            pos = fp + (tp - fp) * i*1.0 / nf
             yield (pos, dir)
         prev_dir = dir
 
