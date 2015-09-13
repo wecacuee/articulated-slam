@@ -296,20 +296,22 @@ if __name__=="__main__":
     data = np.array([3,2])
     data1 = np.array([2+np.cos(np.pi/6),2+np.sin(np.pi/6)])
     data2 = np.array([2+np.cos(np.pi/3),2+np.sin(np.pi/3)])
+    data3 = np.array([2+np.cos(np.pi*0.4),2+np.sin(np.pi*0.4)])
     noise_cov = np.diag([0.01,0.01])
     
     model1 = Revolute_Landmark(3,noise_cov)
     model1.process_inp_data(data)
     model1.process_inp_data(data1)
-    model1.process_inp_data(data2)
+    model1.process_inp_data(data3)
     print model1.model_par,model1.predict_model()
     print "New prediction ", model1.predict_model(np.array([3,2]))
 
-    
+    '''
     model2 = Prismatic_Landmark(2,noise_cov)
     model2.process_inp_data(data)
     model2.process_inp_data(data1)
     model2.process_inp_data(data2)
     print model2.model_par,model2.model_data,model2.predict_model(),model2.model_linear_matrix()
+    '''
     
 

@@ -20,22 +20,28 @@ import warnings
 
 ##
 # @brief Main class for motion parameter of an articulated model
-class motion_par:
+class Motion_Par:
     # @brief Constructor for the class
     #
     # @param _order Order of the motion model, minimum 1 for static model
     # @param _dt Time step between consecutive observations
     #
     # @return none
-    def __init__(self,_order=2,_dt=1):
+    def __init__(self,_order=2,_dt=1,_min_speed=0.0):
         # Define the order of the temporal model
         # Currently this module uses gaussian filtering which as implemented by scipy
         # only deals with derivatives upto order 3
-        if _order<4:
+        if abs(_order-0)<1e-3:
+            warnings.warn("Can not set order as 0")
+            self.order=1
+        elif _order<4:
             self.order = _order
         else:
             warnings.warn("Can not set order more than 3")
             self.order = 3
+        
+        # Order should be greater than 0
+
         # Define the initial state of a finite order temporal model
         self.state = None
         # Noise characteristics for the last state derivative, for example for
@@ -55,15 +61,16 @@ class motion_par:
         # Sigma for Gaussian smoothing to be used for derivative computation
         self.gauss_sigma = 0.6 # Length of the kernel is 2*lw+1 where lw is int(4*sigma+0.5)
         # Because of the above restriction, gauss_sigma should atleast be 0.125 for smoothing
+        self.min_speed = _min_speed
 
 
     ##
     # @brief Forward propagation model
     #
-    # @param state Current state of the motion parameter
+    # @param state Current state of the motion parameter (default is the current state)
     #
     # @return Prediction of the state at next time step 
-    def propagate(self,state):
+    def propagate(self,state=None):
         # Time step
         dt = self._dt
         # Generate a sample for last state by sampling from Gaussian with given noise variance
@@ -74,7 +81,8 @@ class motion_par:
         # noise_input = self.noise_mu+self.noise_sigma*np.random.randn()
 
         # Asserting that we have a valid current state to proceed from
-        assert self.state is not None
+        if state is None:
+            state = self.state
         # Dummy variable for state prediction
         pred_state = np.zeros(len(self.state))
         # Logic for writing discrete state propagation. For example
@@ -83,7 +91,7 @@ class motion_par:
         '''
         for i in range(self.order):
             for j in range(i,self.order):
-                pred_state[i] = pred_state[i]+((dt**(j-i))/math.factorial(j-i))*state[j]
+                pred_state[i] = pred_state[i]+(((dt**(j-i))*1.0)/math.factorial(j-i))*state[j]
                 # Adding noise to the final state
                 pred_state[i] = pred_state[i]+noise_input
         return pred_state
@@ -106,6 +114,12 @@ class motion_par:
 
         print "Model_data is ",self.model_data
 
+        '''
+        Currently we are assuming uniform grid spacing atleast during the interval
+        derivative is being evaluated for convolution -- for more interesting cases
+        with non-uniform grid, look at 
+        https://drive.google.com/a/buffalo.edu/file/d/0B81VL20ggLWyVEdLalF6R0NFdWM/view
+        '''
         # Getting the rest of the states
         for i in range(self.order,1,-1):
             # Denominator
@@ -117,6 +131,8 @@ class motion_par:
             print (i-1),"th order derivative is ",gf[int(len(gf)/2.0)]
             # Getting the current derivative
             self.model_pars[i-1] = gf[int(len(gf)/2.0)]
+        if (self.order == 2) and (abs(self.model_pars[-1])<self.min_speed):
+            self.model_pars[-1] = math.copysign(self.min_speed,self.model_pars[-1])
         # Print estimated model parameters
         print "Estimated temporal model parameters are",self.model_pars
 
@@ -130,8 +146,23 @@ class motion_par:
         model_mat = np.zeros([self.order,self.order])
         for i in range(self.order):
             for j in range(i,self.order):
-                model_mat[i][j] = ((dt**(j-i))/math.factorial(j-i))
+                model_mat[i][j] = (((dt**(j-i))*1.0)/math.factorial(j-i))
         return model_mat
+
+    
+    ##
+    # @brief To get the covariance matrix of B matrix akin to
+    # http://nbviewer.ipython.org/github/balzer82/Kalman/blob/master/Kalman-Filter-CV.ipynb?create=1
+    # where Q = G.G^T.\sigma^2
+    #
+    # @return 
+    def model_qmat(self):
+        dt = self._dt # Time Step
+        q_vec = np.zeros(self.order)
+        for i in range(self.order):
+            q_vec[i] = ((dt**(self.order-i))*1.0)/math.factorial(self.order-i)
+        return self.noise_sigma*np.outer(q_vec,q_vec)
+
 
     ##
     # @brief  Main input data processing 
@@ -144,17 +175,20 @@ class motion_par:
         self.num_data = self.num_data+1
         if self.num_data<self.min_data_samples:
             # Add data to model data
-            self.model_data[self.num_data-1] = inp_data.copy()
+            self.model_data[self.num_data-1] = inp_data
         elif self.num_data==self.min_data_samples:
             # Add data and call estimate_params function
-            self.model_data[self.num_data-1] = inp_data.copy()
+            self.model_data[self.num_data-1] = inp_data
             self.estimate_params()
             # Update the state based on estimated model paramters
             self.state = self.model_pars
         else:
             # Update the stored data as well
-            self.model_data[1:] = self.model_data[:-1]
+            self.model_data[:-1] = self.model_data[1:]
             self.model_data[-1] = inp_data
+            # Updating the current 0th order derivative as well
+            self.state[0] = inp_data
+            # To Do: In future update the other derivatives as well
 
 
 if __name__=="__main__":

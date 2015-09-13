@@ -101,7 +101,7 @@ class Estimate_Mm:
     # robot_state is the position of the robot from where this data was sensed
     def process_inp_data(self,inp_data,robot_state):
         self.num_data = self.num_data+1
-	lk_prob = np.zeros(len(self.mm))
+        lk_prob = np.zeros(len(self.mm))
         residual = list()
         inno_covariances = list()
         # Pass this data to all the models
@@ -160,7 +160,7 @@ if __name__=="__main__":
     r = 1;x_0 = 2;y_0 = 2;w = np.pi/6
     for i in range(10):
         # Revolute
-        # curr_obs = np.array([r*np.cos(i*w)+x_0,r*np.sin(i*w)+y_0])
+        #curr_obs = np.array([r*np.cos(i*w)+x_0,r*np.sin(i*w)+y_0])
 
         # Static
         # curr_obs = np.array([x_0,y_0])

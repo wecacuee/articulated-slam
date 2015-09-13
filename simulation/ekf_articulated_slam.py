@@ -13,6 +13,8 @@ import landmarkmap
 import cv2
 import estimate_mm as mm # To figure out the right motion model
 import pdb
+import utils_plot as up
+import scipy.linalg
 
 def threeptmap():
     nframes = 20
@@ -129,10 +131,13 @@ def mapping_example():
 '''
 Propagates robot motion with two different models, one for linear velocity
 and other one for a combination of linear and rotational velocity
-Inputs are: Previous robot state, actual robot input (translational and rotational component),
-covarinace in previous state, and time interval
+Inputs are: 
+Previous robot state,
+covarinace in previous state,
+actual robot input (translational and rotational component),
+and time interval
 '''
-def robot_motion_prop(prev_state,robot_input,prev_state_cov,delta_t):
+def robot_motion_prop(prev_state,prev_state_cov,robot_input,delta_t=1):
     # Robot input is [v,w]^T where v is the linear velocity and w is the rotational component
     v = robot_input[0];w=robot_input[1];
     # Robot state is [x,y,\theta]^T, where x,y is the position and \theta is the orientation
@@ -142,7 +147,7 @@ def robot_motion_prop(prev_state,robot_input,prev_state_cov,delta_t):
     # Probabilistic Robotics book
     alpha_1 = 0.1; alpha_2=0.05; alpha_3 = 0.05; alpha_4 = 0.1
     # M for transferring noise from input space to state-space
-    M = np.array([[(alpha_1*v^2)+(alpha_2*w^2),0],[0,(alpha_3*v^2)+(alpha_4*w^2)]])
+    M = np.array([[(alpha_1*(v**2))+(alpha_2*(w**2)),0],[0,(alpha_3*(v**2))+(alpha_4*(w**2))]])
     
     # Check if rotational velocity is close to 0
     if (abs(w)<1e-4):
@@ -150,8 +155,8 @@ def robot_motion_prop(prev_state,robot_input,prev_state_cov,delta_t):
         robot_state[1] = y+(v*delta_t*np.sin(theta))        
         robot_state[2] = theta
         # Derivative of forward dynamics model w.r.t previous robot state
-        G = np.array([[1,0,-v*delta_t*np.cos(theta)],\
-                [0,1,v*delta_t*np.sin(theta)],\
+        G = np.array([[1,0,-v*delta_t*np.sin(theta)],\
+                [0,1,v*delta_t*np.cos(theta)],\
                 [0,0,1]])
         # Derivative of forward dynamics model w.r.t robot input
         V = np.array([[delta_t*np.cos(theta),0],[delta_t*np.sin(theta),0],[0,0]])
@@ -166,7 +171,7 @@ def robot_motion_prop(prev_state,robot_input,prev_state_cov,delta_t):
         # Derivative of forward dynamics model w.r.t robot input
         # Page 206, Eq 7.11
         V = np.array([[(-np.sin(theta)+np.sin(theta+w*delta_t))/w,\
-                (v*(np.sin(theta)-sin(theta+w*delta_t)))/(w**2)+((v*np.cos(theta+w*delta_t)*delta_t)/w)],\
+                (v*(np.sin(theta)-np.sin(theta+w*delta_t)))/(w**2)+((v*np.cos(theta+w*delta_t)*delta_t)/w)],\
                 [(np.cos(theta)-np.cos(theta+w*delta_t))/w,\
                 (-v*(np.cos(theta)-np.cos(theta+w*delta_t)))/(w**2)+((v*np.sin(theta+w*delta_t)*delta_t)/w)],\
                 [0,delta_t]])
@@ -193,12 +198,18 @@ def articulated_slam():
                                               # disable visualization
                                               lmvis=None)
     frame_period = lmvis.frame_period
-    # EKF related parameters
-    prev_state = [] # \mu_{t-1} state at previous time step
-    prev_cov = [] # \Sigma_{t-1} Covariance at previous time step
+    # EKF parameters for filtering
 
-    state = [] # \mu_{t} state at current time step
-    cov = [] # covariance at current time step
+    # Initially we only have the robot state
+    slam_state = np.array([8.5,91.5,-np.pi/4]) # \mu_{t} state at current time step
+    # Covariance following discussion on page 317
+    # Assuming that position of the robot is exactly known
+    slam_cov = np.diag(np.ones(slam_state.shape[0])) # covariance at current time step
+    ld_ids = [] # Landmark ids which will be used for EKF motion propagation step
+    index_set = [slam_state.shape[0]] # To update only the appropriate indices of state and covariance 
+    robot_input = np.array([1.5*np.sqrt(2),0]) # Constant input given to robot over time, can be changed later
+    # Observation noise
+    Q_obs = np.array([[5.0,0],[0,np.pi]])
 
 
     # Processing all the observations
@@ -209,9 +220,30 @@ def articulated_slam():
         posdir = map(np.array, ([rob_state[0], rob_state[1]],
                                 [np.cos(rob_state[2]), np.sin(rob_state[2])]))
         robview = landmarkmap.RobotView(posdir[0], posdir[1], maxangle, maxdist)
+        
+        # Following EKF steps now
+
+        # First step is propagate : both robot state and motion parameter of any active landmark
+        slam_state[0:3],slam_cov[0:3,0:3]=robot_motion_prop(slam_state[0:3],slam_cov[0:3,0:3],robot_input)
+        # Active here means the landmark for which an articulation model has been associated
+        if len(ld_ids)>0:
+            '''
+            Step 2: When any landmark's motion model is estimated, we start doing EKF SLAM with 
+            state as robot's pose and motion parameter of each of the landmarks currently estimated
+            Here we propagate motion parameters of each model
+            '''
+            for (ld_id,start_ind,end_ind) in zip(ld_ids,index_set[:-1],index_set[1:]):
+                # Landmark with ld_id to propagate itself from the last state
+                slam_state[start_ind:end_ind] = ldmk_am[ld_id].predict_motion_pars(\
+                        slam_state[start_ind:end_ind])
+                # Propagate the corresponding part of the covariance matrix of SLAM
+                slam_cov[start_ind:end_ind,start_ind:end_ind] = ldmk_am[ld_id].prop_motion_par_cov(\
+                        slam_cov[start_ind:end_ind,start_ind:end_ind])
+
+
         colors = []
         mm_probs = []
-        ld_ids = [] # Landmark ids which will be used for EKF in current iteration
+        # Processing all the observations
         for r, theta, id in zip(rs, thetas, ids):
             motion_class = ldmk_estimater.setdefault(id, mm.Estimate_Mm())
             # For storing the chosen articulated model
@@ -222,11 +254,8 @@ def articulated_slam():
             external landmark as we can and try to get enough data to estimate landmark's motion
             model. 
             '''
-            # EKF has to be done for this
-            if ldmk_am[id] is not None:
-                # Have to pass this landmark to EKF estimator
-                ld_ids.append(id)
-            else:
+            # For each landmark id, we want to check if the motion model has been estimated
+            if ldmk_am[id] is None:
                 # Still need to estimate the motion class
                 obs = [r, theta]
                 motion_class.process_inp_data(obs, rob_state)
@@ -234,22 +263,65 @@ def articulated_slam():
                 # Check if the model is estimated
                 if sum(motion_class.prior>m_thresh)>0:
                     ldmk_am[id] = motion_class.am[np.where(motion_class.prior>m_thresh)[0]]
-                    ekf_map_id[len(ekf_map_id)+1] = id
-        
-        # Following EKF steps now
-        if len(ld_ids)>0:
-            '''
-            Step 2: When any landmark's motion model is estimated, we start doing EKF SLAM with 
-            state as robot's pose and motion parameter of each of the landmarks currently estimated
-            '''
+                    ld_ids.append(id)
+                    curr_ld_state = ldmk_am[id].current_state()
+                    curr_ld_cov = ldmk_am[id].current_cov()
+                    index_set.append(index_set[-1]+curr_ld_state.shape[0])
+                    # Extend Robot state by adding the motion parameter of the landmark
+                    slam_state = np.append(slam_state,curr_ld_state)
+                    # Extend Robot covariance by adding the uncertainity corresponding to the 
+                    # robot state
+                    slam_cov = scipy.linalg.block_diag(slam_cov,curr_ld_cov) 
+            else:
+                # This means this landmark is an actual observation that must be used for filtering
+                # the robot state as well as the motion parameter associated with the observed landmark
+
+                # Getting the predicted observation from the landmark articulated motion
+                # Getting the motion parameters associated with this landmark
+                curr_ind = ld_ids.index(id)
+                # Following steps from Table 10.2 from book Probabilistic Robotics
+                lk_pred = ldmk_am[id].predict_model(slam_state[index_set[curr_ind]:index_set[curr_ind+1]])
+                diff_vec = lk_pred-slam_state[0:2]
+                q_val = np.dot(diff_vec,diff_vec)
+                z_pred = np.array([np.sqrt(q_val),np.arctan2(diff_vec[1],diff_vec[0])-theta])
+                # Getting the jacobian matrix 
+                H_mat = np.zeros((2,index_set[-1]))
+                # w.r.t robot state
+                H_mat[0,0:3] = (1.0/q_val)*np.array([-np.sqrt(q_val)*diff_vec[0],\
+                        -np.sqrt(q_val)*diff_vec[1],0])
+                H_mat[1,0:3] = (1.0/q_val)*np.array([diff_vec[1],-diff_vec[0],-1])
+                # w.r.t landmark associated states
+                # Differentiation w.r.t landmark x and y first
+                diff_landmark = (1.0/q_val)*np.array([[np.sqrt(q_val)*diff_vec[0],\
+                        np.sqrt(q_val)*diff_vec[1]],[-diff_vec[1],diff_vec[0]]])
+                H_mat[:,index_set[curr_ind]:index_set[curr_ind+1]] = np.dot(diff_landmark,\
+                        ldmk_am[id].observation_jac(slam_state[index_set[curr_ind]:index_set[curr_ind+1]])) 
+                # Innovation covariance
+                inno_cov = np.dot(H_mat,np.dot(slam_cov,H_mat.T))+Q_obs
+                # Kalman Gain
+                K_mat = np.dot(np.dot(slam_cov,H_mat.T),np.linalg.inv(inno_cov))
+                # Updating SLAM state
+                slam_state = slam_state+np.dot(K_mat,(np.array([r,theta])-z_pred))
+                # Updating SLAM covariance
+                slam_cov = np.dot(np.identity(slam_cov.shape[0])-np.dot(K_mat,H_mat),slam_cov)
+                
+            # Follow all the steps on 
+        print "SLAM State for robot is",slam_state[0:3]
 
         print 'motion_class.priors', mm_probs
 
 
 if __name__ == '__main__':
     # For reproducing the similar results with newer version of code
-    mapping_example()
-    #articulated_slam()
-
-
+    #mapping_example()
+    articulated_slam()
+    '''
+    robot_state = np.array([8.5,91.5,-np.pi/4])
+    robot_cov = np.diag(np.array([100,100,np.pi]))
+    robot_input = np.array([1.5*np.sqrt(2),0])
+    for i in range(10):
+        print robot_state
+        print robot_cov
+        robot_state,robot_cov=robot_motion_prop(robot_state,robot_cov,robot_input)
+    '''
 

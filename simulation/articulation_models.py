@@ -241,7 +241,7 @@ class Prismatic_Landmark(Articulation_Models):
     def observation_jac(self,inp_state):
         # Asserting that we have a model
         assert(self.config_pars is not None),'Do not call this function until we have sufficient data to estimate a model'
-        mat = np.zeros((inp_state.shape[0],self.motion_pars[0].order))
+        mat = np.zeros((2,self.motion_pars[0].order))
         for i in range(mat.shape[0]):
             mat[i,0] = self.config_pars['normal'][i]
         return mat

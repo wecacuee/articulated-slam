@@ -21,7 +21,7 @@ class temporal_model:
         self.noise_sigma = 0.1/len(init_state)
         self.noise_mu = 0 # Assuming zero mean noise
         # Minimum number of samples required
-        self.min_data_samples = 2*int(self.order/2.0)+5 # Ensure odd
+        self.min_data_samples = max(5,2*int(self.order/2.0)+1) # Ensure odd
         # To store the latest model data
         self.model_data = np.zeros(self.min_data_samples)
         self.num_data = 0
@@ -31,13 +31,14 @@ class temporal_model:
         # variable right
         self.model_pars = np.zeros(len(init_state))
         # Sigma for Gaussian smoothing to be used for derivative computation
-        self.gauss_sigma = 1.0
+        self.gauss_sigma = max(0.6,0.13) # Length of the kernel is 2*lw+1 where lw is int(4*sigma+0.5)
+        # Because of the above restriction, gauss_sigma should atleast be 0.125 for smoothing
         # Noise in the motion propagation step
-        self.noise_motion = np.diag(0.1*np.ones(self.order))
+        self.noise_motion = np.diag(0.01*np.ones(self.order))
         # Noise in the observation step
         self.noise_obs = 1.0
         # State covariance
-        self.cov = np.diag(0.1*np.ones(self.order))
+        self.cov = np.diag(1*np.ones(self.order))
         # Initial likelihood probability of the model
         self.init_lk_prob = None
         # Theshold for fraction by which the probability needs to decrease
@@ -64,17 +65,30 @@ class temporal_model:
 
     # To find the finite order derivative of a sequence
     def fit_model(self):
+
+        '''
+        Right now using convolution of time series with derivatives of gaussian to estimate
+        temporal derivatives but can use other better methods such as
+        https://hal.inria.fr/inria-00319240/document
+        '''
         # Denominator
         den = self._dt**(self.order-1)
         # Convolving with gaussian to find derivative
         gf = ndimage.gaussian_filter1d(self.model_data,
                                        sigma=self.gauss_sigma,
                                        order=self.order-1,mode='wrap') / den
+        print "2nd order",gf[int(len(gf)/2.0)]
         # Getting the last state parameter from the array
         # Assuming that the motion is that order continuous
         self.model_pars[-1] = gf[int(len(gf)/2.0)]
         # First state is the position which is the state itself
         self.model_pars[0] = self.model_data[-1]
+        print self.model_data
+        gf = ndimage.gaussian_filter1d(self.model_data,
+                                       sigma=self.gauss_sigma,
+                                       order=1,mode='wrap') / den
+        print "1st order",gf[int(len(gf)/2.0)]
+
         # Getting the rest of the states
         for i in range(self.order-1,1,-1):
             # Denominator
@@ -89,8 +103,10 @@ class temporal_model:
                                           order=i-1,mode='reflect') / den
             # Getting the current state
             self.model_pars[i-1] = gf[-1-i]
+            print "Gaussian:",gf
         # Print estimated model parameters
-        print "Estimated Model parameters are",self.model_pars
+        print "Estimated temporal model parameters are",self.model_pars
+        #pdb.set_trace()
 
     # Define the linear model for covariance propagation
     def model_linear_matrix(self):
@@ -147,7 +163,7 @@ class temporal_model:
             # Likelihood function and probability
             lk_prob = sp.multivariate_normal.pdf(residual,mean = np.array([0,0]),
                     cov = inno_cov)
-            print lk_prob,self.state,inp_data
+            #print lk_prob,self.state,inp_data
             # Set the model's initial probability
             if self.init_lk_prob is None:
                 self.init_lk_prob = lk_prob
@@ -173,7 +189,7 @@ def observation_jac(robot_state):
 
 
 if __name__=="__main__":
-    init_state = np.array([0,0,0])
+    init_state = np.array([0])
     dt = 1.0 # Time steps of dt sec
     const_vel = temporal_model(init_state,dt)
     # Reading the data from the excel file
@@ -186,6 +202,7 @@ if __name__=="__main__":
     for i in range(1,num_points+1):
         inp_data[i-1] = sh.cell(0,i).value
     inp_data[-10:] = inp_data[-11]
+    print inp_data
     num_points = num_points+10
     # Passing this data to the algorithm
     for i in range(inp_data.shape[0]):

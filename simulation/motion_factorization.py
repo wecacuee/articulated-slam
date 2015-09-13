@@ -231,8 +231,8 @@ if __name__ == '__main__':
         #print w_mat
         # print "rank(W) = %d" % np.linalg.matrix_rank(w_mat)
         # Plotting the resulting linkage
-        #fig = None;ax = None
-        #(fig,ax) = uk.plot_points(sampled_pts,fig,ax)
+        fig = None;ax = None
+        (fig,ax) = uk.plot_points(sampled_pts,fig,ax)
 
     # Estimate shape and motion 
     estimate_motion_shape_kanade(w_mat)

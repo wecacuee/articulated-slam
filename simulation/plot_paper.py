@@ -6,6 +6,8 @@ import articulation_models as am
 import numpy as np
 import matplotlib.pyplot as plt
 import pdb
+import temporal_models as tm
+import xlrd
 from scipy.integrate import odeint
 
 
@@ -90,34 +92,40 @@ def joint_vs_separate():
     plt.tick_params(axis='both', which='major', labelsize=15)
     plt.show()
     
-    '''
-    model2_angles = np.zeros((angles.shape[0]))
-    model1_angles = np.zeros((angles.shape[0]))
-
-    # Estimating motion parameter from both the models
+# Order of motion parameter that should be chosen
+def motion_order_plots():
+    init_state = np.array([0,0,0])
+    dt = 1.0 # Time steps of dt sec
+    const_vel = tm.temporal_model(init_state,dt)
+    # Reading the data from the excel file
+    wb = xlrd.open_workbook('../temp/output_angles_ground_truth.xls')
+    sh = wb.sheet_by_index(0)
+    num_points = 30
+    inp_data = np.zeros(num_points+10)
+    lk_prob = np.zeros(num_points+10)
+    out_state = np.zeros(num_points+10)
+    for i in range(1,num_points+1):
+        inp_data[i-1] = sh.cell(0,i).value
+    inp_data[-10:] = inp_data[-11]
+    num_points = num_points+10
+    # Passing this data to the algorithm
     for i in range(inp_data.shape[0]):
-        model1_angles[i] = np.arctan2(inp_data[i,1]-model1.model_par[1],\
-                inp_data[i,0]-model1.model_par[0])
-        if model1_angles[i]<0:
-            model1_angles[i]=model1_angles[i]+2*np.pi
-        model2_angles[i] = np.arctan2(inp_data[i,1]-model2.config_pars['center'][1],\
-                inp_data[i,0]-model2.config_pars['center'][1])
-        if model2_angles[i]<0:
-            model2_angles[i]=model2_angles[i]+2*np.pi
+        lk_prob[i] = const_vel.process_inp_data(inp_data[i])
+        out_state[i] = const_vel.state[0]
 
-
-    
-    # Plotting the angular positions
-    fig = plt.figure(2)
-    plt.plot(angles,'b+',linewidth=3.0,markersize=10,label='Input Data')
-    plt.plot(model1_angles,'rs',linewidth=3.0,markersize=10,label='Joint Model')
-    plt.plot(model2_angles,'gv',linewidth=3.0,markersize=10,label='Separate Model')
-    plt.xlabel(r'Time $\rightarrow$')
-    plt.ylabel(r'Angle $\rightarrow$')
+    plt.rc('text', usetex=True)
+    #plt.subplot(2, 1, 1)
+    inp = plt.plot(inp_data,'b+',label='Input Data',linewidth=3.0)
+    out = plt.plot(np.arange(const_vel.min_data_samples,num_points),
+                   out_state[const_vel.min_data_samples:],
+                   'r', label='State Output', linewidth=3.0)
+    plt.xlabel(r"Time Steps $\rightarrow$",fontsize=15)
+    plt.ylabel(r"Value $\rightarrow$",fontsize=15)
     plt.legend(loc='upper left')
+    plt.tick_params(axis='both', which='major', labelsize=15)
     plt.show()
-    '''
 
 if __name__=="__main__":
-    joint_vs_separate()
+    #joint_vs_separate()
     #get_plot_door()
+    motion_order_plots()
