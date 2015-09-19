@@ -16,7 +16,7 @@ def eigsorted(cov):
     order = vals.argsort()[::-1]
     return vals[order], vecs[:,order]
 
-def plot_cov_ellipse( pos,cov,obs_num,rob_state, volume=.15, ax=None, fc='none', ec=[0,0,0], a=1, lw=2):
+def plot_cov_ellipse( pos,cov,obs_num,rob_state,ld_preds,ld_ids_preds, volume=.15, ax=None, fc='none', ec=[0,0,0], a=1, lw=2):
     """
     Plots an ellipse enclosing *volume* based on the specified covariance
     matrix (*cov*) and location (*pos*). Additional keyword arguments are passed on to the 
@@ -48,12 +48,16 @@ def plot_cov_ellipse( pos,cov,obs_num,rob_state, volume=.15, ax=None, fc='none',
     ax.set_ylim(0,120)
     # Draw robot's true pose
     plt.plot(rob_state[0],rob_state[1],'r+',linewidth=3.0,markersize=10)
+    # Draw predictions of landmark poses
+    colors = ['k','y','m']
+    for ld,id in zip(ld_preds,ld_ids_preds):
+        plt.plot(ld[0],ld[1],color=colors[id],marker='o',linewidth = 3.0)
     plt.savefig("../media/robot_pose_cov"+str(obs_num)+".png")
     plt.cla()
 
 '''
 Lets plot mean and covariances of the robot
 '''
-def slam_cov_plot(slam_state,slam_cov,obs_num,rob_state):
-    plot_cov_ellipse(slam_state[0:2],slam_cov[0:2,0:2],obs_num,rob_state)
+def slam_cov_plot(slam_state,slam_cov,obs_num,rob_state,ld_preds,ld_ids_preds):
+    plot_cov_ellipse(slam_state[0:2],slam_cov[0:2,0:2],obs_num,rob_state,ld_preds,ld_ids_preds)
 

@@ -246,6 +246,9 @@ def articulated_slam():
 
         colors = []
         mm_probs = []
+        # Collecting all the predictions made by the landmark
+        ld_preds = []
+        ld_ids_preds = []
         # Processing all the observations
         for r, theta, id in zip(rs, thetas, ids):
             motion_class = ldmk_estimater.setdefault(id, mm.Estimate_Mm())
@@ -284,6 +287,8 @@ def articulated_slam():
                 curr_ind = ld_ids.index(id)
                 # Following steps from Table 10.2 from book Probabilistic Robotics
                 lk_pred = ldmk_am[id].predict_model(slam_state[index_set[curr_ind]:index_set[curr_ind+1]])
+                ld_preds.append(lk_pred)
+                ld_ids_preds.append(curr_ind)
                 diff_vec = lk_pred-slam_state[0:2]
                 q_val = np.dot(diff_vec,diff_vec)
                 z_pred = np.array([np.sqrt(q_val),np.arctan2(diff_vec[1],diff_vec[0])-theta])
@@ -309,9 +314,9 @@ def articulated_slam():
                 slam_cov = np.dot(np.identity(slam_cov.shape[0])-np.dot(K_mat,H_mat),slam_cov)
                 
         # Follow all the steps on
-        print "SLAM State for robot is",slam_state[0:3]
+        print "SLAM State for robot and landmarks is",slam_state
         obs_num = obs_num+1
-        up.slam_cov_plot(slam_state,slam_cov,obs_num,rob_state)
+        up.slam_cov_plot(slam_state,slam_cov,obs_num,rob_state,ld_preds,ld_ids_preds)
         print 'motion_class.priors', mm_probs
 
 
