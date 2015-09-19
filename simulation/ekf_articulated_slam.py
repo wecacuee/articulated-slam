@@ -15,6 +15,7 @@ import estimate_mm as mm # To figure out the right motion model
 import pdb
 import utils_plot as up
 import scipy.linalg
+import matplotlib.pyplot as plt
 
 def threeptmap():
     nframes = 20
@@ -210,7 +211,9 @@ def articulated_slam():
     robot_input = np.array([1.5*np.sqrt(2),0]) # Constant input given to robot over time, can be changed later
     # Observation noise
     Q_obs = np.array([[5.0,0],[0,np.pi]])
-
+    # For plotting
+    obs_num = 0
+    
 
     # Processing all the observations
     for fidx, (rs, thetas, ids, rob_state, ldmks) in enumerate(rob_obs_iter): 
@@ -305,9 +308,10 @@ def articulated_slam():
                 # Updating SLAM covariance
                 slam_cov = np.dot(np.identity(slam_cov.shape[0])-np.dot(K_mat,H_mat),slam_cov)
                 
-            # Follow all the steps on 
+        # Follow all the steps on
         print "SLAM State for robot is",slam_state[0:3]
-
+        obs_num = obs_num+1
+        up.slam_cov_plot(slam_state,slam_cov,obs_num,rob_state)
         print 'motion_class.priors', mm_probs
 
 

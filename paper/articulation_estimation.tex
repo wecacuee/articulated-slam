@@ -81,6 +81,7 @@
 \usepackage{tikz}
 \usepackage{pgf}
 \usetikzlibrary{fit,positioning}
+\usepackage[]{algorithm2e}
 
 %\usepackage[numbers]{natbib}
 \usepackage{multicol}
@@ -494,25 +495,7 @@ TODO: \cite{huang2012occlusion} \\
 TODO: \cite{Pillai-RSS-14} \\
 
 
-\section{Articulation Classification}\label{sec:articulation_classification} We consider the problem of motion model identification from point correspondences of motion. In the current work, we consider revolute, prismatic and general motion. Consider motion of two points $x_0,x_1$ (represented in an inertial frame) on a rigid body at time $t_0$ and at some subsequent times $t_1,t_2$. The most general form of rigid body motion of a point can be represented using a rotation matrix $R$ and an associated translation vector $T$
-\begin{align}
-x_0^{t_1}& = R_{t_0}^{t_1}x_0^{t_0}+T_{t_0}^{t_1}
-\end{align}
-where the superscript on the point denotes the time.
-\subsection{Prismatic}
-For points lying on a prismatic joint such as a drawer, rotation w.r.t inertial frame remains the same (R=I), resulting in $x_1^{t_1}-x_0^{t_1} = x_1^{t_0}-x_0^{t_0}$. This is essentially saying that the vector joining two points on a prismatic joint remains the same before and after the motion.
-\subsection{Revolute}
-For further distinction between revolute and general motion, we need information from more than one time step. For points lying on a body undergoing revolute motion such as a door, the points have same translation vector over time. Hence estimating the translation vector from two time steps $T_{t_0}^{t_1} = T_{t_1}^{t_2}$ is a sufficient condition to classify a joint as revolute joint. 
-\subsection{Plane Constrained Motion} Plane constrained motion is useful for characterizing motion of objects like chair that can be translated on a plane and rotated about the normal to the plane. Let the plane be denoted by an point $x_p$ lying on the plane and $\hat{n}$ being normal to that plane. Consider the case of a rigid body that has point $x_c^{t_0}$ in contact with the ground plane which after undergoing the motion moves to $x_c^{t_1}$. Since $x_c^{t_0}$ and $x_c^{t_1}$ both lie on the ground plane, we have
-\begin{align}
-(x_c^{t_0}-x_0)^T\hat{n}&=0\\
-(x_c^{t_1}-x_0)^T\hat{n}&=0\\
-x_c^{t_1} &= R_{t_0}^{t_1}x_c^{t_0}+T_{t_0}^{t_1}
-\end{align}
-By doing algebraic manipulation we get, $(R_{t_0}^{t_1}x_0+T-x_0)^T\hat{n}=0$
 
-\subsection{General Rigid Body Motion}
-For general motion such as a book that can be rotated and translated anywhere in the space both the rotation and translation matrix will be different. 
 \section{Scene Understanding}
 Analysis by method such as ours is essential in order to decompose the scene into types of motion that a robot can influence on the scene.
 For example: Understanding the way a drawer can be opened, fridge door can be opened, what can be moved around in the scene
@@ -525,7 +508,89 @@ Other important use cases of motion estimation
 \item For grasping? -- such as how to open a door?
 \end{itemize}
 
-\section{Factorization Approach} In this section, we extend the factorization approach as described in \cite{costeira1998multibody} to 3-D track data available from a depth camera. Assuming for now that a single object moves relative to a static camera and we track features from frame to frame. Following the notation in the paper, lets represent a point on the object as $p_i^T = [X_i,Y_i,Z_i]^T$ in the camera frame, in the current frame $f$, the position of the point in homogeneous coordinates can be represented as 
+
+
+
+
+%\begin{equation}
+%\begin{bmatrix}
+%m_{11}^2 & 2m_{11}m_{12} & 2m_{11}m_{13} & 2m_{11}m_{14}& m_{12}^2&2m_{12}m_{13}&2m_{12}m_{14}&m_{13}^2&2m_{13}m_{14}&m_{14}^2 \\
+% m_{21}m_{11} & m_{21}m_{12}+m_{22}m_{11}  & m_{21}m_{13}+ m_{23}m_{11}&m_{21}m_{14}+m_{24}m_{11} & m_{22} m_{12}& m_{22}m_{13}+m_{23}m_{12}& m_{22}m_{14} +m_{24} m_{12} & m_{23}m_{13}  & m_{23}m_{14}+m_{24}m_{13} &m_{24}m_{14}\\
+% m_{11}m_{31}& m_{11}m_{32} + m_{12}m_{31} & m_{13}m_{31}+m_{11}m_{33} &  m_{14}m_{31}+ m_{11}m_{34} &  m_{12}m_{32}  &  m_{13}m_{32}+ m_{12}m_{33}&  m_{14}m_{32} + m_{12}m_{34}& m_{13}m_{33} & m_{14}m_{33}+m_{13}m_{34} & m_{14}m_{34}\\
+%m_{21}m_{11} & m_{22}m_{11}+m_{21}m_{12} & m_{23}m_{11}+m_{21}m_{13} & m_{24}m_{11}+m_{21}m_{14}&  m_{22}m_{12} &m_{23}m_{12}+ m_{22}m_{13} & m_{24}m_{12}+m_{22}m_{14}& m_{23}m_{13} & m_{24}m_{13}+m_{23}m_{14} & m_{24}m_{14}\\
+% m_{21}^2 & 2m_{21}m_{22} & 2m_{21}m_{23} & 2m_{21}m_{24} & m_{22}^2 & 2m_{22}m_{23} &2m_{22}m_{24} & m_{23}^2 & 2m_{23}m_{24} &m_{24}^2\\
+%m_{21}m_{31} & m_{22}m_{31}+ m_{21}m_{32} & m_{23}m_{31}+m_{21}m_{33} & m_{24}m_{31}+ m_{21}m_{34} & m_{22}m_{32} & m_{23}m_{32}+ m_{22}m_{33}& m_{24}m_{32} + m_{22}m_{34}&  m_{23}m_{33} & m_{24}m_{33} +m_{23}m_{34} &m_{24}m_{34}\\
+% m_{31}m_{11} & m_{32}m_{11} + m_{31}m_{12} & m_{33}m_{11}+m_{31}m_{13} & m_{34}m_{11} + m_{31}m_{14}  & m_{32}m_{12} & m_{33}m_{12}+ m_{32}m_{13}& m_{34}m_{12} + m_{32}m_{14} &  m_{33}m_{13} & m_{34}m_{13}  + m_{33}m_{14} & m_{34}m_{14}\\
+%m_{31}m_{21} & m_{32}m_{21} + m_{31}m_{22} & m_{33}m_{21} +m_{31}m_{23} & m_{34}m_{21}+ m_{31}m_{24 } & m_{32}m_{22}& m_{33}m_{22}+ m_{32}m_{23} & m_{34}m_{22}+ m_{32}m_{24} & m_{33}m_{23}& m_{34}m_{23}  + m_{33}m_{24} & m_{34}m_{24}\\
+% m_{31}^2 & 2m_{31}m_{32}& 2m_{31}m_{33} & 2m_{31}m_{34} & m_{32}^2 & 2m_{32}m_{33} & 2m_{32}m_{34} & m_{33}^2 & 2m_{33}m_{34} & m_{34}^2]
+% 
+%\end{bmatrix} \\
+%\begin{bmatrix}
+%a_{11}\\
+%a_{12}\\
+%a_{13}\\
+%a_{14}\\
+%a_{22}\\
+%a_{23}\\
+%a_{24}\\
+%a_{33}\\
+%a_{34}\\
+%a_{44}
+%\end{bmatrix} = 
+%\begin{bmatrix}
+%1\\
+%0\\
+%0\\
+%0\\
+%1\\
+%0\\
+%0\\
+%0\\
+%1
+%\end{bmatrix}
+%\label{eq:least_sq_aat}
+%\end{equation}
+
+%\vspace{\belowdisplayskip}\hfill\rule[-6pt]{0.4pt}{6.4pt}%
+%\rule{\dimexpr(0.5\textwidth-0.5\columnsep-1pt)}{0.4pt}
+%\begin{multicols}{2}
+%\lipsum[4-5]
+%\end{multicols}
+
+
+
+\section{Dynamic World Representation} Real world is dynamic in nature with varying degree of motion such as parking lot which can be assumed to be temporary stationary compared to a road which is always in motion. Previous literature to handle dynamic environments can be divided into two predominant approaches A) Detect moving objects and ignore them, B) Track moving objects as landmarks  \cite{bailey2006simultaneous}. In the first approach, using the fact that the conventional SLAM map is highly redundant, the moving landmarks can be removed from the map building process \cite{bailey2002mobile}. In contrast, Wang et. al \cite{wang2003online} explicitly track moving objects by adding them to the estimation state. However the work assumed that the sensor measurement can be decomposed into observation corresponding to moving and static landmarks which requires good estimate of moving and static landmarks to start with. Furthermore, it was assumed that the measurement of moving object carries no information for the SLAM state estimation implying that the map remains unchanged. A simple counter example is the case of a moving door in an indoor environment which changes the map of the scene.
+
+\subsection{Known Decomposition of the World} Object SLAM+ Object Tracking Interacting multiple models
+
+
+\subsection{No Prior Information}
+In feature based mapping, motion of each feature can be assumed to be independent given the location of the feature at previous time step. In dense mapping, a scene/map be decomposed into $n$ different parts such as chair, door etc. whose shape is known. The parts of the scene $m_k = \{b^i_k\},  1\leq i \leq n$ are assumed to move independently and hence the motion of the map can be represented as collection of independent motion of the parts. The true motion model for the  each part of the scene is assumed to be one of the motion models $C \in \{C_j\}^{p}_{j=1}$ as represented in Section \ref{sec:articulation_classification}. 
+
+
+\section{Articulated Model Representation} We represent all the articulated motion in the world as 
+\begin{align}
+X(t) = f_M(C,q(t)) \label{eq:articulated_model_representation}
+\end{align}
+where $X(t)$ is the observed motion of an object, $M \in \{M_j\}_{j=1}^r$ is one of the $r$ possible motion models, $C$ is the configuration space (Ex: doors open about an axis etc.) and $q(t)$ represents the time-varying motion variables(s) (Ex: length of prismatic joint, angle of door etc.) associated with the motion model $M$.  
+
+This kind of representation wherein non-time varying configuration parameters are separated from time-varying motion variables is beneficial in a multitude of ways. First, it allows for a unified treatment of various types of articulation because of a single and consistent representation of motion variables. Second, this representation can be robustly estimated from experimental data given the reduced number of parameters to be estimated and simultaneous often making the estimation problem linear and hence convex.
+
+A notable omission from our modeling of articulated systems as in Equation \ref{eq:articulated_model_representation} is the input to the system such as torque acting on a door, force on a drawer etc. This modeling limitation is due to the passive nature of our sensing approach and not making any other assumption about the agents in the scene. The compensate for the lack of input modeling and still To predict motion at next time step $P(X(t+\delta t)|X(t))$ without modeling the input forces/torques (thus not using a dynamics model), we need to model the propagation of motion variables $P(q(t+\delta t)|q(t))$. Before we proceed to model the temporal evolution of motion variables, we consider the task of configuration estimation.
+
+
+\section{Articulation Classification}\label{sec:articulation_classification} The configuration parameters in Equation \ref{eq:articulated_model_representation} are entirely dependent on the type of articulated joint.  In this section, we consider the problem of articulation identification from point correspondences over time. Rigid bodies can move in $3D$ space with $SE(3)$ configuration which is product space of $SO(3)$ (Rotation Group for 3D rotation) and $E(3)$ (Translation using 3D movement). The full $SE(3)$ has $6$ degrees of freedom (DOF) which is reduced when a rigid body is connected to another rigid body via a joint. For example, the configuration space for a revolute joint which is a 1 DOF joint and can be assumed to be a connected subset of the unit circle. Figure \ref{fig:articulation_classification} shows some of the articulated joint modelled in this work.
+
+\begin{figure}
+\includegraphics[width=1\linewidth,trim = 30mm 10mm 0mm 80mm,clip]{figures/motion_models}
+\caption{Some of the articulated joints considered in this work demonstrated at two different time steps. Revolute and prismatic joints are 1 DOF joint while motion on a plane is a 2 DOF joint.}
+\label{fig:articulation_classification}
+\end{figure}
+
+We consider two different types of articulation classification framework: i) Rigid Body Articulation Classification, ii) Single Point Articulation Classification. This distinction is important because a rigid body articulation classification requires observation of at least 3 points on the same body over time. However this approach is not suitable for a variety of use cases where we can only track 1 point on the body or feature based computer vision methods such as Extended Kalman Filter (EKF) SLAM.
+
+\subsection{Rigid Body Articulation Classification}
+We extend the factorization approach as described in \cite{costeira1998multibody} to 3-D track data available from a depth camera. Assuming for now that a single object moves relative to a static camera and we track features from frame to frame. Following the notation in the paper, lets represent a point on the object as $p_i^T = [X_i,Y_i,Z_i]^T$ in the camera frame, in the current frame $f$, the position of the point in homogeneous coordinates can be represented as 
 \begin{align}
 s_{fi}^C = \begin{bmatrix} 
 p_{fi}^C\\1
@@ -585,7 +650,7 @@ where $U \in R^{3F \times 4}$, and $V \in R^{N \times 4}$ are left and right rea
 \mathbf{\hat{M}} = \mathbf{U}\Sigma^{\frac{1}{2}}, \mathbf{\hat{S}} = \Sigma^{\frac{1}{2}}\mathbf{V}^T \label{eq:motion_factor}
 \end{align}
 
-\subsection{Motion and Shape Estimation} The factorization as defined in Equation \ref{eq:motion_factor} is not unique as any invertible $4 \times 4$ matrix $A$  will lead to an alternate solution $\mathbf{M} = \mathbf{\hat{M}}A$,  $\mathbf{S} = A^{-1}\mathbf{\hat{S}}$
+The factorization as defined in Equation \ref{eq:motion_factor} is not unique as any invertible $4 \times 4$ matrix $A$  will lead to an alternate solution $\mathbf{M} = \mathbf{\hat{M}}A$,  $\mathbf{S} = A^{-1}\mathbf{\hat{S}}$
 
 
 %\begin{align*}
@@ -636,51 +701,158 @@ a_{22}
 
 \end{tiny}
 
+The estimated $M$ matrix has information about the rotation and translation which can be used to classify the joint. In the rest of this section, we describe how the information from $\mathbf{M}$ matrix is necessary and sufficient to classify a joint.
 
-%\begin{equation}
+Consider motion of two points $x_0,x_1$ (represented in an inertial frame) on a rigid body at time $t_0$ and at some subsequent times $t_1,t_2$. The most general form of rigid body motion of a point can be represented using a rotation matrix $R_{t_0}^{t_1}$ and an associated translation vector $T_{t_0}^{t_1}$ from time instant $t_0$ to $t_1$. Motion of any point on that rigid body can be represented as
+\begin{align}
+x_0^{t_1}& = R_{t_0}^{t_1}x_0^{t_0}+T_{t_0}^{t_1}
+\end{align}
+where the superscript on the point denotes the time.
+\subsubsection{Prismatic}
+For points lying on a prismatic joint such as a drawer, rotation w.r.t inertial frame remains the same (or the rortation between two frames is identity $R_{t_0}^{t_1}=I$), resulting in $x_1^{t_1}-x_0^{t_1} = x_1^{t_0}-x_0^{t_0}$. This is essentially saying that the vector joining two points on a prismatic joint remains the same before and after the motion.
+\subsubsection{Revolute}
+For further distinction between revolute and general motion, we need information from more than one time step. For points lying on a body undergoing revolute motion such as a door, the points have same translation vector over time. Hence estimating the translation vector from two time steps $T_{t_0}^{t_1} = T_{t_1}^{t_2}$ is a sufficient condition to classify a joint as revolute joint. 
+\subsubsection{Plane Constrained Motion} Plane constrained motion is useful for characterizing motion of objects like chair that can be translated on a plane and rotated about the normal to the plane. Let the plane be denoted by an point $x_p$ lying on the plane and $\hat{n}$ being normal to that plane. Consider the case of a rigid body that has point $x_c^{t_0}$ in contact with the ground plane which after undergoing the motion moves to $x_c^{t_1}$. Since $x_c^{t_0}$ and $x_c^{t_1}$ both lie on the ground plane, we have
+\begin{align}
+(x_c^{t_0}-x_0)^T\hat{n}&=0\\
+(x_c^{t_1}-x_0)^T\hat{n}&=0\\
+x_c^{t_1} &= R_{t_0}^{t_1}x_c^{t_0}+T_{t_0}^{t_1}
+\end{align}
+By doing algebraic manipulation we get, $(R_{t_0}^{t_1}x_0+T-x_0)^T\hat{n}=0$
+
+\subsubsection{General Rigid Body Motion}
+For general motion such as a book that can be rotated and translated anywhere in the space both the rotation and translation matrix will be different. 
+
+\subsubsection{Static} If the rotation matrix between two instances is identity and translation is zero, then the rigid body is stationary.
+
+\subsection{Point Particle Articulation Classification} For the point particle classification, we consider revolute, prismatic and static point types. To find the revolute joint involves finding a circle passing through the observations of the point over time. Similarly, for the prismatic joint, we need to find a line passing through the point particle observation. We will elaborate more on this estimation process in Section \ref{sec:configuration_estimation}. 
+
+
+\section{Temporal Structure}\label{sec:temporal_structure} Articulation estimation provides us with configuration parameters of the articulated motion but one still needs to estimate the evolution of motion variables over time e.g: Position of the object along an axis for prismatic joint. Temporal propagation of articulated bodies will require knowledge of dynamics model parameters (mass, friction etc.) apart from the external excitation (motor torque, force) applied  to the system. Several approaches have been proposed for estimating these parameters that use the knowledge of some ground truth trajectories to estimate inertial and friction parameters \cite{endres2013learning} but they assume apriori access to the object. Furthermore, the external excitation can not be predicted as it can vary depending on the intention of agents. 
+
+The goal of our approach is to enforce a structure on the evolution of articulated motion without using any prior information specific to the current articulated body. We take our inspiration from neuroscience literature which posits that humans produce trajectories that are smooth in nature \cite{flash1985coordination} to plan movements from one point to another point in environment. This smoothness assumption can be leveraged by using motion models that use only limited number of derivatives. To concertize, lets assume that $q(t)$ is the articulated motion variable (extension of a prismatic joint, angle of door along a hinge ). The system model for a finite order motion model in continuous time domain with $\mathbb{X}(t) = [q,q^{1},.,.,q^{n-1}]$ (dropping the explicit time dependence of $q$ and using superscript to denote the order of derivative) as the state can be written as
+\begin{align}
+\begin{bmatrix}
+q^{1} \\
+q^{2} \\
+. \\
+.\\
+q^{n}
+\end{bmatrix} = 
+\begin{bmatrix}
+0 & 1  & . & . & 0\\
+0 & 0  & . & . & 0\\
+0 & 0  & . & . & 0\\
+0& 0 & . & . & 1\\
+0 & 0  & . & . & 0\\
+\end{bmatrix}
+\begin{bmatrix}
+q \\
+q^{1} \\
+. \\
+.\\
+q^{n-1}
+\end{bmatrix}
++\begin{bmatrix}
+0 \\
+0 \\
+.\\
+.\\
+1
+\end{bmatrix} \eta
+\end{align}
+where $q^{n}$ denotes $n^{th}$ order derivative of the motion variable and $\eta$ is the noise. This state propagation model can be converted to discrete time model as 
+\begin{align}
+\mathbb{X}(t+\delta t)& = A \mathbb{X}(t) + B \eta\\
+A& = 
+\begin{bmatrix}
+ 1 & \delta  t & \frac{{\delta  t}^2}{2} &  . & . \\
+0 & 1 & \delta  t &  . & . \\
+0 & 0 & 1  &  . & . \\
+0 & 0 & 1  &  . & . \\
+0 & 0 & .  &  . & . \\
+0&  0&    0 &     0 &    1
+\end{bmatrix}
+B = 
+\begin{bmatrix}
+\frac{{\delta t}^n}{n!}\\
+\frac{{\delta t}^{n-1}}{(n-1)!}\\
+.\\
+.\\
+\frac{{\delta t}^2}{2!}\\
+\delta t
+\end{bmatrix}\label{eq:motion_parameter_prop}
+\end{align}
+%From : http://www.lehigh.edu/~eus204/Teaching/ME433/lectures/lecture07_handout.pdf
+where $A$ is simply matrix exponential $\exp\{A^c\delta t\}$ of the matrix representation $A^c$  in continuous time equation and $B = (\int_0^{\delta T}\exp\{A^c\mu\}\mathrm{d}\mu) B^c $ where $B^c$ is the continuous time representation. 
+
+The kind of model considered in Equation \ref{eq:motion_parameter_prop} is essentially trying to predict the motion variable $q(t+\delta t)$ using the information at time step $t$. It is a finite order taylor series expansion of the motion variable $q(t+\delta t)$. 
+\begin{align}
+q(t+\delta t) = q(t) + \frac{q^1}{1!}\delta t + \frac{q^2}{2!}(\delta t)^2 + . . . +\sum_{k=n}^{\infty} \frac{q^k}{n!}(\delta t)^k \label{eq:taylor_approx}
+\end{align} 
+This representation hence assumes the differentiability of the motion variable. The approximation error in using the order $n$ of the variable is of the order $O((\delta t)^n)$. Various convergence studies can be done to choose the right order $n$ for given time duration $\delta t$ but here we study the physical aspects of the problem.
+
+
+\subsection{Choosing Order}
+Ideally one would want to choose the motion variable order as high as possible to reduce the approximation error as represented in Equation \ref{eq:taylor_approx} especially for long-term behaviour prediction which is necessary for motion planning or when sensors go blind. But the problem with higher order motion models are due to over-fitting given the need to estimate more parameters from few initial samples. It increases the filtering problem complexity (as described in the later section) significantly as Kalman filtering involves matrix multiplication due to which the computational complexity is atleast $O(n^2)$ where $n$ is the length of state. Furthermore, the error in estimating higher-order derivatives of a noisy signal increases exponentially w.r.t derivative order.
+
+However there are a number of reasons of why we might get away with choosing smaller order of temporal variables. First, in classical mechanics, we only consider second order derivatives of position variables. Also as pointed out earlier, humans minimize jerk \cite{flash1985coordination} in their motion.
+
+%Following the  \cite{flash1985coordination}, we assume jerk to be the noise in the system models. Using this method of providing temporal structure to the motion, we can write the motion of a prismatic joint with state $\mathbb{X}(k) = [x[k],y[k],v[k],\dot{v}[k],\ddot{v}[k],\dddot{v}[k]]$ as 
+%\begin{align}
+%\mathbb{X}(k+1) = 
 %\begin{bmatrix}
-%m_{11}^2 & 2m_{11}m_{12} & 2m_{11}m_{13} & 2m_{11}m_{14}& m_{12}^2&2m_{12}m_{13}&2m_{12}m_{14}&m_{13}^2&2m_{13}m_{14}&m_{14}^2 \\
-% m_{21}m_{11} & m_{21}m_{12}+m_{22}m_{11}  & m_{21}m_{13}+ m_{23}m_{11}&m_{21}m_{14}+m_{24}m_{11} & m_{22} m_{12}& m_{22}m_{13}+m_{23}m_{12}& m_{22}m_{14} +m_{24} m_{12} & m_{23}m_{13}  & m_{23}m_{14}+m_{24}m_{13} &m_{24}m_{14}\\
-% m_{11}m_{31}& m_{11}m_{32} + m_{12}m_{31} & m_{13}m_{31}+m_{11}m_{33} &  m_{14}m_{31}+ m_{11}m_{34} &  m_{12}m_{32}  &  m_{13}m_{32}+ m_{12}m_{33}&  m_{14}m_{32} + m_{12}m_{34}& m_{13}m_{33} & m_{14}m_{33}+m_{13}m_{34} & m_{14}m_{34}\\
-%m_{21}m_{11} & m_{22}m_{11}+m_{21}m_{12} & m_{23}m_{11}+m_{21}m_{13} & m_{24}m_{11}+m_{21}m_{14}&  m_{22}m_{12} &m_{23}m_{12}+ m_{22}m_{13} & m_{24}m_{12}+m_{22}m_{14}& m_{23}m_{13} & m_{24}m_{13}+m_{23}m_{14} & m_{24}m_{14}\\
-% m_{21}^2 & 2m_{21}m_{22} & 2m_{21}m_{23} & 2m_{21}m_{24} & m_{22}^2 & 2m_{22}m_{23} &2m_{22}m_{24} & m_{23}^2 & 2m_{23}m_{24} &m_{24}^2\\
-%m_{21}m_{31} & m_{22}m_{31}+ m_{21}m_{32} & m_{23}m_{31}+m_{21}m_{33} & m_{24}m_{31}+ m_{21}m_{34} & m_{22}m_{32} & m_{23}m_{32}+ m_{22}m_{33}& m_{24}m_{32} + m_{22}m_{34}&  m_{23}m_{33} & m_{24}m_{33} +m_{23}m_{34} &m_{24}m_{34}\\
-% m_{31}m_{11} & m_{32}m_{11} + m_{31}m_{12} & m_{33}m_{11}+m_{31}m_{13} & m_{34}m_{11} + m_{31}m_{14}  & m_{32}m_{12} & m_{33}m_{12}+ m_{32}m_{13}& m_{34}m_{12} + m_{32}m_{14} &  m_{33}m_{13} & m_{34}m_{13}  + m_{33}m_{14} & m_{34}m_{14}\\
-%m_{31}m_{21} & m_{32}m_{21} + m_{31}m_{22} & m_{33}m_{21} +m_{31}m_{23} & m_{34}m_{21}+ m_{31}m_{24 } & m_{32}m_{22}& m_{33}m_{22}+ m_{32}m_{23} & m_{34}m_{22}+ m_{32}m_{24} & m_{33}m_{23}& m_{34}m_{23}  + m_{33}m_{24} & m_{34}m_{24}\\
-% m_{31}^2 & 2m_{31}m_{32}& 2m_{31}m_{33} & 2m_{31}m_{34} & m_{32}^2 & 2m_{32}m_{33} & 2m_{32}m_{34} & m_{33}^2 & 2m_{33}m_{34} & m_{34}^2]
-% 
-%\end{bmatrix} \\
+%1 & 0 & \cos{\theta} & 0 & 0\\
+%0 & 1 & \sin{\theta} & 0 & 0\\
+%0 & 0 & 1 & \delta t &\frac{{\delta  t}^2}{2}\\
+%0 & 0 & 0 & 1 &\delta t \\
+%0 & 0 & 0 & 0 &1 \\
+%\end{bmatrix} \mathbb{X}(k)+
 %\begin{bmatrix}
-%a_{11}\\
-%a_{12}\\
-%a_{13}\\
-%a_{14}\\
-%a_{22}\\
-%a_{23}\\
-%a_{24}\\
-%a_{33}\\
-%a_{34}\\
-%a_{44}
-%\end{bmatrix} = 
-%\begin{bmatrix}
-%1\\
 %0\\
-%0\\
-%0\\
-%1\\
 %0\\
 %0\\
 %0\\
 %1
-%\end{bmatrix}
-%\label{eq:least_sq_aat}
-%\end{equation}
+%\end{bmatrix}\eta
+%\end{align}
+%where $\theta$ is the direction of prismatic axis in 2D. The covariance of noise $\eta$ in jerk needs to be continuously updated \cite{castella1980adaptive} (maybe even least squares with forgetting?) to enable one to track all the possible range of smooth motions that can be performed by an articulated object.
 
-%\vspace{\belowdisplayskip}\hfill\rule[-6pt]{0.4pt}{6.4pt}%
-%\rule{\dimexpr(0.5\textwidth-0.5\columnsep-1pt)}{0.4pt}
-%\begin{multicols}{2}
-%\lipsum[4-5]
-%\end{multicols}
+\section{Articulation Model Estimation}
+We now consider the task of estimating the type of articulated model $M \in \{M_j\}_{j=1}^r$ out of $r$ different models. This does not automatically follow the configuration and motion variables estimation. For example: Consider the case of a point particle moving in $2D$ space, one can fit a line, circle or assume it to be static. One can hypothesize using goodness-of-fit measures to estimate the appropriate model along with some heuristics. However, there are various limitations in comparing goodness-of-fit measures related to number of free parameters in different models, noise in the data, overfitting and number of data samples required \cite{schunn2005evaluating}. Instead of picking a model at initial time-step, we use a filtering based multiple model approach to correctly pick the model for a given object.
+
+We assume that our target object/particle obeys one of the $r$ ($r \in Z^+, r>0$) different motion models. In current formulation, we assume a uniform prior $\mu_j(0) = P(M_j), \sum_{j=1}^{r}\mu_j(0) = 1$ over different motion models for each individual object. This prior can be modified appropriately by object detection such as doors are more likely to have revolute joints etc.. Motion model probability is updated as more and more observations are received \cite{yaakov2001estimation} as 
+\begin{align}
+& \mu_j(k) \equiv P(M_j|\mathbf{Z}_{0:k})  = 
+\frac{P(z_k|\mathbf{Z}_{0:k-1}, M_j)P(M_j|\mathbf{Z}_{0:k-1})}{P(z_k|\mathbf{Z}_{0:k-1})} \nonumber \\
+&\mu_j(k) = \frac{P(z_k|\mathbf{Z}_{0:k-1}, M_j)\mu_j(k-1)}{\sum_{j=1}^{p} P(z_k|\mathbf{Z}_{0:k-1}, M_j)\mu_j(k-1) }
+\end{align}
+The probability of the current observation $z_k$ at time step $k$, conditioned over a specific articulated motion model and all the previous observation can be represented by various method. In the current work, we filter the states using Extended Kalman Filter, in which this probability is the probability of observation residual w.r.t a normal distribution distributed with zero mean and innovation covariance \cite{yaakov2001estimation}. To eventually we pick a model when the probability of a particular model becomes greater than a specified threshold.
+
+\begin{algorithm}
+ \KwData{$\{M_j\}_{j=1}^r$, $z_k$, $\tau$}
+ \KwResult{$\hat{M} \in \{M_j\}_{j=1}^r$, $C$, $P(q(t+\delta t)|q(t))$ }
+ initialization: $C_j = \{\}$, $M= \{\}$ \;
+\While{$M= \{\}$} {
+\ForAll{$M \in \{M_j\}_{j=1}^r$, }{
+\eIf{$C_j$ is $\{ \}$ }{
+Estimate $C_j$ \;
+Estimate Temporal Structure \;
+}{
+Propagate state using EKF \;
+Estimate $P(z_k|\mathbf{Z}_{0:k-1}, M_j)$ \;
+}
+}
+\ForAll{$M \in \{M_j\}_{j=1}^r$, }{
+Normalize to obtain $\mu_j(k)$ \;
+  \If{$\mu_j(k)>\tau$}{
+$\hat{M} = M_j$
+   }
+}
+}
+ \caption{Estimating the correct motion model and associated configuration parameters and motion variables}
+\end{algorithm}
+
 
 \section{SLAM for Dynamic World}
 \begin{figure}
@@ -778,91 +950,148 @@ P(x_k,m_k|B) &= \frac{P(z_k|x_k,m_k,A)P(x_k,m_k|A)}{P(z_k|A)} \nonumber\\
 
 Equation \ref{eq:measurement_update} together with equation \ref{eq:time_update} defines the complete recursive form of the SLAM algorithm for a dynamic environment. Robot motion model and observation model $P(z_k|x_k,m_k)$ are well described in previous literature and hence we will exclude that from current discussion. The focus of current work is the representation of map motion model to extend the standard SLAM algorithm with its static world assumption to dynamic world.
 
-\section{Dynamic World Representation} Real world is dynamic in nature with varying degree of motion such as parking lot which can be assumed to be temporary stationary compared to a road which is always in motion. Previous literature to handle dynamic environments can be divided into two predominant approaches A) Detect moving objects and ignore them, B) Track moving objects as landmarks  \cite{bailey2006simultaneous}. In the first approach, using the fact that the conventional SLAM map is highly redundant, the moving landmarks can be removed from the map building process \cite{bailey2002mobile}. In contrast, Wang et. al \cite{wang2003online} explicitly track moving objects by adding them to the estimation state. However the work assumed that the sensor measurement can be decomposed into observation corresponding to moving and static landmarks which requires good estimate of moving and static landmarks to start with. Furthermore, it was assumed that the measurement of moving object carries no information for the SLAM state estimation implying that the map remains unchanged. A simple counter example is the case of a moving door in an indoor environment which changes the map of the scene.
+\section{Articulated EKF SLAM}
 
-\subsection{Known Decomposition of the World} Object SLAM+ Object Tracking Interacting multiple models
-
-In feature based mapping, motion of each feature can be assumed to be independent given the location of the feature at previous time step. In dense mapping, a scene/map be decomposed into $n$ different parts such as chair, door etc. whose shape is known. The parts of the scene $m_k = \{b^i_k\},  1\leq i \leq n$ are assumed to move independently and hence the motion of the map can be represented as collection of independent motion of the parts. The true motion model for the  each part of the scene is assumed to be one of the motion models $C \in \{C_j\}^{p}_{j=1}$ as represented in Section \ref{sec:articulation_classification}. 
-
-Dropping the notation for scene part, In current formulation, we assume a uniform prior $\mu_j(0) = P(C_j), \sum_{j=1}^{p}\mu_j(0) = 1$ over different motion models for each scene part. However, this prior can be modified appropriately by object detection such as doors are more likely to have revolute joints etc.. Motion model probability is updated as more and more observations are received \cite{yaakov2001estimation} as 
+\subsection{Robot Motion Model} We consider a robot with state $x_k = (x,y,\theta)^T$ at time $k$ moving with constant linear velocity $v_k$ and angular velocity $\omega_k$. The state of the robot at next time step can be represented as 
 \begin{align}
-& \mu_j(k) \equiv P(C_j|\mathbf{Z}_{0:k})  = 
-\frac{P(z_k|\mathbf{Z}_{0:k-1}, C_j)P(C_j|\mathbf{Z}_{0:k-1})}{P(z_k|\mathbf{Z}_{0:k-1})} \nonumber \\
-&\mu_j(k) = \frac{P(z_k|\mathbf{Z}_{0:k-1}, C_j)\mu_j(k-1)}{\sum_{j=1}^{p} P(z_k|\mathbf{Z}_{0:k-1}, C_j)\mu_j(k-1) }
-\end{align}
-The probability of the current observation $z_k$ at time step $k$, conditioned over a specific motion model and all the previous observation can be represented by various method. In the current work, we filter the states using Extended Kalman Filter, for which this probability is the probability of observation residual w.r.t a normal distribution distributed with zero mean and innovation covariance \cite{yaakov2001estimation}.
-\subsection{No Prior Information}
+x_{k+1} = 
+\begin{pmatrix}
+x-\frac{v_k}{\omega_k} \sin{\theta} + \frac{v_k}{\omega_k}\sin(\theta+\omega_k \delta t) \\
+y+\frac{v_k}{\omega_k} \cos{\theta} - \frac{v_k}{\omega_k}\cos(\theta+\omega_k \delta t) \\
+\theta+\omega_k \delta t
+\end{pmatrix}+ \mathcal{N}(0,R_k) \label{eq:robot_model}
+\end{align},
+where $\delta t$ is the time step and $R_k$ is the error covariance of noise which is distributed with a zero mean Gaussian. Error covariance can be derived by propagating the noise in input to the state space\cite{thrun2005probabilistic}.
 
-
-\section{Temporal Structure} Articulation estimation provides us with better structure for the motion estimation problem however one still needs to estimate the evolution of parameters of these models over time e.g: Position of the object along an axis for prismatic joint. Temporal propagation of articulated bodies will require knowledge of dynamics model parameters (mass, friction etc.) apart from the external excitation (motor torque, force) applied  to the system. Several approaches have been proposed for estimating these parameters that use the knowledge of some ground truth trajectories to estimate inertial and friction parameters \cite{endres2013learning} but they assume apriori access to the object. Furthermore, the external excitation can not be predicted as it can vary depending on the intention of agents. 
-
-The goal of our approach is to enforce a structure on the evolution of articulated motion without using any prior information specific to the current articulated body. We take our inspiration from neuroscience literature which posits that humans produce trajectories that are smooth in nature \cite{flash1985coordination} to plan movements from one point to another point in environment. This smoothness assumption can be leveraged by using motion models that use only limited number of derivatives. To concertize, lets assume that $x$ is the articulated model parameter (extension of a prismatic joint, angle of door along a hinge ). The system model for a finite order motion model in continuous time domain with $\mathbb{X}(t) = [x,x^{1},.,.,x^{n-1}]$ as the state can be written as
+If the angular velocity is close to zero, the robot model as represented in Equation \ref{eq:robot_model} will be ill-conditioned. The model with zero angular velocity is given by 
 \begin{align}
-\begin{bmatrix}
-x^{1} \\
-x^{2} \\
-. \\
-.\\
-x^{n}
-\end{bmatrix} = 
-\begin{bmatrix}
-0 & 1  & . & . & 0\\
-0 & 0  & . & . & 0\\
-0 & 0  & . & . & 0\\
-0& 0 & . & . & 1\\
-0 & 0  & . & . & 0\\
-\end{bmatrix}
-\begin{bmatrix}
-x \\
-x^{1} \\
-. \\
-.\\
-x^{n-1}
-\end{bmatrix}
-+\begin{bmatrix}
-0 \\
-0 \\
-.\\
-.\\
-1
-\end{bmatrix} \eta
+x_{k+1} = 
+\begin{pmatrix}
+x+v_k\delta t \cos(\theta) \\
+y+v_k\delta t \sin(\theta)\\
+\theta
+\end{pmatrix}+ \mathcal{N}(0,R_k) \label{eq:robot_model}
 \end{align}
-where $x^{n}$ denotes $n^{th}$ order derivative of the state variable and $\eta$ is the noise. This state propagation model can be converted to discrete time model as 
+Following the approximations proposed by Thrun et. al \cite{thrun2005probabilistic}, the angular and linear velocities are generated by by a motion control unit $\hat{u}_k = (\hat{v}_k,\hat{\omega}_k)^T$ with zero mean additive Gaussian noise.
 \begin{align}
-\mathbb{X}(t+\delta t)& = A \mathbb{X}(t) + B \eta\\
-A& = 
-\begin{bmatrix}
- 1 & \delta  t & \frac{{\delta  t}^2}{2} &  . & . \\
-0 & 1 & \delta  t &  . & . \\
-0 & 0 & 1  &  . & . \\
-0 & 0 & 1  &  . & . \\
-0 & 0 & .  &  . & . \\
-0&  0&    0 &     0 &    1
-\end{bmatrix}
+\begin{pmatrix}
+v_k\\
+\omega_k
+\end{pmatrix} & =
+\begin{pmatrix}
+\hat{v}_k\\
+\hat{\omega}_k
+\end{pmatrix}+
+\mathcal{N}(0,M_k) \\
+M_k & = 
+\begin{pmatrix}
+\alpha_1 \hat{v}_k^2 + \alpha_2 \hat{\omega}_k^2 &  0\\
+0 & \alpha_3 \hat{v}_k^2 + \alpha_4 \hat{\omega}_k^2
+\end{pmatrix}
 \end{align}
-where $A$ is simply matrix exponential $\exp\{A^c\delta t\}$ of the matrix representation $A^c$  in continuous time equation.
+where $\alpha_1,\alpha_2,\alpha_3,\alpha_4$ are the noise coefficients. 
 
-Following the  \cite{flash1985coordination}, we assume jerk to be the noise in the system models. Using this method of providing temporal structure to the motion, we can write the motion of a prismatic joint with state $\mathbb{X}(k) = [x[k],y[k],v[k],\dot{v}[k],\ddot{v}[k],\dddot{v}[k]]$ as 
+
+\subsection{Observation Model} Robot measures range and bearing angle for $j^{th}$ landmark located at position $m_j = (m_{j,x},m_{j,y})^T$ within robot's sensor field of view. Each observation can be written as
 \begin{align}
-\mathbb{X}(k+1) = 
-\begin{bmatrix}
-1 & 0 & \cos{\theta} & 0 & 0\\
-0 & 1 & \sin{\theta} & 0 & 0\\
-0 & 0 & 1 & \delta t &\frac{{\delta  t}^2}{2}\\
-0 & 0 & 0 & 1 &\delta t \\
-0 & 0 & 0 & 0 &1 \\
-\end{bmatrix} \mathbb{X}(k)+
-\begin{bmatrix}
-0\\
-0\\
-0\\
-0\\
-1
-\end{bmatrix}\eta
+z^i_k = 
+\begin{pmatrix}
+\sqrt{(m_{j,x}-x)^2+(m_{j,y}-y)^2}\\
+\arctan(m_{j,y}-y,m_{j,x}-x)-\theta \\
+\end{pmatrix}+\mathcal{N}(0,Q_k)
 \end{align}
-where $\theta$ is the direction of prismatic axis in 2D. The covariance of noise $\eta$ in jerk needs to be continuously updated \cite{castella1980adaptive} to enable one to track all the possible range of smooth motions that can be performed by an articulated object.
+, where $z^i_k$ is the $i^{th}$ observation at time step $k$ which is also affected by zero mean Gaussian noise with covariance matrix $Q_k$. 
+
+\subsection{Jacobian Computation}
+Extended Kalman Filtering (EKF) requires linearization to ensure that the state propagation and observation assimilation maintains Gaussianity of the state distribution. In order to propagate state, we need to estimate the jacobian of the state propagation model w.r.t to state at time step $k$. The state jacobian can be represented as
+\begin{align}
+J^{x_{k+1}}_{x_k} = 
+\begin{pmatrix}
+1 & 0 & -\frac{v_k}{\omega_k} \cos{\theta} + \frac{v_k}{\omega_k}\cos(\theta+\omega_k \delta t)\\
+0 & 1 & -\frac{v_k}{\omega_k} \sin{\theta} + \frac{v_k}{\omega_k}\sin(\theta+\omega_k \delta t) \\
+0 & 0 & 1
+\end{pmatrix}
+\end{align}
+Furthermore the error in the input control space needs to be projected to the state space for which one needs to compute jacobian of state propagation model w.r.t input $u_k$. 
+\begin{align}
+J_{u_k}^{x_{k+1}} = 
+\begin{pmatrix}
+\frac{-\sin{\theta}+\sin(\theta+\omega_k \delta t)}{\omega_k} & \frac{v_k(\sin{\theta}-\sin(\theta+\omega_k \delta t))}{\omega_k^2} + \frac{v_k\cos(\theta+\omega_k \delta t)}{\omega_k} \\
+\frac{\cos{\theta}-\cos(\theta+\omega_k \delta t)}{\omega_k} & \frac{-v_k(\cos{\theta}-\cos(\theta+\omega_k \delta t))}{\omega_k^2} + \frac{v_k\sin(\theta+\omega_k \delta t)}{\omega_k} \\
+0 & \delta t 
+\end{pmatrix}
+\end{align}
+
+
+To assimilate each observation $z_i^k$, we need to compute jacobian of the observation model w.r.t to the overall SLAM state which consists of robot state as well as motion parameters state associated with each landmark. However for computing the jacobian matrix for $i^{th}$ observation at time step $k$ of landmark $j$, the only relevant entries in the jacobian matrix are derivative of observation w.r.t robot states and motion parameters state associated with landmark $j$. Jacobian of observation w.r.t robot state is 
+\begin{align}
+J^{z^i_k}_{x_k} = 
+\begin{pmatrix}
+\frac{x-m_{j,x}}{\sqrt{q}} & \frac{y-m_{j,y}}{\sqrt{q}} & 0 \\
+\frac{m_{j,y}-y}{q} & \frac{x-m_{j,x}}{q} & -1 
+\end{pmatrix}
+\end{align}
+and the jacobian w.r.t motion parameters state is 
+\begin{align}
+J^{z^i_k}_{m_j} = 
+\begin{pmatrix}
+\frac{m_{j,x}-x}{\sqrt{q}} & \frac{m_{j,y}-y}{\sqrt{q}} \\
+\frac{y-m_{j,y}}{q} & \frac{m_{j,x}-x}{q} 
+\end{pmatrix}J^{m_j}_{m(t)}
+\end{align}
+where $J^{m_j}_{m(t)}$ is the jacobian of landmark observation w.r.t motion parameters state $m(t)$.
+
+\begin{algorithm}
+ \KwData{$\mu_{t-1}$, $\Sigma_{t-1}$, $u_t$, $\{M_j\}_{j=1}^r$, $z_k$, $\tau$}
+ \KwResult{$\mu_t$, $\Sigma_t$}
+Propagate Robot State and Covariance\;
+Propagate Landmarks State and Covariance\;
+\ForAll{$z^i_k \in z_k$}{
+\uIf{$\hat{M} \neq \{ \}$ }{
+Estimate Motion Model($\{M_j\}_{j=1}^r$, $z_k$, $\tau$)\;
+}
+\Else{Assimilate Observation\;}
+}
+\caption{Articulated EKF SLAM}
+\end{algorithm}
+
 
 \section{Results}
+\subsection{Configuration Estimation}\label{sec:configuration_estimation} We tested our configuration estimation for a variety of joint models. To elucidate the effectiveness of the separating modeling of motion parameters from configuration parameters, we consider the configuration estimation of revolute motion. Consider a point moving along a circle centered at $X_c = [x_c,y_c]^T$ with a radius $r$. According to our definition configuration here refers to $C = [x_x,y_c,r]^T$ while the motion parameter is $\theta$ which represents the time-varying angle made by the moving point. For joint estimation, one first needs to assume the order of motion prior to configuration estimation. For current case, we assume a constant-velocity motion model which can be written as
+
+\begin{align}
+X(t) = X_c+r[\cos(\theta_0+\Delta T \omega),\sin(\theta_0+\Delta T \omega)]^T \label{eq:2D_revolute}
+\end{align}
+where $X(t)$ is the observed motion, $\theta_0$ is the initial angle and $\omega$ is the constant angular velocity of the point. As can be observed the estimation problem resulting from Eq. \ref{eq:2D_revolute} is non-linear in $\theta_0$ and $\omega$. For the separate representation the estimation problem reduces to estimation of a circle from points lying on a circle which is linear. Figure \ref{fig:joint_vs_separate_estimation} shows the estimation results. To estimate the resulting errors, we did a monte-carlo simulation and averaged errors across all the trials. Table \ref{tab:error_joint_vs_separate} shows results from $500$ monte-carlo runs of the algorithm for the same problem. The errors in estimation is $L_2$ norm of difference between estimated and true center and radius. It can be observed that separate estimation has considerably less errors compared to joint estimation problem.
+
+\begin{figure}
+\includegraphics[width=1\linewidth]{figures/joint_vs_separate.png}
+\caption{Estimation of configuration parameters for a 2D landmark in revolute motion centered at point $(2,2)$ with radius $1$. Gaussian noise of  $0.01$ variance in both $X$ and $Y$ directions. Joint estimation yield a revolute motion centered at $(2.18,2,21)$ with a radius of $0.83$ while separate configuration estimation yields in a revolute joint centered at $(2.05,1.88)$ with a radius of $1.10$}
+\label{fig:joint_vs_separate_estimation}
+\end{figure}
+
+\begin{table}
+\center
+\begin{tabular}{| c | c| c| }
+\hline
+  Estimation & Center Error & Radius Error\\ \hline
+  Joint & 0.71 & 0.09 \\ \hline
+  Separate & 0.60 & 0.04 \\ \hline
+\end{tabular}
+\caption{Error metrics for center and radius error}
+\label{tab:error_joint_vs_separate}
+\end{table}
+
+\subsection{Temporal Order} Once the configuration parameters have been estimated, various orders of motion models can be estimated from motion data. In order to perform this, we assume that there is a function $G: (X(t),C) \mapsto m(t) $ which can map observation and configuration data to motion parameters. This allows us to obtain motion parameters over time to which various order of motion can be fitted. We took the raw angular trajectory of a pendulum and fitted zeroth, first and second order motion models. For a zeroth, first and second order motion model the state is $\theta$, $[\theta,\dot{\theta}]$, $[\theta,\dot{\theta},\ddot{\theta}]$ where $\theta,\dot{\theta},\ddot{\theta}$ are zeroth, first and second order derivative of the motion parameter. The motion parameter can be propagated to next time frame using the framework in Section \ref{sec:temporal_structure}. For the observation model, we assumed the observation of motion parameter itself which is equivalent to observation of the body $X(t)$ once the configuration is estimated using the function $G$. Figure \ref{fig:order_model} shows the motion parameter for various different orders. It can be observed that higher order motion model clearly follow the trajectory much better than lower order motion models.
+
+\begin{figure}
+\subfloat[Zero Order]{\includegraphics[width=1\linewidth]{figures/zero_order_temporal_models_py}}\\
+\subfloat[First Order]{\includegraphics[width=1\linewidth]{figures/first_order_temporal_models_py}}\\
+\subfloat[Second Order]{\includegraphics[width=1\linewidth]{figures/second_order_temporal_models_py}}
+\caption{Comparison of EKF filtering based state estimation for various orders of a motion parameter. For displaying purposes, we only show the zeroth order derivative state from all the different motion models.}
+\label{fig:order_model}
+\end{figure}
+
 %\begin{figure*}
 %  \usetikzlibrary{calc}
 %  \input{resultsfig.tex}
