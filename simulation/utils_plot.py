@@ -16,6 +16,14 @@ def eigsorted(cov):
     order = vals.argsort()[::-1]
     return vals[order], vecs[:,order]
 
+def ellipse_parameters_from_cov(cov, volume):
+    vals, vecs = eigsorted(cov)
+    theta = np.degrees(np.arctan2(*vecs[:,0][::-1]))
+    # Width and height are "full" widths, not radius
+    width, height = 2 * np.sqrt(chi2.ppf(volume,2)) * np.sqrt(vals)
+    return theta, width, height
+
+
 def plot_cov_ellipse( pos,cov,obs_num,rob_state,ld_preds,ld_ids_preds, volume=.15, ax=None, fc='none', ec=[0,0,0], a=1, lw=2):
     """
     Plots an ellipse enclosing *volume* based on the specified covariance
@@ -33,13 +41,10 @@ def plot_cov_ellipse( pos,cov,obs_num,rob_state,ld_preds,ld_ids_preds, volume=.1
     """
     fig = plt.figure(1)
     ax = fig.add_subplot(111,aspect='equal')
-    vals, vecs = eigsorted(cov)
-    theta = np.degrees(np.arctan2(*vecs[:,0][::-1]))
 
     kwrg = {'facecolor':fc, 'edgecolor':ec, 'alpha':a, 'linewidth':lw}
 
-    # Width and height are "full" widths, not radius
-    width, height = 2 * np.sqrt(chi2.ppf(volume,2)) * np.sqrt(vals)
+    theta, width, height = ellipse_parameters_from_cov(cov, volume)
     ellip = Ellipse(xy=pos, width=width, height=height, angle=theta, **kwrg)
     ellip.set_alpha(0.5)
     ellip.set_facecolor((0,1,0))
