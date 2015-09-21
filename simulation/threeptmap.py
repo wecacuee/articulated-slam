@@ -27,7 +27,7 @@ def threeptmap():
     lmvis = landmarkmap.LandmarksVisualizer([0,0], [100, 100], frame_period=-1,
                                          scale=3)
     robtraj = landmarkmap.robot_trajectory(np.array([[10, 90], [40,60]]),
-                                           [10], np.pi/100)
+                                           5, np.pi/100)
     # angle on both sides of robot dir
     maxangle = 45*np.pi/180
     # max distance in pixels

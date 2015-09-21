@@ -111,11 +111,11 @@ def R2D_angle(theta):
     return np.array([[ np.cos(theta),  np.sin(theta)],
                      [-np.sin(theta),  np.cos(theta)]])
 
-def robot_trajectory(positions, nframes, angular_vel):
+def robot_trajectory(positions, lin_vel, angular_vel):
     prev_dir = None
     from_pos = positions[:-1]
     to_pos = positions[1:]
-    for fp, tp, nf in zip(from_pos, to_pos, nframes):
+    for fp, tp in zip(from_pos, to_pos):
         dir = (tp - fp) / vnorm(tp-fp)
 
         if prev_dir is not None:
@@ -133,9 +133,13 @@ def robot_trajectory(positions, nframes, angular_vel):
                 yield (pos, dir)
             dir = to_dir
 
-        for i in range(nf+1):
-            pos = fp + (tp - fp) * i*1.0 / nf
+        #for i in range(nf+1):
+        pos = fp
+        vel = (tp - fp) * lin_vel / np.linalg.norm(tp - fp)
+        # continue till pos is on the same side of tp as fp
+        while np.dot((pos - tp), (fp - tp)) > 0:
             yield (pos, dir)
+            pos = pos + vel
         prev_dir = dir
 
 
@@ -154,7 +158,7 @@ class LandmarksVisualizer(object):
     def genframe(self, landmarks, robview=None, colors=None):
         img = np.ones(self._imgdims) * 255
         if landmarks.shape[1] > 10:
-            radius = 1 * self._scale
+            radius = 2 * self._scale
         else:
             radius = 4 * self._scale
         red = (0, 0, 255)
@@ -320,7 +324,7 @@ def hundred_ldmk_map(sample_per_block=20):
     lmmap = map_from_conf(map_conf, nframes)
     lmv = LandmarksVisualizer([0,0], [110, 140], frame_period=80, scale=3)
     robtraj = robot_trajectory(np.array([[20, 130], [50,100], [35,50]]), 
-            [62, 62], # frame break points
+            5, # frame break points
             np.pi/25) # angular velocity
     # angle on both sides of robot dir
     maxangle = 45*np.pi/180

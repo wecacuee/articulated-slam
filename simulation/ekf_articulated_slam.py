@@ -18,32 +18,38 @@ import scipy.linalg
 import matplotlib.pyplot as plt
 
 def threeptmap():
-    nframes = 80
-    map_conf = [dict(ldmks=np.array([[10, 10]]).T,
+    nframes = 100
+    map_conf = [# static
+                dict(ldmks=np.array([[0, 0]]).T,
                      inittheta=0,
-                     initpos=[80, 10],
+                     initpos=[x, y],
                      deltheta=0,
-                     delpos=[0,0]),
-                # prismatic
+                     delpos=[0,0]) 
+                for x,y in zip([10] * 10 + range(10, 191, 20) + [190]*10 +
+                               range(10, 191, 20),
+                               range(10, 191, 20) + [190]*10 + 
+                               range(10, 191, 20) + [10] * 10
+                              )
+               ] + [# prismatic
                 dict(ldmks=np.array([[10,10]]).T,
                      inittheta=0,
-                     initpos=[20,10],
+                     initpos=[120,10],
                      deltheta=0,
                      delpos=[5,0]),
                 # revolute
-                dict(ldmks=np.array([[0,20]]).T,
-                     inittheta=np.pi,
-                     initpos=[50,40],
-                     deltheta=-10*np.pi/180,
-                     delpos=[0,0])
+                dict(ldmks=np.array([[0,20]]).T, # point wrt rigid body frame
+                     inittheta=np.pi,            # initial rotation
+                     initpos=[160,40],            # origin of rigid body
+                     deltheta=-10*np.pi/180,     # rotation per frame
+                     delpos=[0,0])               # translation per frame
                ]
     lmmap = landmarkmap.map_from_conf(map_conf, nframes)
-    lmvis = landmarkmap.LandmarksVisualizer([0,0], [100, 100], frame_period=-1,
+    lmvis = landmarkmap.LandmarksVisualizer([0,0], [200, 200], frame_period=-1,
                                          scale=3)
-    robtraj = landmarkmap.robot_trajectory(np.array([[10, 90], [40,60],
-                                                     [20,50], [10, 90], 
-                                                     [40, 60]]),
-                                           [nframes/4]*4, np.pi/10)
+    robtraj = landmarkmap.robot_trajectory(np.array([[110, 90], [140,60],
+                                                     [120,50], [110, 90], 
+                                                     [140, 60]]),
+                                           5, np.pi/10)
     # angle on both sides of robot dir
     maxangle = 45*np.pi/180
     # max distance in pixels
