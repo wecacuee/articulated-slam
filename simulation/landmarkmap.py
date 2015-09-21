@@ -14,11 +14,11 @@ def landmarks_from_rectangle(n, maxs):
     # Some random generator
     landmarks = []
     if n >= 4:
-	landmarks = [[1,1],
-		[maxs[0]-1, 1],
-		[maxs[0]-1, maxs[1]-1],
-		[1, maxs[1]-1],
-		]
+        landmarks = [[1,1],
+                [maxs[0]-1, 1],
+                [maxs[0]-1, maxs[1]-1],
+                [1, maxs[1]-1],
+                ]
     for i in range(len(landmarks),n):
         landmarks.append(nprnd.rand(2) * maxs)
     return np.array(landmarks).T
@@ -217,15 +217,15 @@ class LandmarksVisualizer(object):
         return img
 
     def visualizemap_with_robot(self, map, robottraj_iter):
-	frame_period = self.frame_period
+        frame_period = self.frame_period
         for lmks, posdir in itertools.izip(map.get_landmarks(), 
                                            robottraj_iter):
             robview = RobotView(posdir[0], posdir[1], 45*np.pi/180, 40)
             img = self.genframe(lmks, robview)
             img = self.drawrobot(robview, img)
             cv2.imshow(self._name, img)
-	    if cv2.waitKey(frame_period) >= 0:
-		frame_period = self.frame_period if self.frame_period == -1 else -1
+            if cv2.waitKey(frame_period) >= 0:
+                frame_period = self.frame_period if self.frame_period == -1 else -1
 
 
 
@@ -320,8 +320,8 @@ def hundred_ldmk_map(sample_per_block=20):
     lmmap = map_from_conf(map_conf, nframes)
     lmv = LandmarksVisualizer([0,0], [110, 140], frame_period=80, scale=3)
     robtraj = robot_trajectory(np.array([[20, 130], [50,100], [35,50]]), 
-	    [62, 62], # frame break points
-	    np.pi/25) # angular velocity
+            [62, 62], # frame break points
+            np.pi/25) # angular velocity
     # angle on both sides of robot dir
     maxangle = 45*np.pi/180
     # max distance in pixels
