@@ -18,7 +18,7 @@ import scipy.linalg
 import matplotlib.pyplot as plt
 
 def threeptmap():
-    nframes = 20
+    nframes = 80
     map_conf = [dict(ldmks=np.array([[10, 10]]).T,
                      inittheta=0,
                      initpos=[80, 10],
@@ -40,8 +40,10 @@ def threeptmap():
     lmmap = landmarkmap.map_from_conf(map_conf, nframes)
     lmvis = landmarkmap.LandmarksVisualizer([0,0], [100, 100], frame_period=-1,
                                          scale=3)
-    robtraj = landmarkmap.robot_trajectory(np.array([[10, 90], [40,60]]),
-                                           [nframes], np.pi/10)
+    robtraj = landmarkmap.robot_trajectory(np.array([[10, 90], [40,60],
+                                                     [20,50], [10, 90], 
+                                                     [40, 60]]),
+                                           [nframes/4]*4, np.pi/10)
     # angle on both sides of robot dir
     maxangle = 45*np.pi/180
     # max distance in pixels
@@ -49,6 +51,18 @@ def threeptmap():
 
     return nframes, lmmap, lmvis, robtraj, maxangle, maxdist
 
+def visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state_2D, slam_cov_2D):
+    thisframe = lmvis.genframe(ldmks, robview)
+    thisframe = lmvis.drawrobot(robview, thisframe)
+    theta, width, height = up.ellipse_parameters_from_cov(slam_cov_2D,
+                                                          volume=0.50)
+    cv2.ellipse(thisframe, 
+                tuple(map(np.int32, slam_state_2D * lmvis._scale)),
+                tuple(np.int32(x * lmvis._scale) for x in (width/2, height/2)),
+                theta, 0, 360,
+                (0,0,255))
+    cv2.imshow(lmvis._name, thisframe)
+    cv2.waitKey(lmvis.frame_period)
 
 def mapping_example():
     nframes, lmmap, lmvis, robtraj, maxangle, maxdist = threeptmap()
@@ -242,6 +256,10 @@ def articulated_slam():
                 # Propagate the corresponding part of the covariance matrix of SLAM
                 slam_cov[start_ind:end_ind,start_ind:end_ind] = ldmk_am[ld_id].prop_motion_par_cov(\
                         slam_cov[start_ind:end_ind,start_ind:end_ind])
+            # end of loop over ekf propagation
+
+        # end of if
+
 
 
         colors = []
@@ -312,12 +330,17 @@ def articulated_slam():
                 slam_state = slam_state+np.dot(K_mat,(np.array([r,theta])-z_pred))
                 # Updating SLAM covariance
                 slam_cov = np.dot(np.identity(slam_cov.shape[0])-np.dot(K_mat,H_mat),slam_cov)
+            # end of if else ldmk_am[id]
+        # end of loop over observations in single frame
                 
         # Follow all the steps on
         print "SLAM State for robot and landmarks is",slam_state
         obs_num = obs_num+1
-        up.slam_cov_plot(slam_state,slam_cov,obs_num,rob_state,ld_preds,ld_ids_preds)
         print 'motion_class.priors', mm_probs
+        #up.slam_cov_plot(slam_state,slam_cov,obs_num,rob_state,ld_preds,ld_ids_preds)
+        visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state[:2],
+                                  slam_cov[:2, :2])
+    # end of loop over frames
 
 
 if __name__ == '__main__':
