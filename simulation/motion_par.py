@@ -15,7 +15,6 @@ import matplotlib.pyplot as plt
 from scipy import ndimage
 import scipy.stats as sp
 import pdb
-import xlrd
 import warnings
 
 ##
