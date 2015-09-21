@@ -218,16 +218,20 @@ def articulated_slam():
                                               # Do not pass visualizer to
                                               # disable visualization
                                               lmvis=None)
+    rob_obs_iter = list(rob_obs_iter)
     frame_period = lmvis.frame_period
     # EKF parameters for filtering
 
     # Initially we only have the robot state
-    slam_state = np.array([8.5,91.5,-np.pi/4]) # \mu_{t} state at current time step
+    (_, _, _, rob_state0, _) = rob_obs_iter[0]
+    slam_state =  np.array(rob_state0) # \mu_{t} state at current time step
     # Covariance following discussion on page 317
     # Assuming that position of the robot is exactly known
     slam_cov = np.diag(np.ones(slam_state.shape[0])) # covariance at current time step
     ld_ids = [] # Landmark ids which will be used for EKF motion propagation step
     index_set = [slam_state.shape[0]] # To update only the appropriate indices of state and covariance 
+    # FIXME: Define robot_input and generate robot trajectory by
+    # robot input.
     robot_input = np.array([1.5*np.sqrt(2),0]) # Constant input given to robot over time, can be changed later
     # Observation noise
     Q_obs = np.array([[5.0,0],[0,np.pi]])
