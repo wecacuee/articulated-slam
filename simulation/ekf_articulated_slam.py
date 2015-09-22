@@ -342,6 +342,12 @@ def articulated_slam():
                 # Updating SLAM covariance
                 slam_cov = np.dot(np.identity(slam_cov.shape[0])-np.dot(K_mat,H_mat),slam_cov)
             # end of if else ldmk_am[id]
+            color = np.int64((motion_class.prior[0]*rev_color 
+                     + motion_class.prior[1]*pris_color
+                     + motion_class.prior[2]*stat_color))
+            color = color - np.min(color)
+            colors.append(color)
+
         # end of loop over observations in single frame
                 
         # Follow all the steps on
