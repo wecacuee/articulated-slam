@@ -83,7 +83,9 @@ def mapping_example():
                                               # disable visualization
                                               lmvis=None)
     frame_period = lmvis.frame_period
-    for fidx, (rs, thetas, ids, rob_state, ldmks) in enumerate(rob_obs_iter): 
+    for fidx, (rs, thetas, ids, rob_state_and_input, ldmks) in enumerate(rob_obs_iter): 
+        rob_state = rob_state_and_input[:3]
+        robot_input = rob_state_and_input[3:]
         print '+++++++++++++ fidx = %d +++++++++++' % fidx
         print 'Robot state:', rob_state
         print 'Observations:', zip(rs, thetas)
@@ -223,16 +225,13 @@ def articulated_slam():
     # EKF parameters for filtering
 
     # Initially we only have the robot state
-    (_, _, _, rob_state0, _) = rob_obs_iter[0]
-    slam_state =  np.array(rob_state0) # \mu_{t} state at current time step
+    (_, _, _, rob_state_and_input, _) = rob_obs_iter[0]
+    slam_state =  np.array(rob_state_and_input[:3]) # \mu_{t} state at current time step
     # Covariance following discussion on page 317
     # Assuming that position of the robot is exactly known
     slam_cov = np.diag(np.ones(slam_state.shape[0])) # covariance at current time step
     ld_ids = [] # Landmark ids which will be used for EKF motion propagation step
     index_set = [slam_state.shape[0]] # To update only the appropriate indices of state and covariance 
-    # FIXME: Define robot_input and generate robot trajectory by
-    # robot input.
-    robot_input = np.array([1.5*np.sqrt(2),0]) # Constant input given to robot over time, can be changed later
     # Observation noise
     Q_obs = np.array([[5.0,0],[0,np.pi]])
     # For plotting
@@ -240,7 +239,9 @@ def articulated_slam():
     
 
     # Processing all the observations
-    for fidx, (rs, thetas, ids, rob_state, ldmks) in enumerate(rob_obs_iter): 
+    for fidx, (rs, thetas, ids, rob_state_and_input, ldmks) in enumerate(rob_obs_iter): 
+        rob_state = rob_state_and_input[:3]
+        robot_input = rob_state_and_input[3:]
         print '+++++++++++++ fidx = %d +++++++++++' % fidx
         print 'Robot true state:', rob_state
         print 'Observations:', zip(rs, thetas)
@@ -360,7 +361,6 @@ if __name__ == '__main__':
     '''
     robot_state = np.array([8.5,91.5,-np.pi/4])
     robot_cov = np.diag(np.array([100,100,np.pi]))
-    robot_input = np.array([1.5*np.sqrt(2),0])
     for i in range(10):
         print robot_state
         print robot_cov

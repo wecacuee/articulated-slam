@@ -108,10 +108,17 @@ class RobotView(object):
         return in_view_pts
 
 def R2D_angle(theta):
-    return np.array([[ np.cos(theta),  np.sin(theta)],
-                     [-np.sin(theta),  np.cos(theta)]])
+    '''
+    Return rotation matrix for theta
+    '''
+    return np.array([[ np.cos(theta),  -np.sin(theta)],
+                     [ np.sin(theta),   np.cos(theta)]])
 
 def robot_trajectory(positions, lin_vel, angular_vel):
+    '''
+    Returns (position_t, direction_t, linear_velocity_{t+1},
+    angular_velocity_{t+1})
+    '''
     prev_dir = None
     from_pos = positions[:-1]
     to_pos = positions[1:]
@@ -122,6 +129,11 @@ def robot_trajectory(positions, lin_vel, angular_vel):
             #import pdb;pdb.set_trace()
             to_dir = dir
             dir = prev_dir
+            # Try rotation, if it increases the projection then we are good.
+            after_rot = R2D_angle(angular_vel).dot(prev_dir)
+            after_rot_proj = to_dir.dot(after_rot)
+            before_rot_proj = to_dir.dot(prev_dir)
+            angular_vel = np.sign(after_rot_proj - before_rot_proj) * angular_vel
             # Checks if dir is still on the same side of to_dir as prev_dir
             # Uses the fact that cross product is a measure of sine of
             # differences in orientation. As long as sine of the two
@@ -129,16 +141,16 @@ def robot_trajectory(positions, lin_vel, angular_vel):
             # keep rotating otherwise we have rotated too far and we must
             # stop.
             while np.cross(dir, to_dir) * np.cross(prev_dir, to_dir) > 0:
+                yield (pos, dir, 0, angular_vel)
                 dir = R2D_angle(angular_vel).dot(dir)
-                yield (pos, dir)
             dir = to_dir
 
         #for i in range(nf+1):
         pos = fp
-        vel = (tp - fp) * lin_vel / np.linalg.norm(tp - fp)
+        vel = (tp - fp) * lin_vel / vnorm(tp - fp)
         # continue till pos is on the same side of tp as fp
         while np.dot((pos - tp), (fp - tp)) > 0:
-            yield (pos, dir)
+            yield (pos, dir, lin_vel, 0)
             pos = pos + vel
         prev_dir = dir
 
@@ -240,8 +252,10 @@ def T_from_angle_pos(theta, pos):
 
 def get_robot_observations(lmmap, robtraj, maxangle, maxdist, lmvis=None):
     """ Return a tuple of r, theta and ids for each frame"""
-    for ldmks, posdir in itertools.izip(lmmap.get_landmarks(), 
+    for ldmks, posdir_and_inputs in itertools.izip(lmmap.get_landmarks(), 
                                        robtraj):
+        posdir = posdir_and_inputs[:2]
+        robot_inputs = posdir_and_inputs[2:]
         robview = RobotView(posdir[0], posdir[1], maxangle, maxdist)
         if lmvis is not None:
             img = lmvis.genframe(ldmks, robview)
@@ -259,7 +273,9 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, lmvis=None):
         angles = np.arctan2(obsvecs[1, :], obsvecs[0, :]) - rob_theta
         ldmks_idx = np.where(in_view_ldmks)
         yield (dists, angles, ldmks_idx[0], [float(pos[0]), float(pos[1]),
-                                             rob_theta], ldmks)
+                                             rob_theta,
+                                             float(robot_inputs[0]),
+                                             float(robot_inputs[1])], ldmks)
 
 def map_from_conf(map_conf, nframes):
     """ Generate LandmarkMap from configuration """

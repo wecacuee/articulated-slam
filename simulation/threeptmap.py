@@ -52,7 +52,9 @@ if __name__ == '__main__':
                                               # disable visualization
                                               lmvis=None)
     frame_period = lmvis.frame_period
-    for fidx, (rs, thetas, ids, rob_state, ldmks) in enumerate(rob_obs_iter): 
+    for fidx, (rs, thetas, ids, rob_state_and_input, ldmks) in enumerate(rob_obs_iter): 
+        rob_state = rob_state_and_input[:3]
+        robot_input = rob_state_and_input[3:]
         print '+++++++++++++ fidx = %d +++++++++++' % fidx
         print 'Robot state:', rob_state
         print 'Observations:', zip(rs, thetas)
