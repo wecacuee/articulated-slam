@@ -57,8 +57,9 @@ def threeptmap():
 
     return nframes, lmmap, lmvis, robtraj, maxangle, maxdist
 
-def visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state_2D, slam_cov_2D):
-    thisframe = lmvis.genframe(ldmks, robview)
+def visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state_2D,
+                              slam_cov_2D, colors):
+    thisframe = lmvis.genframe(ldmks, robview, colors)
     thisframe = lmvis.drawrobot(robview, thisframe)
     theta, width, height = up.ellipse_parameters_from_cov(slam_cov_2D,
                                                           volume=0.50)
@@ -282,6 +283,7 @@ def articulated_slam(debug_inp=True):
         # Collecting all the predictions made by the landmark
         ld_preds = []
         ld_ids_preds = []
+        ids_list = []
         # Processing all the observations
         for r, theta, id in zip(rs, thetas, ids):
             motion_class = ldmk_estimater.setdefault(id, mm.Estimate_Mm())
@@ -301,7 +303,6 @@ def articulated_slam(debug_inp=True):
                 #if id == 32:
                 #    print "Model Data", motion_class.am[0].model_data," Obs Num ",fidx
                 #    pdb.set_trace()
-                mm_probs.append(motion_class.prior)
                 # Check if the model is estimated
                 if sum(motion_class.prior>m_thresh)>0:
                     ldmk_am[id] = motion_class.am[np.where(motion_class.prior>m_thresh)[0]]
@@ -349,11 +350,16 @@ def articulated_slam(debug_inp=True):
                 # Updating SLAM covariance
                 slam_cov = np.dot(np.identity(slam_cov.shape[0])-np.dot(K_mat,H_mat),slam_cov)
             # end of if else ldmk_am[id]
-            color = np.int64((motion_class.prior[0]*rev_color 
-                     + motion_class.prior[1]*pris_color
-                     + motion_class.prior[2]*stat_color))
+            mm_probs.append(motion_class.prior)
+
+            motion_class = ldmk_estimater[id]
+            p1, p2, p3 = motion_class.prior[:3]
+            color = np.int64((p1*rev_color
+                     + p2*pris_color
+                     + p3*stat_color))
             color = color - np.min(color)
             colors.append(color)
+            ids_list.append(id)
 
         # end of loop over observations in single frame
                 
@@ -361,9 +367,11 @@ def articulated_slam(debug_inp=True):
         print "SLAM State for robot and landmarks is",slam_state
         obs_num = obs_num+1
         print 'motion_class.priors', mm_probs
+        print 'ids:', ids_list
+        print 'colors:', colors
         #up.slam_cov_plot(slam_state,slam_cov,obs_num,rob_state,ld_preds,ld_ids_preds)
         visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state[:2],
-                                  slam_cov[:2, :2])
+                                  slam_cov[:2, :2], colors)
     # end of loop over frames
 
     # Debugging
