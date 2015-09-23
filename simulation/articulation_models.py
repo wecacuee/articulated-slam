@@ -411,8 +411,8 @@ class Revolute_Landmark(Articulation_Models):
     def get_motion_pars(self,curr_data):
         # Asserting that we have a model
         assert(self.config_pars is not None),'No model estimated yet'
-        val = np.arctan2(curr_data[1]-self.config_pars['center'][0],
-                curr_data[0]-self.config_pars['center'][1])
+        val = np.arctan2(curr_data[1]-self.config_pars['center'][1],
+                curr_data[0]-self.config_pars['center'][0])
         if val<0:
             val = val+2*np.pi
         # Need to take special care because angle wraps back at pi
