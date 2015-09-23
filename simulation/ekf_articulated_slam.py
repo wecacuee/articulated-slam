@@ -202,10 +202,14 @@ def robot_motion_prop(prev_state,prev_state_cov,robot_input,delta_t=1):
     state_cov = np.dot(np.dot(G,prev_state_cov),np.transpose(G))+np.dot(np.dot(V,M),np.transpose(V))
     return robot_state,state_cov
 
+'''
+Performing Articulated SLAM
+Pass in optional parameter for collecting debug output for all the landmarks
+'''
+def articulated_slam(debug_inp=True):
 
-def articulated_slam():
     # Motion probability threshold
-    m_thresh = 0.8 # Choose the articulation model with greater than this threhsold's probability
+    m_thresh = 0.75 # Choose the articulation model with greater than this threhsold's probability
     # Getting the map
     nframes, lmmap, lmvis, robtraj, maxangle, maxdist = threeptmap()
 
@@ -244,7 +248,7 @@ def articulated_slam():
         robot_input = rob_state_and_input[3:]
         print '+++++++++++++ fidx = %d +++++++++++' % fidx
         print 'Robot true state:', rob_state
-        print 'Observations:', zip(rs, thetas)
+        print 'Observations:', zip(rs, thetas, ids)
         posdir = map(np.array, ([rob_state[0], rob_state[1]],
                                 [np.cos(rob_state[2]), np.sin(rob_state[2])]))
         robview = landmarkmap.RobotView(posdir[0], posdir[1], maxangle, maxdist)
@@ -294,6 +298,9 @@ def articulated_slam():
                 # Still need to estimate the motion class
                 obs = [r, theta]
                 motion_class.process_inp_data(obs, rob_state)
+                if id == 32:
+                    print "Model Data", motion_class.am[0].model_data," Obs Num ",fidx
+                    pdb.set_trace()
                 mm_probs.append(motion_class.prior)
                 # Check if the model is estimated
                 if sum(motion_class.prior>m_thresh)>0:
@@ -358,6 +365,16 @@ def articulated_slam():
         visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state[:2],
                                   slam_cov[:2, :2])
     # end of loop over frames
+
+    # Debugging
+    if debug_inp is True:
+        # Going over all the landmarks
+        for ldmk_id,ldmk in ldmk_estimater.iteritems():
+            if ldmk.num_data>10: #ldmk.min_samples:
+                # This landmark has atleast got enought observations for estimating motion parameters
+                if ldmk_am[ldmk_id] is None:
+                    pdb.set_trace()
+
 
 
 if __name__ == '__main__':
