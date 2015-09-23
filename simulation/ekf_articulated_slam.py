@@ -298,9 +298,9 @@ def articulated_slam(debug_inp=True):
                 # Still need to estimate the motion class
                 obs = [r, theta]
                 motion_class.process_inp_data(obs, rob_state)
-                if id == 32:
-                    print "Model Data", motion_class.am[0].model_data," Obs Num ",fidx
-                    pdb.set_trace()
+                #if id == 32:
+                #    print "Model Data", motion_class.am[0].model_data," Obs Num ",fidx
+                #    pdb.set_trace()
                 mm_probs.append(motion_class.prior)
                 # Check if the model is estimated
                 if sum(motion_class.prior>m_thresh)>0:
@@ -373,7 +373,8 @@ def articulated_slam(debug_inp=True):
             if ldmk.num_data>10: #ldmk.min_samples:
                 # This landmark has atleast got enought observations for estimating motion parameters
                 if ldmk_am[ldmk_id] is None:
-                    pdb.set_trace()
+                    print "Could not estimate model for landmark ", ldmk_id,\
+                            "with model data ", ldmk_estimater[ldmk_id].am[0].model_data
 
 
 
