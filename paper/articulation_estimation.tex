@@ -463,36 +463,43 @@ Email: dhiman@umich.edu }
 \section{Introduction}
 Imagine a robot moving in a typical living room environment which encounters indoor objects such as doors, drawers and chairs etc. We posit that in order for the robot to understand, map or interact with such objects, the robot needs to be able to understand the articulation. Pyschophysical experiments on human motion understanding have demonstrated that human first distinguish between competing motion models (translation, rotation and expansion) and then estimate the motion conditioned on motion model \cite{NIPS2008_3458}.
 
+For any pose estimation task, it is essential to know the articulated structure in order to represent the pose state. We refer to information about joints such as type of joints (Ex: Revolute), number of joints and kinematic chain as articulated structure. The most common solution to this problem is to ``detect" the objects (Ex: People \cite{girshick2014rich}) using sensor data and conditioned on the object detection, the articulation structure is known a prior (Ex: Pose Estimation for Humans \cite{yang2011articulated}). Because of the tremendous improvements in the object detection over large datasets \cite{krizhevsky2012imagenet}, solutions that address the problem of articulation structure have taken a backseat. However, we argue that despite the success in visual detection, object detection in unstructured environment still remains an open ended problem. The performance is further reduced on texture-less objects \cite{choi20123d} which populate our indoor environments such as doors, drawers, chairs etc. Furthermore, machine learning based approaches only generalize to the objects in the training dataset which limit the applicability of ``detection" first methods to previously unseen objects.
+
+
 \section{Related Work}
 
-\subsection{Historical Perspective}
-Using image motion to understand motion and structure in the scene is a historically well studied problem in computer vision.  Ullman \cite{ullman1979interpretation} proposed that in non-degenerate cases under orthographic projection, three pictures of four points can determine structure and motion. Tomasi and Kanade \cite{tomasi1992shape} formalized Ullmans's idea and proposed one of the influential method to compute camera motion and image structure by tracking features in the images. They proposed factorizing a matrix of feature tracks into motion and shape matrix by enforcing the rank constraint of the rigid body motion and metric constraints of a rotation matrix. Costeira and Kanade \cite{costeira1998multibody} extended the factorization idea to segment and recover shape along with motion of multiple moving bodies in the scene. 
+\subsection{Structure from Motion}
+Using image motion to understand motion and structure in the scene is a historically well studied problem in computer vision.  Ullman \cite{ullman1979interpretation} proposed that in non-degenerate cases under orthographic projection, three pictures of four points can determine structure and motion. Tomasi and Kanade \cite{tomasi1992shape} formalized Ullmans's idea and proposed one of the influential method to compute camera motion and image structure by tracking features in the images. They proposed factorizing a matrix of feature tracks into motion and shape matrix by enforcing the rank constraint of the rigid body motion and metric constraints of a rotation matrix. Costeira and Kanade \cite{costeira1998multibody} extended the factorization idea to segment and recover shape along with motion of multiple moving bodies in the scene. The resulting motion of rigid bodies can be further analyzed to estimate kinematic chains \cite{yan2006automatic} and hence to yield articulated structures. 
 
-Yan and Pollefeys \cite{yan2006automatic} further extended this rank and subspace idea to estimate kinematic chains from tracked features. There are certain fundamental limitations which is common to these approaches. First, the reliance on feature tracking methods such as KLT is not suitable for indoor environments which may not have much texture. Furthermore, this feature tracking requirement limits the application of such methods tremendously by i) Not being able to track new parts/objects that enter/exit the scene, ii) Not modelling the entire scene and as a result not exploring dependencies between neighbouring objects, iii) Restricting the ability to assimilate the motion of objects in SLAM like approaches that map the entire scene. Secondly, motion orthogonal to image plane is not modelled \cite{yan2006automatic} as image projection is modelled as affine projection in the most general case. 
-
-With the discovery of cheap and commonplace hardware such as Kinect, there is a need to re-examine this structure from motion idea. First, since such hardware already provides depth for a feature point, one already has shape as estimated by traditional structure from motion. Also since depth is available, one can model the motion orthogonal to image plane. Texture-less objects can be tracked by adding depth edges to the tracking mix.
+There are certain fundamental limitations to structure from motion approaches. First, the reliance on feature tracking methods such as KLT is not suitable for indoor environments which may not have much texture. Secondly, motion orthogonal to image plane is not modelled \cite{yan2006automatic} because image projection is approximated as affine projection. With the discovery of cheap and commonplace hardware such as Kinect, there is a need to re-examine the traditional structure from motion idea. First, since such hardware already provides depth for a feature point, one already has shape as estimated by traditional structure from motion. Also using depth, one can model the motion orthogonal to image plane. Furthermore, texture-less objects can be tracked better by adding depth edges to the tracking mix. There have been efforts at using depth information by simply using the depth and calibration parameters to directly represent the trajectory in $R^3$ \cite{Pillai-RSS-14,katz2013interactive}. 
 
 
-\cite{martin2014online} Build on existing work on articulation estimation. Add interactive perception where manipulation adds to perception and vice versa.
-  \cite{yan2006automatic} 
-    Problem: Analysis and reconstruction of dynamical scenes
-    Method: Estimate the rigid motion subspaces. Extend the method to non-rigid
-    parts by modeling it with linear combination of key shapes. Use motion
-    segmentation ( by SVD) to segment feature trajectories for each object. Use
-    n neighbors to estimate local subspace of each point and cluster the
-    subspaces to estimate the cluster of trajectories that form the same metric subspace.
+\subsection{Direct Motion Sensing Approaches} Another predominant class of methods to estimate articulated structure assumes the motion information of individual parts is directly available. Placement of markers such as ARToolKit \cite{fiala2005comparing}, checker-board markers, Infrared markers etc. on various parts of the articulated body can yield good estimates of the motion transformation. The placement of markers removes the need of otherwise noisy feature-tracking from the structure estimation process \cite{gray2013single,sturm2011probabilistic,sturm2013learning,hausman2015active}. Another way to get better estimation of articulated motion is via active interaction of robot manipulating an articulated object \cite{katz2008extracting, hausman2015active}. 
 
-    \cite{katz2010interactive} uses RGB for 3D articulation estimation.
-    \cite{katz2013interactive} Uses RGBD
-
- 
-TODO: Anguelov et al. - kinematic models of doors
-TODO: Yan and Pollefeys : Assumes affine geometry. Only revolute joints.
+In contrast to state-of-the-art methods, we propose performing articulation estimation online. Prior work has relied on collecting data from demonstrations and performing articulation estimation offline. Recently Martin et. al \cite{martin2014online} have proposed a framework for online estimation, however there is no explicit probabilistic measure for model confidence to select a articulation model. Our second major contribution is addressing the lack of temporal modelling (Ex:acceleration/deceleration of a door) in articulation estimation. We propose an explicit temporal model for each articulation type which is necessary to make good long-term future predictions. Temporal modelling of arbitrary order allows us to ; i) Track new parts/objects that enter/exit the scene \cite{martin2014online}, ii) Modelling the entire scene and as a result exploring dependencies between neighbouring objects, iii) Assimilating articulated object motion in Simultaneous Localization  and Mapping (SLAM). To the best of our knowledge, this is first work that addresses using articulated objects with arbitrary order temporal models within SLAM.
 
 
-TODO: \cite{sturm20103d} : 3D trajectories by manipulation of environment \\
-TODO: \cite{huang2012occlusion} \\ 
-TODO: \cite{Pillai-RSS-14} \\
+
+%\cite{martin2014online} Build on existing work on articulation estimation. Add interactive perception where manipulation adds to perception and vice versa. 
+%  \cite{yan2006automatic} 
+%    Problem: Analysis and reconstruction of dynamical scenes
+%    Method: Estimate the rigid motion subspaces. Extend the method to non-rigid
+%    parts by modeling it with linear combination of key shapes. Use motion
+%    segmentation ( by SVD) to segment feature trajectories for each object. Use
+%    n neighbors to estimate local subspace of each point and cluster the
+%    subspaces to estimate the cluster of trajectories that form the same metric subspace.
+%
+%    \cite{katz2010interactive} uses RGB for 3D articulation estimation.
+%    \cite{katz2013interactive} Uses RGBD
+%
+% 
+%TODO: Anguelov et al. - kinematic models of doors
+%TODO: Yan and Pollefeys : Assumes affine geometry. Only revolute joints.
+%
+%
+%TODO: \cite{sturm20103d} : 3D trajectories by manipulation of environment \\
+%TODO: \cite{huang2012occlusion} \\ 
+%TODO: \cite{Pillai-RSS-14} \\
 
 
 
