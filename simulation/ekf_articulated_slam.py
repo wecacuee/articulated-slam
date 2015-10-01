@@ -241,6 +241,9 @@ def articulated_slam(debug_inp=True):
     Q_obs = np.array([[5.0,0],[0,np.pi]])
     # For plotting
     obs_num = 0
+    # For error estimation in robot localization
+    true_robot_states = []
+    slam_robot_states = []
 
 
     # Processing all the observations
@@ -372,6 +375,8 @@ def articulated_slam(debug_inp=True):
         #up.slam_cov_plot(slam_state,slam_cov,obs_num,rob_state,ld_preds,ld_ids_preds)
         visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state[:2],
                                   slam_cov[:2, :2], colors)
+        true_robot_states.append(rob_state)
+        slam_robot_states.append(slam_state[0:3])
     # end of loop over frames
 
     # Debugging
@@ -383,7 +388,7 @@ def articulated_slam(debug_inp=True):
                 if ldmk_am[ldmk_id] is None:
                     print "Could not estimate model for landmark ", ldmk_id,\
                             "with model data ", ldmk_estimater[ldmk_id].am[0].model_data
-    pdb.set_trace()
+    return (true_robot_states,slam_robot_states)
 
 
 if __name__ == '__main__':
