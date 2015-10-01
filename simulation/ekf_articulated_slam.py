@@ -328,7 +328,7 @@ def articulated_slam(debug_inp=True):
                 ld_ids_preds.append(curr_ind)
                 diff_vec = lk_pred-slam_state[0:2]
                 q_val = np.dot(diff_vec,diff_vec)
-                z_pred = np.array([np.sqrt(q_val),np.arctan2(diff_vec[1],diff_vec[0])-theta])
+                z_pred = np.array([np.sqrt(q_val),np.arctan2(diff_vec[1],diff_vec[0])-slam_state[2]])
                 # Getting the jacobian matrix 
                 H_mat = np.zeros((2,index_set[-1]))
                 # w.r.t robot state
