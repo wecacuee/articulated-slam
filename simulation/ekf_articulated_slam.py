@@ -241,10 +241,10 @@ def articulated_slam(debug_inp=True):
     Q_obs = np.array([[5.0,0],[0,np.pi]])
     # For plotting
     obs_num = 0
-    
+
 
     # Processing all the observations
-    for fidx, (rs, thetas, ids, rob_state_and_input, ldmks) in enumerate(rob_obs_iter): 
+    for fidx, (rs, thetas, ids, rob_state_and_input, ldmks) in enumerate(rob_obs_iter[1:]): 
         rob_state = rob_state_and_input[:3]
         robot_input = rob_state_and_input[3:]
         print '+++++++++++++ fidx = %d +++++++++++' % fidx
