@@ -20,7 +20,7 @@ def ellipse_parameters_from_cov(cov, volume):
     vals, vecs = eigsorted(cov)
     theta = np.degrees(np.arctan2(*vecs[:,0][::-1]))
     # Width and height are "full" widths, not radius
-    width, height = 2 * np.sqrt(chi2.ppf(volume,2)) * np.sqrt(vals)
+    width, height = 4 * np.sqrt(vals) # This will make +- 2 sigma bounds
     return theta, width, height
 
 
