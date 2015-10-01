@@ -334,7 +334,7 @@ def articulated_slam(debug_inp=True):
                 # w.r.t robot state
                 H_mat[0,0:3] = (1.0/q_val)*np.array([-np.sqrt(q_val)*diff_vec[0],\
                         -np.sqrt(q_val)*diff_vec[1],0])
-                H_mat[1,0:3] = (1.0/q_val)*np.array([diff_vec[1],-diff_vec[0],-1])
+                H_mat[1,0:3] = (1.0/q_val)*np.array([diff_vec[1],-diff_vec[0],-q_val])
                 # w.r.t landmark associated states
                 # Differentiation w.r.t landmark x and y first
                 diff_landmark = (1.0/q_val)*np.array([[np.sqrt(q_val)*diff_vec[0],\
@@ -383,7 +383,7 @@ def articulated_slam(debug_inp=True):
                 if ldmk_am[ldmk_id] is None:
                     print "Could not estimate model for landmark ", ldmk_id,\
                             "with model data ", ldmk_estimater[ldmk_id].am[0].model_data
-
+    pdb.set_trace()
 
 
 if __name__ == '__main__':
