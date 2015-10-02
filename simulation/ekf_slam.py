@@ -314,10 +314,10 @@ def slam(debug_inp=True):
         print "SLAM State for robot and landmarks is",slam_state
         obs_num = obs_num+1
         #up.slam_cov_plot(slam_state,slam_cov,obs_num,rob_state,ld_preds,ld_ids_preds)
-        visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state[:2],
-                                  slam_cov[:2, :2], colors)
+        #visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state[:2],
+        #                          slam_cov[:2, :2], colors)
         true_robot_states.append(rob_state)
-        slam_robot_states.append(slam_state[0:3])
+        slam_robot_states.append(slam_state[0:3].tolist())
     # end of loop over frames
     return (true_robot_states,slam_robot_states)
 

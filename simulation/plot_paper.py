@@ -9,6 +9,8 @@ import pdb
 import temporal_models as tm
 import xlrd
 from scipy.integrate import odeint
+import ekf_articulated_slam as eslam
+import ekf_slam as slam
 
 
 def deriv(y,t): # Return derivative of the array y
@@ -125,7 +127,39 @@ def motion_order_plots():
     plt.tick_params(axis='both', which='major', labelsize=15)
     plt.show()
 
+'''
+Plotting SLAM Errors over time
+'''
+def get_slam_errors():
+    (true_robot_states_eslam,eslam_states) = eslam.articulated_slam()
+    (etrans_err,erot_err) = slam_metric(true_robot_states_eslam,eslam_states)
+    (true_robot_states_slam,slam_states) = slam.slam()
+    (trans_err,rot_err) = slam_metric(true_robot_states_slam,slam_states)
+    plt.figure(1)
+    plt.plot(range(1,len(true_robot_states_eslam)),etrans_err)
+    plt.figure(2)
+    plt.plot(range(1,len(true_robot_states_slam)),trans_err)
+    plt.show()
+    pdb.set_trace()
+    
+# Replicating error measures from 
+# http://europa.informatik.uni-freiburg.de/files/kuemmerl09auro.pdf
+def slam_metric(true_robot_states,slam_states):
+    trans_err_measure = []
+    rot_err_measure = []
+    for i in range(len(true_robot_states)-1):
+        dtrans_gt = np.array(true_robot_states[i+1][0:2])-np.array(true_robot_states[i][0:2])
+        dtrans = np.array(slam_states[i+1][0:2])-np.array(slam_states[i][0:2])
+        drot_gt = np.array(true_robot_states[i+1][2])-np.array(true_robot_states[i][2])
+        drot = np.array(slam_states[i+1][2])-np.array(slam_states[i][2])
+        trans_err_measure.append(np.linalg.norm(dtrans_gt-dtrans))
+        rot_err_measure.append(abs(np.arctan2(np.sin(drot-drot_gt),np.cos(drot-drot_gt))))
+    return (trans_err_measure,rot_err_measure)
+
+
+
 if __name__=="__main__":
     #joint_vs_separate()
     #get_plot_door()
-    motion_order_plots()
+    #motion_order_plots()
+    get_slam_errors()

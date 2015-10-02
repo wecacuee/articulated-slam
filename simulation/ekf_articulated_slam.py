@@ -58,7 +58,7 @@ def threeptmap():
     return nframes, lmmap, lmvis, robtraj, maxangle, maxdist
 
 def visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state_2D,
-                              slam_cov_2D, colors):
+                              slam_cov_2D, colors,obs_num):
     thisframe = lmvis.genframe(ldmks, robview, colors)
     thisframe = lmvis.drawrobot(robview, thisframe)
     theta, width, height = up.ellipse_parameters_from_cov(slam_cov_2D,
@@ -67,8 +67,10 @@ def visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state_2D,
                 tuple(map(np.int32, slam_state_2D * lmvis._scale)),
                 tuple(np.int32(x * lmvis._scale) for x in (width/2, height/2)),
                 theta, 0, 360,
-                (0,0,255))
+                (0,0,255),2)
     cv2.imshow(lmvis._name, thisframe)
+    filename = '../media/ekf_frame%04d.png' % obs_num 
+    cv2.imwrite(filename,thisframe)
     cv2.waitKey(lmvis.frame_period)
 
 def mapping_example():
@@ -374,20 +376,20 @@ def articulated_slam(debug_inp=True):
         print 'colors:', colors
         #up.slam_cov_plot(slam_state,slam_cov,obs_num,rob_state,ld_preds,ld_ids_preds)
         visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state[:2],
-                                  slam_cov[:2, :2], colors)
+                                  slam_cov[:2, :2], colors,obs_num)
         true_robot_states.append(rob_state)
-        slam_robot_states.append(slam_state[0:3])
+        slam_robot_states.append(slam_state[0:3].tolist())
     # end of loop over frames
 
     # Debugging
     if debug_inp is True:
         # Going over all the landmarks
         for ldmk_id,ldmk in ldmk_estimater.iteritems():
-            if ldmk.num_data>10: #ldmk.min_samples:
+            if ldmk.num_data>ldmk.min_samples:
                 # This landmark has atleast got enought observations for estimating motion parameters
                 if ldmk_am[ldmk_id] is None:
                     print "Could not estimate model for landmark ", ldmk_id,\
-                            "with model data ", ldmk_estimater[ldmk_id].am[0].model_data
+                            "with ", ldmk.num_data, " samples"
     return (true_robot_states,slam_robot_states)
 
 
