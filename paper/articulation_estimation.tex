@@ -80,7 +80,7 @@
 \usepackage{lipsum,amsmath,multicol}
 \usepackage{tikz}
 \usepackage{pgf}
-\usetikzlibrary{fit,positioning}
+\usetikzlibrary{fit,positioning,calc}
 \usepackage[]{algorithm2e}
 
 %\usepackage[numbers]{natbib}
@@ -1098,6 +1098,69 @@ where $X(t)$ is the observed motion, $\theta_0$ is the initial angle and $\omega
 \caption{Comparison of EKF filtering based state estimation for various orders of a motion parameter. For displaying purposes, we only show the zeroth order derivative state from all the different motion models.}
 \label{fig:order_model}
 \end{figure}
+
+\subsection{Articulation Estimation}
+To test articulation estimation, we simulated an environment with one static, prismatic and revolute points each. We use a minimum of $7$ samples to estimate configuration and initialize motion parameters. Figure \ref{fig:results_articulation_estimation} shows the results for the articulation estimation. In long term, all the articulations models are estimated correctly. However as can be observed Static articulation takes the longest time to be correctly estimated. This is because of difficulty in separating static landmark from a revolute landmark with $0$ radius and $0$ velocity and a prismatic landmark with $0$ velocity. 
+\begin{figure}[t]
+\begin{tikzpicture}[imgstyle/.style={draw,thick,anchor=south west,inner sep=1pt}]
+ %\path[use as bounding box, draw] (0,-1) rectangle (\imgwidth, 0.34\imgwidth);
+\node[imgstyle] (img1) at (0,0) {\includegraphics[width=0.32\linewidth]{../media/frame0000}};
+\node[imgstyle] (img2) at (0.333\linewidth,0) {\includegraphics[width=0.32\linewidth]
+{../media/frame0008}};
+\node[imgstyle] (img3) at (0.666\linewidth,0) {\includegraphics[width=0.32\linewidth]{../media/frame0010}};
+\begin{scope}[x={(img1.south east)}, y={(img1.north west)}]
+\node (r) at (0.3, 0.1) {Robot};
+\node (lmks) at (0.7, 0.6) {Landmarks};
+\node (t1) at (0.8, 0.1) {t=0};
+\end{scope}
+\begin{scope}[x={(img2.south east)}, y={(img2.north west)}]
+\node (t1) at (0.8, 0.1) {t=8};
+\end{scope}
+\begin{scope}[x={(img3.south east)}, y={(img3.north west)}]
+\node (t1) at (0.8, 0.1) {t=10};
+\end{scope}
+\path ($(img1.south) + (-0.5, -0.5)$) node (ld) {Legend:};
+\path 
+(ld)
+ ++ (1, 0) node [circle,fill=green] {} + (1, 0) node {Prismatic}
+ ++ (2, 0) node [circle,fill=blue] {} + (1, 0) node {Revolute}
+ ++ (2, 0) node [circle,fill=red] {} + (0.8, 0) node {Static}
+;
+
+ \end{tikzpicture}
+    \caption{Frames at different time intervals of our simulation.
+      Color of a landmark at a particular frame is the weighted sum of colors
+      assigned to each motion model. The weights used are the probability of the
+    landmark following that particular motion model and estimated by our algorithm. We also show the predicted trajectory of a landmark according to the estimated motion model.}
+    \label{fig:results_articulation_estimation}
+\end{figure}
+
+\subsection{Dynamic World SLAM} We simulated a map with point features that are either static, prismatic or revolute. A robot with limited field of view simulated reading from a laser scanner which were then used to simultaneously localize the robot as well map the environment.
+\subsubsection{Qualitative Analysis} We used a total of 42 landmarks in the scene with $1$ revolute, $1$ prismatic and $40$ static landmark. Both the revolute and prismatic landmarks were correctly identified while our algorithm could not identify a total of $2$ static landmark (from have been observed more than $10$ times by the robot ) with a selection threshold of $\tau = 0.75$. With a relaxed selection threshold of $\tau = 0.5$, our algorithm correctly identified all the static landmarks with more than $10$ samples. observations. Figure \ref{fig:articulated_ekf_model} shows the summary of results from the articulated EKF algorithm. Our algorithm needs a minimum of $7$ samples and hence till frame 7, the covariance of the robot state keeps increasing. On $8^{th}$ frame, our estimation algorithm correctly identifies two landmarks and as a result the covariance of the robot state decreases.
+\begin{figure}
+\subfloat[Frame 1]{\includegraphics[width=0.3\linewidth]{../media/ekf_frame0001}}
+\subfloat[Frame 6]{\includegraphics[width=0.3\linewidth]{../media/ekf_frame0006}}
+\subfloat[Frame 8]{\includegraphics[width=0.3\linewidth]{../media/ekf_frame0008}}\\
+\subfloat[Frame 9]{\includegraphics[width=0.3\linewidth]{../media/ekf_frame0009}}
+\subfloat[Frame 41]{\includegraphics[width=0.3\linewidth]{../media/ekf_frame0041}}
+\subfloat[Frame 42]{\includegraphics[width=0.3\linewidth]{../media/ekf_frame0042}}
+\caption{Demonstration of Articulated EKF algorithm at various time steps. At each time step, we plot the robot true state with a triangle and the estimation of robot's mean and covariance SLAM states is shown by an ellipse.}
+\label{fig:articulated_ekf_model}
+\end{figure}
+
+\subsubsection{Quantitative Analysis} We compared the proposed Articulated EKF SLAM algorithm against the standard EKF SLAM algorithm. In contrast to our algorithm where the SLAM state includes the motion parameters, standard EKF SLAM algorithm includes the landmark position in the state. As a result, we are only comparing the resulting localization estimates of the robot. Notably, only two landmarks are non-static landmarks which violate the assumption of standard SLAM algorithms.
+\begin{table}
+\center
+\begin{tabular}{| c | c| c| }
+\hline
+  Algorithm & Avg. Translation Error & Avg. Rotation Error\\ \hline
+  Articulated EKF SLAM & 1.592 & 0.076 \\ \hline
+  EKF SLAM & 3.652 & 0.110 \\ \hline
+\end{tabular}
+\caption{Comparison of Localization Error for two different SLAM algorithms}
+\label{tab:error_articulated_vs_normal}
+\end{table}
+Table \ref{tab:error_articulated_vs_normal} summarizes the average localization error metrics in both position and orientation increments \cite{kummerle2009measuring}. As is evident from results, our algorithm clearly improves on both the error metrics significantly even with just two landmarks in motion.
 
 %\begin{figure*}
 %  \usetikzlibrary{calc}
