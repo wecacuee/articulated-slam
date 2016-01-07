@@ -70,6 +70,7 @@ def visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state_2D,
                 (0,0,255),2)
     cv2.imshow(lmvis._name, thisframe)
     filename = '../media/ekf_frame%04d.png' % obs_num 
+    print 'Writing frame to %s' % filename
     cv2.imwrite(filename,thisframe)
     cv2.waitKey(lmvis.frame_period)
 
