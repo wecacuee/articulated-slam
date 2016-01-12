@@ -10,20 +10,24 @@ import scipy.stats as sp
 import pdb
 
 # Robot bearing and range to x,y in cartesian frame given the robot state
-# v2.0 Use landmark coordinates in robot frame as opposed to bearing and direction
 def bearing_to_cartesian(obs,robot_state,gen_obv):
     # Robot state consists of (x,y,\theta) where \theta is heading angle
     x = robot_state[0]; y= robot_state[1]; theta = robot_state[2]
     
     # v1.0 Observation is of range and bearing angle
-    #r = obs[0]; phi = obs[1]
+    r = obs[0]; phi = obs[1]
+    
+    return np.array([x+r*np.cos(theta+phi),y+r*np.sin(theta+phi)])
+
+# v2.0 function used instead of bearing_to_cartesian
+def robot_to_world(robot_state,gen_obv):
+    # Robot state consists of (x,y,\theta) where \theta is heading angle
+    x = robot_state[0]; y= robot_state[1]; theta = robot_state[2]
     
     # v2.0 Using inverse rotation matrix to retrieve landmark world frame coordinates
     R = np.array([[np.cos(theta), -np.sin(theta)],
                 [np.sin(theta), np.cos(theta)]])
     
-    # v1.0
-    #return np.array([x+r*np.cos(theta+phi),y+r*np.sin(theta+phi)])
     # v2.0 
     return np.reshape(R.T.dot(gen_obv) + np.array([[x],[y]]),[1,2])[0]
 
@@ -72,7 +76,7 @@ class Estimate_Mm:
         inno_covariances = list()
         # All the motion models work in x,y but we get bearing and range from sensor
         # v2.0 Modified bearing_to_catersian function to use only ldmk_rob_obv variable
-        inp_data = bearing_to_cartesian(inp_data_bearing,robot_state,ldmk_rob_obv)
+        inp_data = robot_to_world(robot_state,ldmk_rob_obv)
 
         # Pass this data to all the models
         for i in range(len(self.am)):
