@@ -43,6 +43,8 @@ def threeptmap():
                      deltheta=-10*np.pi/180,     # rotation per frame
                      delpos=[0,0])               # translation per frame
                ]
+    # Possible issue: Revolute joint appears as 160,20 in the first frame. Is that right???
+
     lmmap = landmarkmap.map_from_conf(map_conf, nframes)
     lmvis = landmarkmap.LandmarksVisualizer([0,0], [200, 200], frame_period=-1,
                                          scale=3)
@@ -171,7 +173,6 @@ def robot_motion_prop(prev_state,prev_state_cov,robot_input,delta_t=1):
     x = prev_state[0]; y=prev_state[1];theta = prev_state[2]
     robot_state = np.zeros(3)
     # Setting noise parameters, following Page 210 Chapter 7, Mobile Robot Localization of 
-    # Probabilistic Robotics book
     alpha_1 = 0.1; alpha_2=0.05; alpha_3 = 0.05; alpha_4 = 0.1
     # M for transferring noise from input space to state-space
     M = np.array([[(alpha_1*(v**2))+(alpha_2*(w**2)),0],[0,(alpha_3*(v**2))+(alpha_4*(w**2))]])
@@ -203,6 +204,7 @@ def robot_motion_prop(prev_state,prev_state_cov,robot_input,delta_t=1):
                 (-v*(np.cos(theta)-np.cos(theta+w*delta_t)))/(w**2)+((v*np.sin(theta+w*delta_t)*delta_t)/w)],\
                 [0,delta_t]])
     # Covariance in propagated state
+    # Equation from???
     state_cov = np.dot(np.dot(G,prev_state_cov),np.transpose(G))+np.dot(np.dot(V,M),np.transpose(V))
     return robot_state,state_cov
 
@@ -214,6 +216,7 @@ def articulated_slam(debug_inp=True):
 
     # Motion probability threshold
     m_thresh = 0.75 # Choose the articulation model with greater than this threhsold's probability
+    
     # Getting the map
     nframes, lmmap, lmvis, robtraj, maxangle, maxdist = threeptmap()
 
@@ -222,6 +225,7 @@ def articulated_slam(debug_inp=True):
     ekf_map_id = dict(); # Formulating consistent EKF mean and covariance vectors
     rev_color, pris_color, stat_color = [np.array(l) for l in (
         [255, 0, 0], [0, 255, 0], [0, 0, 255])]
+    
     # to get the landmarks with ids that are being seen by robot
     rob_obs_iter = landmarkmap.get_robot_observations(
         lmmap, robtraj, maxangle, maxdist, 
@@ -230,11 +234,14 @@ def articulated_slam(debug_inp=True):
                                               lmvis=None)
     rob_obs_iter = list(rob_obs_iter)
     frame_period = lmvis.frame_period
+    
+
     # EKF parameters for filtering
 
     # Initially we only have the robot state
-    (_, _, _, rob_state_and_input, _) = rob_obs_iter[0]
+    (_, _, _, rob_state_and_input, _,_) = rob_obs_iter[0]
     slam_state =  np.array(rob_state_and_input[:3]) # \mu_{t} state at current time step
+    
     # Covariance following discussion on page 317
     # Assuming that position of the robot is exactly known
     slam_cov = np.diag(np.ones(slam_state.shape[0])) # covariance at current time step
@@ -250,12 +257,20 @@ def articulated_slam(debug_inp=True):
 
 
     # Processing all the observations
-    for fidx, (rs, thetas, ids, rob_state_and_input, ldmks) in enumerate(rob_obs_iter[1:]): 
+    # v1.0 Need to update to v2.0 with no rs and thetas
+    for fidx, (rs, thetas, ids, rob_state_and_input, ldmks,ldmk_robot_obs) in enumerate(rob_obs_iter[1:]): 
+    # v2.0 Expected format
+    #for fidx,(idx,rob_state_and_input, ldmks, ldmk_robot_obs) in enumerate(rob_obs_iter[1:]):    
+
         rob_state = rob_state_and_input[:3]
         robot_input = rob_state_and_input[3:]
         print '+++++++++++++ fidx = %d +++++++++++' % fidx
         print 'Robot true state:', rob_state
-        print 'Observations:', zip(rs, thetas, ids)
+        # v1.0
+        #print 'Observations:', zip(rs, thetas, ids)
+        # v2.0 
+        print 'Observations:',ldmk_robot_obs
+        
         posdir = map(np.array, ([rob_state[0], rob_state[1]],
                                 [np.cos(rob_state[2]), np.sin(rob_state[2])]))
         robview = landmarkmap.RobotView(posdir[0], posdir[1], maxangle, maxdist)
@@ -290,8 +305,13 @@ def articulated_slam(debug_inp=True):
         ld_preds = []
         ld_ids_preds = []
         ids_list = []
+    
         # Processing all the observations
-        for r, theta, id in zip(rs, thetas, ids):
+        # v1.0 Update to v2.0 to exclude r and theta  
+        for r, theta, id, ldmk_rob_obv in zip(rs, thetas, ids, np.dstack(ldmk_robot_obs)):
+        # v2.0
+        # for id, ldmk_rob_obv in zip(idx,np.dstack(ldmk_robot_obs)):
+           
             motion_class = ldmk_estimater.setdefault(id, mm.Estimate_Mm())
             # For storing the chosen articulated model
             chosen_am = ldmk_am.setdefault(id,None)
@@ -305,7 +325,7 @@ def articulated_slam(debug_inp=True):
             if ldmk_am[id] is None:
                 # Still need to estimate the motion class
                 obs = [r, theta]
-                motion_class.process_inp_data(obs, rob_state)
+                motion_class.process_inp_data(obs, rob_state,np.vstack(ldmk_rob_obv))
                 #if id == 32:
                 #    print "Model Data", motion_class.am[0].model_data," Obs Num ",fidx
                 #    pdb.set_trace()
@@ -351,8 +371,11 @@ def articulated_slam(debug_inp=True):
                 inno_cov = np.dot(H_mat,np.dot(slam_cov,H_mat.T))+Q_obs
                 # Kalman Gain
                 K_mat = np.dot(np.dot(slam_cov,H_mat.T),np.linalg.inv(inno_cov))
+                
                 # Updating SLAM state
+                # v1.0 Need to update mode to v2.0
                 slam_state = slam_state+np.dot(K_mat,(np.array([r,theta])-z_pred))
+                
                 # Updating SLAM covariance
                 slam_cov = np.dot(np.identity(slam_cov.shape[0])-np.dot(K_mat,H_mat),slam_cov)
             # end of if else ldmk_am[id]

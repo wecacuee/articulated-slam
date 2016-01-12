@@ -84,7 +84,7 @@ class LandmarkMap(object):
                     landmarks = np.hstack((landmarks, lmk))
                 yield landmarks
             except StopIteration:
-                break
+                brea
 
 class RobotView(object):
     """ Describes the cone in view by robot """
@@ -100,9 +100,15 @@ class RobotView(object):
         dir = self._dir
         cpoints = points - pos
         dists = np.sqrt(np.sum(cpoints**2, axis=0))
+
+        # Taking dot product for cosine angle
         cosangles = dir.T.dot(cpoints) / dists
         cosangles = cosangles[0, :]
-        in_view_pts = (cosangles > np.cos(self._maxangle)) & (dists < self._maxdist)
+
+        # The cos angle is negative only when landmark lies behind the robot's heading direction. 
+        # Max distance landmarks can be retained. There is no argument or counter-argument yet for in/ex-clusion
+        in_view_pts = (cosangles > np.cos(self._maxangle)) & (dists <= self._maxdist)
+    
         if len(in_view_pts.shape) > 1:
             import pdb;pdb.set_trace()
         return in_view_pts
@@ -126,7 +132,6 @@ def robot_trajectory(positions, lin_vel, angular_vel):
         dir = (tp - fp) / vnorm(tp-fp)
 
         if prev_dir is not None:
-            #import pdb;pdb.set_trace()
             to_dir = dir
             dir = prev_dir
             # Try rotation, if it increases the projection then we are good.
@@ -252,8 +257,10 @@ def T_from_angle_pos(theta, pos):
 
 def get_robot_observations(lmmap, robtraj, maxangle, maxdist, lmvis=None):
     """ Return a tuple of r, theta and ids for each frame"""
+    """ v2.0 Return a tuple of lndmks in robot frame and ids for each frame"""
     for ldmks, posdir_and_inputs in itertools.izip(lmmap.get_landmarks(), 
                                        robtraj):
+        
         posdir = posdir_and_inputs[:2]
         robot_inputs = posdir_and_inputs[2:]
         robview = RobotView(posdir[0], posdir[1], maxangle, maxdist)
@@ -265,6 +272,8 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, lmvis=None):
         in_view_ldmks = robview.in_view(ldmks)
         selected_ldmks = ldmks[:, in_view_ldmks]
         pos = posdir[0].reshape(2,1)
+        
+        # v1.0 Need to update after new model has been implemented
         dists = np.sqrt(np.sum((selected_ldmks - pos)**2, 0))
         dir = posdir[1]
         #angles = np.arccos(dir.dot((selected_ldmks - pos))/dists)
@@ -272,10 +281,16 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, lmvis=None):
         rob_theta = np.arctan2(dir[1], dir[0])
         angles = np.arctan2(obsvecs[1, :], obsvecs[0, :]) - rob_theta
         ldmks_idx = np.where(in_view_ldmks)
+        
+        # Changed selected_ldmks to robot coordinate frame -> looks like we need to directly send           obsvecs with rotation according to heading
+        # v2.0 Rename gen_obs 
+        # NOTE: Modify R2D_Angle function based on dimensions of feature space
+        ldmk_robot_obs = R2D_angle(rob_theta).dot(obsvecs)
+
         yield (dists, angles, ldmks_idx[0], [float(pos[0]), float(pos[1]),
                                              rob_theta,
                                              float(robot_inputs[0]),
-                                             float(robot_inputs[1])], ldmks)
+                                             float(robot_inputs[1])], ldmks,ldmk_robot_obs)
 
 def map_from_conf(map_conf, nframes):
     """ Generate LandmarkMap from configuration """
