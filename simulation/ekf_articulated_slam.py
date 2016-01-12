@@ -308,7 +308,7 @@ def articulated_slam(debug_inp=True):
     
         # Processing all the observations
         # v1.0 Update to v2.0 to exclude r and theta  
-        for r, theta, id, ldmk_rob_obv in zip(rs, thetas, ids, np.dstack(ldmk_robot_obs)):
+        for r, theta, id, ldmk_rob_obv in zip(rs, thetas, ids, np.dstack(ldmk_robot_obs)[0]):
         # v2.0
         # for id, ldmk_rob_obv in zip(idx,np.dstack(ldmk_robot_obs)):
            
