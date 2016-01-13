@@ -82,6 +82,17 @@ def mat2euler(M, cy_thresh=None):
         x = 0.0
     return z, y, x
 
+'''
+Getting an equivalent rotation axes and angle representation for revolute joint
+https://en.wikipedia.org/wiki/Axis%E2%80%93angle_representation
+'''
+def rotation_to_axis_angle(rot):
+    rot_axis = np.zeros([3])
+    theta = np.arccos((np.matrix.trace(rot)[0,0]-1)/2.0)
+    rot_axis[0] = 0.5*np.sin(theta)*(rot[2,1]-rot[1,2])
+    rot_axis[1] = 0.5*np.sin(theta)*(rot[0,2]-rot[2,0])
+    rot_axis[2] = 0.5*np.sin(theta)*(rot[1,0]-rot[0,1])
+    return (rot_axis,theta)
 
 def analyze_rotation(M_mat):
     # Analyze data for every frame and comparing it to first frame
@@ -110,6 +121,10 @@ def analyze_motion(M_mat,w_mat_mean):
     # Checking whether the joint can be modeled as a revolute joint only
     if (np.max(np.mean(np.abs(trans_est),1))<1e-2):
         print "The joint is of revolute type"
+        # Checking the axis angle representation of last axis
+        (rot_axis,theta) = rotation_to_axis_angle(R_rel)
+        print "The rotation axis is given by ", rot_axis, "and angle is ",theta
+        return
     else:
         print "The joint is not purely revolute"
 

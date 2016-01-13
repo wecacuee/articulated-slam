@@ -195,14 +195,15 @@ if __name__ == '__main__':
     sampled_pts = sample_shapes.sample_points(np.array([1,5]),'cylinder')
     #sampled_pts = sample_shapes.sample_points(np.array([1,1,1]),'ellipse')
     #first_joint = uk.Joint('f', np.zeros(6), 1,sampled_pts)
-    first_joint = uk.Joint('p', np.zeros(4), 1,sampled_pts)
-    chain = uk.JointChain(first_joint)
 
     # Initialize w_mat the matrix that is used for factorization of shape and motion
     w_mat = None
     
     # Test cases for prismatic joint, make sure the axes are same throughout
+    '''
+    first_joint = uk.Joint('p', np.zeros(4), 1,sampled_pts)
     joint_motion_data = np.array([[1,1,0,0],[1,1,0,-1],[1,1,0,-1],[1,1,0,0.5],[1,1,0,1],[1,1,0,-1]])
+    '''
     
     
     # Pass in a bunch of commands and see how the rotation joint changes things
@@ -215,7 +216,12 @@ if __name__ == '__main__':
     # Test case for translation along a line (assume x axes for now) and rotation
     #joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,1,0,0],[0,np.pi/4,0,2,0,0],[0,np.pi/3,0,1,0,0],[0,np.pi/2,0,0,0,0]])
     # Test case for rotation only joint
-    #joint_motion_data = np.array([[0,0,0,0,0,0],[0,np.pi/6,0,0,0,0],[0,np.pi/3,0,0,0,0],[0,np.pi/2,0,0,0,0]])
+    first_joint = uk.Joint('r', np.zeros(3), 1,sampled_pts)
+    # Rotation about y axis
+    joint_motion_data = np.array([[0,0,0],[0,np.pi/6,0],[0,np.pi/3,0],[0,np.pi/2,0]])
+    
+    
+    chain = uk.JointChain(first_joint)
     # Test case for rotation and 
     origin = np.zeros(3)
     # Processing each motion command
