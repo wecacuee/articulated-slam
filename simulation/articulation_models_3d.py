@@ -211,7 +211,7 @@ class Prismatic_Landmark(Articulation_Models):
             # Using just the actual prediction of motion parameter and not the
             # velocity, acc or higher derivatives
             pred_motion_pars[i] = self.motion_pars[i].propagate(inp_state)
-        # Assembling if the assebly is required
+        # Assembling if the assembly is required
         if assemble is not None:
             pred_motion_pars = np.ravel(np.asarray(pred_motion_pars))
 
@@ -249,12 +249,12 @@ class Prismatic_Landmark(Articulation_Models):
 
         return mmat
 
-    # The only observation we make are (x,y) position and the variable
+    # The only observation we make are (x,y,z) position and the variable
     # with respect to which we take derivative is the position along the prismatic joint
     def observation_jac(self,inp_state):
         # Asserting that we have a model
         assert(self.config_pars is not None),'Do not call this function until we have sufficient data to estimate a model'
-        mat = np.zeros((2,self.motion_pars[0].order))
+        mat = np.zeros((3,self.motion_pars[0].order))
         for i in range(mat.shape[0]):
             mat[i,0] = self.config_pars['normal'][i]
         return mat
