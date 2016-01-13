@@ -27,6 +27,7 @@ import itertools
 import motion_par as mp # Motion parameters
 import scipy.linalg
 import pdb
+import utils_kin as uk
 
 # Abstract class for storing and estimating various motion models
 class Articulation_Models:
@@ -37,7 +38,7 @@ class Articulation_Models:
     _inp_type : Either 'point' or 'transform' to pass 3D values (3 dimensional
     array) or homogeneous transforms (3 X 4 matrices [R T] R-3 x 3 and T-3 x 1)
     '''
-    def __init__(self,_motion_pars,_noise_cov=1.0,_min_speed=0.1,_inp_type='point'):
+    def __init__(self,_motion_pars,inp_type ='point' ,_noise_cov=1.0,_min_speed=0.1):
         # Defining the motion parameters for the current articulation model
         self.motion_pars = _motion_pars
         self.noise_cov = _noise_cov # To store the noise covariance of motion models
@@ -53,7 +54,7 @@ class Articulation_Models:
         self.config_pars = None # To store the configuration parameters of articulated joint
         self.num_data = 0 # Number of observation samples for current landmark
         self.model_data = None
-        self.inp_type = _inp_type
+        self.inp_type = inp_type
     
     # Main function to take in streaming data 
     def process_inp_data(self,inp_data):
@@ -63,7 +64,7 @@ class Articulation_Models:
                 self.model_data = np.zeros((self.min_data_samples,inp_data.shape[0]))
             else:
                 self.model_data =\
-                np.zeros(self.min_data_samples,inp_data.shape[0],inp_data.shape[1])
+                np.zeros((self.min_data_samples,inp_data.shape[0],inp_data.shape[1]))
         # Main function to receive input data and call appropriate functions
         self.num_data = self.num_data+1
         if self.num_data<self.min_data_samples:
@@ -154,11 +155,11 @@ class Prismatic_Landmark(Articulation_Models):
     # @param _dt Time sampling rate
     #
     # @return 
-    def __init__(self,_temp_order=2,_noise_cov=1.0,_dt=1,_min_speed=0.1):
+    def __init__(self,inp_type,_temp_order=2,_noise_cov=1.0,_dt=1,_min_speed=0.1):
         # For prismatic joint, there is only one motion parameter which
         # is the length along the prismatic axis
         _motion_pars = [mp.Motion_Par(_temp_order,_dt,_min_speed)]
-        Articulation_Models.__init__(self,_motion_pars,_noise_cov)
+        Articulation_Models.__init__(self,_motion_pars,inp_type,_noise_cov)
 
     ##
     # @brief Fit the spatial model first, estimate the corresponding temporal part and
@@ -170,22 +171,26 @@ class Prismatic_Landmark(Articulation_Models):
         assert(self.num_data>=self.min_data_samples),"Need more data to estimate model"
         # Fitting a line using least square estimates
         # Model consists of  x_0 (point on line), t (unit vector along line)
-        
         # The point on the line with least square criteria is simply
         # http://stackoverflow.com/questions/2298390/fitting-a-line-in-3d
-        x0 = self.model_data.mean(axis=0)
+        if self.inp_type is 'point':
+            inp_data = self.model_data.copy()
+        else:
+            # For transforms, we want to extract only the translation part
+            inp_data = self.model_data[:,:,3].copy()
+        x0 = inp_data.mean(axis=0)
         # Getting the unit vector along line
-        uu,dd,vv = np.linalg.svd(self.model_data-x0)
+        uu,dd,vv = np.linalg.svd(inp_data-x0)
         # I have no idea but we have to do this to get this to work
         if vv[0][0]<0: # Theoretically it doesn't matter but the code cares
             vv[0] = -1*vv[0]
-        self.config_pars = {'point':x0,'normal':vv[0]}
-        print "Estimated configuration paramters for prismatic are", self.config_pars
+        # rot_mat has to be added to predict homogeneous transforms
+        self.config_pars = {'point':x0,'normal':vv[0],'rot_mat':self.model_data[-1,0:3,0:3]}
+        print "Estimated configuration parameters for prismatic are", self.config_pars
         # Now estimate the motion parameters as well
         for curr_data in self.model_data:
             self.motion_pars[0].process_inp_data(self.get_motion_pars(curr_data))
         # Done estimating the motion parameters as well
-        pdb.set_trace()
 
         
     def update_model_pars(self):
@@ -226,14 +231,23 @@ class Prismatic_Landmark(Articulation_Models):
             # First predict the motion parameter
             # Without assembling
             pred_motion_pars = self.predict_motion_pars(assemble=None)
-            displacement = pred_motion_pars[0]
+            displacement = pred_motion_pars[0][0]
             # State model is x[k+1] = x_0 + motion_par[0]*t
             # Forward Sample -- Includes noise
             # np.random.multivariate_normal(self.config_pars,noise_cov)
         else:
             displacement = inp_state[0]
+
+        if self.inp_type is 'point':
+            output = self.config_pars['point']+displacement*self.config_pars['normal']
+        else:
+            # For transform, we return a 3 X 4 matrix with 3 X 3 rotation and 3
+            # X 1 translation
+            output = np.zeros((3,4))
+            output[:,0:3] = self.config_pars['rot_mat']
+            output[:,3] = self.config_pars['point']+displacement*self.config_pars['normal']
         
-        return self.config_pars['point']+displacement*self.config_pars['normal']
+        return output
     
     ##
     # @brief Provides linear matrix for EKF filtering
@@ -267,7 +281,12 @@ class Prismatic_Landmark(Articulation_Models):
     def get_motion_pars(self,curr_data):
         # Asserting that we have a model
         assert(self.config_pars is not None), 'No model estimated yet'
-        return np.dot(curr_data-self.config_pars['point'],self.config_pars['normal'])
+        if self.inp_type is 'point':
+            output = np.dot(curr_data-self.config_pars['point'],self.config_pars['normal'])
+        else:
+            output = np.dot(curr_data[:,3]-self.config_pars['point'],self.config_pars['normal'])
+
+        return output 
     
     # Only used for plotting axis and things
     def get_prismatic_par(self):
@@ -533,11 +552,15 @@ class Static_Landmark(Articulation_Models):
 
 if __name__=="__main__":
     # Lets simulate some data from prismatic actuation
-    noise_cov = np.diag([0.01,0.01])
-    
-    model1 = Prismatic_Landmark()
+    model1 = Prismatic_Landmark(inp_type='transform')
+
     for i in range(8):
-        model1.process_inp_data(np.array([i,0,0]))
+        homo_transform = np.zeros((3,4))
+        homo_transform[:,0:3] = np.eye(3)
+        homo_transform[:,3] = np.array([i,0,0])
+        #model1.process_inp_data(np.array([i,0,0]))
+        model1.process_inp_data(homo_transform)
+    print model1.predict_model(),model1.model_linear_matrix()
     pdb.set_trace()
     '''
     model1.process_inp_data(data)
