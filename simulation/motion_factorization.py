@@ -193,6 +193,7 @@ if __name__ == '__main__':
     # To test the functions in utils_kin.py
     # Definining the articulated body in initial position
     sampled_pts = sample_shapes.sample_points(np.array([1,5]),'cylinder')
+    pdb.set_trace()
     #sampled_pts = sample_shapes.sample_points(np.array([1,1,1]),'ellipse')
     #first_joint = uk.Joint('f', np.zeros(6), 1,sampled_pts)
 

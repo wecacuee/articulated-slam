@@ -52,7 +52,7 @@ class Articulation_Models:
         if self.model_data is None:
             # Initializing the model_data dimension from the first observation
             self.model_data = np.zeros((self.min_data_samples,inp_data.shape[0]))
-        # Main function to recieve input data and call appropriate functions
+        # Main function to receive input data and call appropriate functions
         self.num_data = self.num_data+1
         if self.num_data<self.min_data_samples:
             # Add data to model data
@@ -457,7 +457,7 @@ class Static_Landmark(Articulation_Models):
         assert(self.num_data>=self.min_data_samples),"Can not call this function until we have sufficient data to estimate the model"
         # Fitting a static model using maximum likelihood
         self.config_pars = {'location':self.model_data[-1,:].copy()}
-        print "Estimated Model paramters for static model are", self.config_pars
+        print "Estimated Model parameters for static model are", self.config_pars
         # Assuming the model is x_{t+1} = x_{t}+\tau,y_{t+1} = y_{t}+\tau where \tau is zero
         for curr_data in self.model_data:
             self.motion_pars[0].process_inp_data(self.get_motion_pars(curr_data))

@@ -16,7 +16,7 @@ def ransac_samples(data,n):
     ind = random.sample(xrange(data.shape[0]),n)
     return ind
 
-# Rotation matrix corresponding to an angle about z axis
+# Rotation matrix corresponding to an angle about x,y,z axis
 def rot_matrix(t1,t2,t3):
     # Assume euler angle paramterization (z-y-x) to generate an rotation matrix
     # Inputs are three angles t1,t2,t3 which represent yaw, pitch and roll angles
@@ -24,6 +24,27 @@ def rot_matrix(t1,t2,t3):
     Ry =  np.matrix([[np.cos(-t2),0,np.sin(-t2)],[0,1,0],[-np.sin(-t2),0,np.cos(-t2)]])
     Rz =  np.matrix([[np.cos(-t3),-np.sin(-t3),0],[np.sin(-t3),np.cos(-t3),0],[0,0,1]])
     return Rx*Ry*Rz 
+
+# Rotation matrix given axes and the rotation angle about the axes
+def rot_axes_angle(target_ax,angle):
+    cross_mat = np.matrix([[0,-target_ax[2],target_ax[1]],
+        [target_ax[2],0,-target_ax[0]],
+        [-target_ax[1],target_ax[0],0]])
+    return np.eye(3)+np.sin(angle)*cross_mat+(1-np.cos(angle))*np.dot(cross_mat,cross_mat)
+
+'''
+Getting an equivalent rotation axes and angle representation for revolute joint
+https://en.wikipedia.org/wiki/Axis%E2%80%93angle_representation
+'''
+def rotation_to_axis_angle(rot):
+    rot_axis = np.zeros((3))
+    theta = np.arccos((np.matrix.trace(rot)-1)/2.0)
+    rot_axis[0] = 0.5*np.sin(theta)*(rot[2,1]-rot[1,2])
+    rot_axis[1] = 0.5*np.sin(theta)*(rot[0,2]-rot[2,0])
+    rot_axis[2] = 0.5*np.sin(theta)*(rot[1,0]-rot[0,1])
+    # Normalizing
+    rot_axis = rot_axis/np.linalg.norm(rot_axis)
+    return (rot_axis,theta)
 
 '''
 Added sampled points to the joint, so that articulate_links uses the sampled points rather than

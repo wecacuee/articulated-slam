@@ -307,23 +307,39 @@ class Revolute_Landmark(Articulation_Models):
     # @param _min_speed Minimum speed in terms of the angle (0.02 Radian is 1.14 degrees)
     #
     # @return 
-    def __init__(self,_temp_order=2,_noise_cov=1.0,_dt=1,_min_speed=0.02):
+    def __init__(self,inp_type,_temp_order=2,_noise_cov=1.0,_dt=1,_min_speed=0.02):
         # For revolute joint, there is only one motion parameter which
         # is the angle along the revolute axis
         _motion_pars = [mp.Motion_Par(_temp_order,_dt,_min_speed)]
         self.addition_factor = 0
-        Articulation_Models.__init__(self,_motion_pars,_noise_cov)
+        Articulation_Models.__init__(self,_motion_pars,inp_type,_noise_cov)
+    
+    def distanceToPlane(self,p0,n0,p):
+        return np.dot(n0,p-p0)    
 
-    # Defining functions for estimating the spatial model
-    def calc_R(self,xc,yc):
-        # Calculate the distance of each 2D points from the center (xc,yc)
-        return np.sqrt((self.model_data[:,0]-xc)**2+(self.model_data[:,1]-yc)**2)
-
+    def residualsPlane(self,parameters):
+        px,py,pz,theta,phi = parameters
+        plane_point = np.array([px,py,pz])
+        normal_vec = np.array([np.sin(theta)*np.cos(phi),np.sin(theta)*np.sin(phi),\
+                np.cos(theta)])
+        distances = [self.distanceToPlane(plane_point,normal_vec,test_p) for test_p \
+                in self.model_data]
+        return distances
+    
     def f_2(self,c):
-        # Calculate the algebraic distance between the data points and mean circle
         Ri = self.calc_R(*c)
         return Ri-Ri.mean()
-
+        
+    def calc_R(self,xc,yc):
+        # First project 3D point to the plane
+        distances = np.zeros(self.model_data.shape[0])
+        for i in range(self.model_data.shape[0]):
+            test_p = self.model_data[i,:]
+            plane_proj = \
+            np.array([np.dot(test_p-self.plane_point,self.plane_vec1),\
+                np.dot(test_p-self.plane_point,self.plane_vec2)])
+            distances[i] = np.linalg.norm(plane_proj-np.array([xc,yc]))
+        return distances
     ##
     # @brief First fit the circle to the revolute data and then estimate the temporal
     #           part and fit the temporal part as well
@@ -333,30 +349,47 @@ class Revolute_Landmark(Articulation_Models):
         # asserting that we have atleast the minimum required observation for estimation
         assert(self.num_data>=self.min_data_samples),"Need more data to estimate the model"
         # First fitting the spatial model
-        
-        # Algorithm source http://wiki.scipy.org/Cookbook/Least_Squares_Circle
-        # First computing center of the circle
-        circle_center, ier = optimize.leastsq(self.f_2,np.array([np.mean(self.model_data[:,0]),
-            np.mean(self.model_data[:,1])]))
-        # Calculating radius of the circle
-        Ri_2 = self.calc_R(*circle_center)
-        R_2 = Ri_2.mean()
-        
-        # We need to separate the real revolute joint from the static and prismatic joint
-        maxradius, minradius = 1000.0, 0.8
+        if self.inp_type is 'point':
+            # Algorithm source http://wiki.scipy.org/Cookbook/Least_Squares_Circle
+            # First computing center of the circle
+            estimate = [np.mean(self.model_data,0)[0],np.mean(self.model_data,0)[1],\
+                    np.mean(self.model_data,0)[2],0,0]
+            # Fitting a plane: http://stackoverflow.com/questions/15481242/python-optimize-leastsq-fitting-a-circle-to-3d-set-of-points
+            opt_vals, ier = optimize.leastsq(self.residualsPlane, estimate)
+            self.plane_point  = np.array(opt_vals[0:3])
+            self.plane_normal = np.array([np.sin(opt_vals[3])*np.cos(opt_vals[4]),\
+                    np.sin(opt_vals[3])*np.sin(opt_vals[4]),np.cos(opt_vals[3])])
+            # Now fitting the circle with the plane fitted values
+            # Creating two vectors in plane
+            self.plane_vec1 = self.model_data[-1,:]-self.plane_point
+            self.plane_vec1 = self.plane_vec1/np.linalg.norm(self.plane_vec1)
+            self.plane_vec2 = np.cross(self.plane_vec1,self.plane_normal)
+            self.plane_vec2 = self.plane_vec2/np.linalg.norm(self.plane_vec2)
+            opt_vals, ier = optimize.leastsq(self.f_2,np.array([0,0]))
+            self.circle_center = opt_vals[0]*self.plane_vec1 + opt_vals[1]*self.plane_vec2 +self.plane_point
 
-        # To separate it from static joint, fix minimum revolute joint radius
-        if R_2<minradius:
-            R_2 = minradius
-        # To separate it from prismatic joint, fix maximum revolute joint radius
-        if R_2>maxradius:
-            R_2 = maxradius
+            # Calculating radius of the circle
+            Ri_2 = self.calc_R(opt_vals[0],opt_vals[1])
+            R_2 = Ri_2.mean()
+            
+            # We need to separate the real revolute joint from the static and prismatic joint
+            maxradius, minradius = 1000.0, 0.8
 
-        # Storing the model parameters: Circle Center and Radius
-        self.config_pars = {'center':np.array([circle_center[0],circle_center[1]]),
-            'radius':R_2}
-        print "Estimated Model paramters for revolute are", self.config_pars
+            # To separate it from static joint, fix minimum revolute joint radius
+            if R_2<minradius:
+                R_2 = minradius
+            # To separate it from prismatic joint, fix maximum revolute joint radius
+            if R_2>maxradius:
+                R_2 = maxradius
 
+            # Storing the model parameters: Circle Center and Radius
+            self.config_pars = {'center':np.array([opt_vals[0],opt_vals[1]]),\
+                    'radius':R_2,'vec1':self.plane_vec1,'vec2':self.plane_vec2}
+            print "Estimated Model parameters for revolute are", self.config_pars
+        else:
+            # Getting axes-angle representation of the rotation matrix
+            (axes_rot,ang) = uk.rotation_to_axis_angle(self.model_data[-1,0:3,0:3])
+            self.config_pars = {'axis':axes_rot,'translation':self.model_data[-1,:,3]}
         # Now estimating the motion parameter as well
         for curr_data in self.model_data:
             self.motion_pars[0].process_inp_data(self.get_motion_pars(curr_data))
@@ -379,7 +412,7 @@ class Revolute_Landmark(Articulation_Models):
             # velocity, acc or higher derivatives
             pred_motion_pars[i] = self.motion_pars[i].propagate(inp_state)
 
-        # Assembling if the assebly is required
+        # Assembling if the assembly is required
         if assemble is not None:
             pred_motion_pars = np.ravel(np.asarray(pred_motion_pars))
         
@@ -391,17 +424,29 @@ class Revolute_Landmark(Articulation_Models):
         if inp_state is None:        
             # First predict the motion parameter
             pred_motion_pars = self.predict_motion_pars(assemble=None)
-            theta = pred_motion_pars[0]
+            theta = pred_motion_pars[0][0]
             # State model is x[k+1] = x_0 + [R*cos(theta);R*sin(theta)]
         
             # Forward Sample -- Includes noise
             # np.random.multivariate_normal(np.array([mean_x,mean_y]),noise_cov)
         else:
             theta = inp_state[0]
+
+        if self.inp_type is 'point':
+            output_plane = np.array([self.config_pars['center'][0]+self.config_pars['radius']*np.cos(theta),
+            self.config_pars['center'][1]+self.config_pars['radius']*np.sin(theta)])
+            output = output_plane[0]*self.config_pars['vec1']+ \
+                    output_plane[1]*self.config_pars['vec2']+self.plane_point
+        else:
+            # The output is axes angle representation of rotation and
+            # translation is constant
+            output = np.zeros((3,4))
+            output[0:3,0:3] = uk.rot_axes_angle(self.config_pars['axis'],theta)
+            output[:,3] = self.config_pars['translation']
+
         
         # Returning just the mean state for now
-        return np.array([self.config_pars['center'][0]+self.config_pars['radius']*np.cos(theta),
-            self.config_pars['center'][1]+self.config_pars['radius']*np.sin(theta)])
+        return output
     
     def model_linear_matrix(self,assemble=1):
         mmat = [0]*len(self.motion_pars)
@@ -412,13 +457,25 @@ class Revolute_Landmark(Articulation_Models):
 
         return mmat
 
-    def observation_jac(self,inp_state):
+    def observation_jac(self,inp_state,initial_point):
         # Assuming that first input state is the angle \theta
         # Asserting that we have a model
         assert(self.config_pars is not None),'No model estimated yet'
-        mat = np.zeros((2,self.motion_pars[0].order))
-        mat[0,0] = -self.config_pars['radius']*np.sin(inp_state[0])
-        mat[1,0] = self.config_pars['radius']*np.cos(inp_state[0])
+        mat = np.zeros((3,self.motion_pars[0].order))
+        if self.inp_type is 'point':
+            mat[:] = -self.config['radius']*np.sin(inp_state[0])*self.config['vec1']+\
+                    self.config['radius']*np.cos(inp_state[0])*self.config['vec2']
+        else:
+            # Initial point is a must as rotation matrix is involved in the
+            # derivative as well unlike the prismatic joint
+            target_ax = self.config_pars['axis']
+            cross_mat = np.matrix([[0,-target_ax[2],target_ax[1]],
+                            [target_ax[2],0,-target_ax[0]],
+                            [-target_ax[1],target_ax[0],0]])
+            mat = np.dot(np.cos(inp_state[0])*cross_mat+\
+                    np.sin(inp_state[0])*np.dot(cross_mat,cross_mat),initial_point)
+
+
         return mat
 
 
@@ -443,11 +500,17 @@ class Revolute_Landmark(Articulation_Models):
     def get_motion_pars(self,curr_data):
         # Asserting that we have a model
         assert(self.config_pars is not None),'No model estimated yet'
-        val = np.arctan2(curr_data[1]-self.config_pars['center'][1],
-                curr_data[0]-self.config_pars['center'][0])
+        if self.inp_type is 'point':
+            plane_proj = np.array([np.dot(curr_data-self.plane_point,self.plane_vec1),\
+                np.dot(curr_data-self.plane_point,self.plane_vec2)])
+            val = np.arctan2(plane_proj[1]-self.config_pars['center'][1],
+                plane_proj[0]-self.config_pars['center'][0])
+        else:
+            val = np.arccos((np.matrix.trace(curr_data[0:3,0:3])-1)/2.0)
+        
         if val<0:
             val = val+2*np.pi
-        # Need to take special care because angle wraps back at pi
+            # Need to take special care because angle wraps back at pi
         if self.motion_pars[0].num_data>0:
             if self.motion_pars[0].num_data<self.motion_pars[0].min_data_samples:
                 last_val = self.motion_pars[0].model_data[self.motion_pars[0].num_data-1]
@@ -463,7 +526,7 @@ class Revolute_Landmark(Articulation_Models):
                     else:
                         self.addition_factor = self.addition_factor+2*np.pi
                         val = val+2*np.pi
-                    
+            
         return val
 
     def get_revolute_par(self):
@@ -552,16 +615,16 @@ class Static_Landmark(Articulation_Models):
 
 if __name__=="__main__":
     # Lets simulate some data from prismatic actuation
-    model1 = Prismatic_Landmark(inp_type='transform')
+    model1 = Revolute_Landmark(inp_type='transform')
 
     for i in range(8):
         homo_transform = np.zeros((3,4))
-        homo_transform[:,0:3] = np.eye(3)
-        homo_transform[:,3] = np.array([i,0,0])
-        #model1.process_inp_data(np.array([i,0,0]))
+        homo_transform[:,0:3] = uk.rot_axes_angle(np.array([0,0,1]),((i+1)*np.pi/18))
+        homo_transform[:,3] = np.array([1,1,0])
+        #model1.process_inp_data(np.array([np.cos(i*np.pi/18),np.sin(i*np.pi/18),1]))
         model1.process_inp_data(homo_transform)
     print model1.predict_model(),model1.model_linear_matrix()
-    pdb.set_trace()
+    #pdb.set_trace()
     '''
     model1.process_inp_data(data)
     model1.process_inp_data(data1)
