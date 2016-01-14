@@ -9,8 +9,8 @@ inside SLAM, by first
 '''
 
 import numpy as np
-import landmarkmap
 import cv2
+import landmarkmap
 import estimate_mm as mm # To figure out the right motion model
 import pdb
 import utils_plot as up
@@ -290,7 +290,8 @@ def articulated_slam(debug_inp=True):
                 # Landmark with ld_id to propagate itself from the last state
                 slam_state[start_ind:end_ind] = ldmk_am[ld_id].predict_motion_pars(\
                         slam_state[start_ind:end_ind])
-                # Propagate the corresponding part of the covariance matrix of SLAM
+                # Propagateontact directly to setup meeting
+
                 slam_cov[start_ind:end_ind,start_ind:end_ind] = ldmk_am[ld_id].prop_motion_par_cov(\
                         slam_cov[start_ind:end_ind,start_ind:end_ind])
             # end of loop over ekf propagation
@@ -354,9 +355,17 @@ def articulated_slam(debug_inp=True):
                 ld_ids_preds.append(curr_ind)
                 diff_vec = lk_pred-slam_state[0:2]
                 q_val = np.dot(diff_vec,diff_vec)
+                
+                # v1.0
                 z_pred = np.array([np.sqrt(q_val),np.arctan2(diff_vec[1],diff_vec[0])-slam_state[2]])
-                # Getting the jacobian matrix 
+                # v2.0 : Need to modify to include z_pred using 3D rotation matrix obtained from the model
+                #z_pred = lk_pred[:,0:3].dot(np.dstack(ldmk_rob_obv)) + lk_pred[:,3]                
+                pdb.set_trace()
+                # Getting the jacobian matrix v 1.0
                 H_mat = np.zeros((2,index_set[-1]))
+                # v2.0 : New definition
+                #H_mat = np.zeros(3,6)
+                
                 # w.r.t robot state
                 H_mat[0,0:3] = (1.0/q_val)*np.array([-np.sqrt(q_val)*diff_vec[0],\
                         -np.sqrt(q_val)*diff_vec[1],0])
@@ -367,6 +376,14 @@ def articulated_slam(debug_inp=True):
                         np.sqrt(q_val)*diff_vec[1]],[-diff_vec[1],diff_vec[0]]])
                 H_mat[:,index_set[curr_ind]:index_set[curr_ind+1]] = np.dot(diff_landmark,\
                         ldmk_am[id].observation_jac(slam_state[index_set[curr_ind]:index_set[curr_ind+1]])) 
+
+                # v2.0 Need to modify based on 3D rotation matrix jacobian: Need to find the updated theta value
+                #H_mat[0,0:3] = np.array([1,0,-np.sin(theta)*ldmk_rob_obv[0] - np.cos(theta)*ldmk_rob_obv[1]])
+                #H_mat[1,0:3] = np.array([0,1,(np.cos(theta)-np.sin(theta))*ldmk_rob_obv[0] - (np.cos(theta)+np.sin(theta))*ldmk_rob_obv[1]])
+                #H_mat[2,0:3] = np.array([0,0,(np.sin(theta)+npcos(theta))*ldmk_rob_obv[0] + (np.cos(theta)+np.sin(theta))*ldmk_rob_obv[1]])
+                #H_mat[0:3,3:6] = lk_pred[:,0:3]
+
+
                 # Innovation covariance
                 inno_cov = np.dot(H_mat,np.dot(slam_cov,H_mat.T))+Q_obs
                 # Kalman Gain
@@ -375,7 +392,10 @@ def articulated_slam(debug_inp=True):
                 # Updating SLAM state
                 # v1.0 Need to update mode to v2.0
                 slam_state = slam_state+np.dot(K_mat,(np.array([r,theta])-z_pred))
-                
+                # v2.0
+                #slam_state = slam_state + np.dot(K_mat,(np.dstack(ldmk_rob_obv)-z_pred))               
+
+ 
                 # Updating SLAM covariance
                 slam_cov = np.dot(np.identity(slam_cov.shape[0])-np.dot(K_mat,H_mat),slam_cov)
             # end of if else ldmk_am[id]
