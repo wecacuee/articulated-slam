@@ -77,6 +77,7 @@ def threeptmap():
     map_conf = [# static
                 dict(ldmks=np.array([[0, 0]]).T,
                      inittheta=0,
+                # Where do we obtain the x and y from?   
                      initpos=[x, y],
                      deltheta=0,
                      delpos=[0,0]) 

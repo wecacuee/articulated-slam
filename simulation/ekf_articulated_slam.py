@@ -204,7 +204,6 @@ def robot_motion_prop(prev_state,prev_state_cov,robot_input,delta_t=1):
                 (-v*(np.cos(theta)-np.cos(theta+w*delta_t)))/(w**2)+((v*np.sin(theta+w*delta_t)*delta_t)/w)],\
                 [0,delta_t]])
     # Covariance in propagated state
-    # Equation from???
     state_cov = np.dot(np.dot(G,prev_state_cov),np.transpose(G))+np.dot(np.dot(V,M),np.transpose(V))
     return robot_state,state_cov
 
@@ -326,6 +325,7 @@ def articulated_slam(debug_inp=True):
             if ldmk_am[id] is None:
                 # Still need to estimate the motion class
                 obs = [r, theta]
+                pdb.set_trace()
                 motion_class.process_inp_data(obs, rob_state,np.vstack(ldmk_rob_obv))
                 #if id == 32:
                 #    print "Model Data", motion_class.am[0].model_data," Obs Num ",fidx

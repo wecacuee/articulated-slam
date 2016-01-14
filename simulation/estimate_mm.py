@@ -4,7 +4,7 @@ The idea is to first use some measurements in batch mode to
 initialize the paramters of the articulation model and then recursively estimate
 the probability of each articulation model
 '''
-import articulation_models as am
+import articulation_models_3d as am
 import numpy as np
 import scipy.stats as sp
 import pdb
@@ -25,11 +25,12 @@ def robot_to_world(robot_state,gen_obv):
     x = robot_state[0]; y= robot_state[1]; theta = robot_state[2]
     
     # v2.0 Using inverse rotation matrix to retrieve landmark world frame coordinates
-    R = np.array([[np.cos(theta), -np.sin(theta)],
-                [np.sin(theta), np.cos(theta)]])
+    R = np.array([[np.cos(theta), -np.sin(theta),0],
+                [np.sin(theta), np.cos(theta),0],
+                [0,0,1]])
     
     # v2.0 
-    return np.reshape(R.T.dot(gen_obv) + np.array([[x],[y]]),[1,2])[0]
+    return np.reshape(R.T.dot(gen_obv) + np.array([[x],[y],[0]]),[1,3])[0]
 
 # x,y in cartesian to robot bearing and range
 def cartesian_to_bearing(obs,robot_state):
@@ -47,7 +48,7 @@ class Estimate_Mm:
         # self.noise_motion = np.diag([0.01,0.01])
         # self.noise_obs = np.diag([0.01,0.01])
         self.noise_motion = np.diag([0.01,0.01]) * 10
-        self.noise_obs = np.diag([0.01,0.01]) * 100
+        self.noise_obs = np.diag([0.01,0.01,0.01]) * 100
         # To keep track of the number of samples that have been processed
         self.num_data = 0
         # Refer to landmarks_motion_models.py for more details
@@ -69,7 +70,7 @@ class Estimate_Mm:
 
     # To process input data -- input data is from robot sensor [r,\theta]
     # robot_state is the position of the robot from where this data was sensed
-    def process_inp_data(self,inp_data_bearing,robot_state,ldmk_rob_obv):
+    def process_inp_data(self,inp_data_bearing,robot_state,ldmk_rob_obv,init_pt):
         self.num_data = self.num_data+1
         lk_prob = np.zeros(len(self.am))
         residual = list()
@@ -98,7 +99,7 @@ class Estimate_Mm:
                 self.covs[i] = model_lin_mat.dot(self.covs[i]).dot(model_lin_mat.T)+\
                                 np.diag(np.tile(self.am[i].noise_cov,(self.means[i].shape[0],)))
                 # Step 3.0: Compute Innovation Covariance
-                H_t = self.am[i].observation_jac(self.means[i])
+                H_t = self.am[i].observation_jac(self.means[i],init_pt)
                 inno_cov = H_t.dot(self.covs[i]).dot(H_t.T)+self.noise_obs
 
                 # Step 3: Compute Kalman Gain
@@ -117,7 +118,7 @@ class Estimate_Mm:
                 # tracking and navigation
 
                 # Likelihood function and probability
-                lk_prob[i] = sp.multivariate_normal.pdf(residual[-1],mean = np.array([0,0]),
+                lk_prob[i] = sp.multivariate_normal.pdf(residual[-1],mean = np.array([0,0,0]),
                         cov = inno_cov)
                 inno_covariances.append(np.linalg.det(inno_cov))
 

@@ -95,6 +95,7 @@ class RobotView(object):
         self._maxdist = maxdist
 
     def in_view(self, points):
+    # Need to change this to view in 3D ??
         """ Returns true for points that are within view """
         pos = self._pos
         dir = self._dir

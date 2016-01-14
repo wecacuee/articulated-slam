@@ -155,7 +155,7 @@ class Prismatic_Landmark(Articulation_Models):
     # @param _dt Time sampling rate
     #
     # @return 
-    def __init__(self,inp_type,_temp_order=2,_noise_cov=1.0,_dt=1,_min_speed=0.1):
+    def __init__(self,inp_type='point',_temp_order=2,_noise_cov=1.0,_dt=1,_min_speed=0.1):
         # For prismatic joint, there is only one motion parameter which
         # is the length along the prismatic axis
         _motion_pars = [mp.Motion_Par(_temp_order,_dt,_min_speed)]
@@ -185,7 +185,10 @@ class Prismatic_Landmark(Articulation_Models):
         if vv[0][0]<0: # Theoretically it doesn't matter but the code cares
             vv[0] = -1*vv[0]
         # rot_mat has to be added to predict homogeneous transforms
-        self.config_pars = {'point':x0,'normal':vv[0],'rot_mat':self.model_data[-1,0:3,0:3]}
+        if self.inp_type is not 'point': 
+            self.config_pars = {'point':x0,'normal':vv[0],'rot_mat':self.model_data[-1,0:3,0:3]}
+        else:
+            self.config_pars = {'point':x0,'normal':vv[0]}
         print "Estimated configuration parameters for prismatic are", self.config_pars
         # Now estimate the motion parameters as well
         for curr_data in self.model_data:
@@ -265,7 +268,7 @@ class Prismatic_Landmark(Articulation_Models):
 
     # The only observation we make are (x,y,z) position and the variable
     # with respect to which we take derivative is the position along the prismatic joint
-    def observation_jac(self,inp_state):
+    def observation_jac(self,inp_state,initial_point):
         # Asserting that we have a model
         assert(self.config_pars is not None),'Do not call this function until we have sufficient data to estimate a model'
         mat = np.zeros((3,self.motion_pars[0].order))
@@ -307,7 +310,7 @@ class Revolute_Landmark(Articulation_Models):
     # @param _min_speed Minimum speed in terms of the angle (0.02 Radian is 1.14 degrees)
     #
     # @return 
-    def __init__(self,inp_type,_temp_order=2,_noise_cov=1.0,_dt=1,_min_speed=0.02):
+    def __init__(self,inp_type='point',_temp_order=2,_noise_cov=1.0,_dt=1,_min_speed=0.02):
         # For revolute joint, there is only one motion parameter which
         # is the angle along the revolute axis
         _motion_pars = [mp.Motion_Par(_temp_order,_dt,_min_speed)]
@@ -463,8 +466,8 @@ class Revolute_Landmark(Articulation_Models):
         assert(self.config_pars is not None),'No model estimated yet'
         mat = np.zeros((3,self.motion_pars[0].order))
         if self.inp_type is 'point':
-            mat[:] = -self.config['radius']*np.sin(inp_state[0])*self.config['vec1']+\
-                    self.config['radius']*np.cos(inp_state[0])*self.config['vec2']
+            mat[:,0:1] = np.vstack(-self.config_pars['radius']*np.sin(inp_state[0])*self.config_pars['vec1']+\
+                    self.config_pars['radius']*np.cos(inp_state[0])*self.config_pars['vec2'])
         else:
             # Initial point is a must as rotation matrix is involved in the
             # derivative as well unlike the prismatic joint
@@ -541,7 +544,7 @@ class Revolute_Landmark(Articulation_Models):
 # Landmark motion model that is static
 class Static_Landmark(Articulation_Models):
 
-    def __init__(self,inp_type,_noise_cov=1.0,_dt=1):
+    def __init__(self,inp_type='point',_noise_cov=1.0,_dt=1):
         # Minimum order motion parameter
         _motion_pars = [mp.Motion_Par(1,_dt)]
         Articulation_Models.__init__(self,_motion_pars,inp_type,_noise_cov)
@@ -600,7 +603,7 @@ class Static_Landmark(Articulation_Models):
         return mmat
 
     
-    def observation_jac(self,inp_state):
+    def observation_jac(self,inp_state,initial_point):
         mat = np.zeros((3,self.motion_pars[0].order))
         mat[0,0] = 1
         mat[1,0] = 1
