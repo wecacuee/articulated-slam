@@ -541,10 +541,10 @@ class Revolute_Landmark(Articulation_Models):
 # Landmark motion model that is static
 class Static_Landmark(Articulation_Models):
 
-    def __init__(self,_noise_cov=1.0,_dt=1):
+    def __init__(self,inp_type,_noise_cov=1.0,_dt=1):
         # Minimum order motion parameter
         _motion_pars = [mp.Motion_Par(1,_dt)]
-        Articulation_Models.__init__(self,_motion_pars,_noise_cov)
+        Articulation_Models.__init__(self,_motion_pars,inp_type,_noise_cov)
     
     # Model paramters for a static landmark is just the location of the landmark
     def fit_model(self):
@@ -601,9 +601,10 @@ class Static_Landmark(Articulation_Models):
 
     
     def observation_jac(self,inp_state):
-        mat = np.zeros((2,self.motion_pars[0].order))
-        mat[0,0] = 1 
+        mat = np.zeros((3,self.motion_pars[0].order))
+        mat[0,0] = 1
         mat[1,0] = 1
+        mat[2,0] = 1
         return mat
     
     def get_motion_pars(self,curr_data):
