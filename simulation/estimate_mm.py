@@ -10,7 +10,7 @@ import scipy.stats as sp
 import pdb
 
 # Robot bearing and range to x,y in cartesian frame given the robot state
-def bearing_to_cartesian(obs,robot_state,gen_obv):
+def bearing_to_cartesian(obs,robot_state):
     # Robot state consists of (x,y,\theta) where \theta is heading angle
     x = robot_state[0]; y= robot_state[1]; theta = robot_state[2]
     
@@ -25,11 +25,14 @@ def robot_to_world(robot_state,gen_obv):
     x = robot_state[0]; y= robot_state[1]; theta = robot_state[2]
     
     # v2.0 Using inverse rotation matrix to retrieve landmark world frame coordinates
+    #R = np.array([[np.cos(theta), -np.sin(theta)],
+    #            [np.sin(theta), np.cos(theta)]])
+    
     R = np.array([[np.cos(theta), -np.sin(theta),0],
                 [np.sin(theta), np.cos(theta),0],
                 [0,0,1]])
-    
     # v2.0 
+    #return np.reshape(R.T.dot(gen_obv) + np.array([[x],[y]]),[1,2])[0]
     return np.reshape(R.T.dot(gen_obv) + np.array([[x],[y],[0]]),[1,3])[0]
 
 # x,y in cartesian to robot bearing and range
@@ -76,7 +79,9 @@ class Estimate_Mm:
         residual = list()
         inno_covariances = list()
         # All the motion models work in x,y but we get bearing and range from sensor
-        # v2.0 Modified bearing_to_catersian function to use only ldmk_rob_obv variable
+        # v1.0 
+	#inp_data = bearing_to_cartesian(inp_data_bearing,robot_state)
+	# v2.0 Modified bearing_to_catersian function to use only ldmk_rob_obv variable
         inp_data = robot_to_world(robot_state,ldmk_rob_obv)
 
         # Pass this data to all the models
@@ -99,6 +104,7 @@ class Estimate_Mm:
                 self.covs[i] = model_lin_mat.dot(self.covs[i]).dot(model_lin_mat.T)+\
                                 np.diag(np.tile(self.am[i].noise_cov,(self.means[i].shape[0],)))
                 # Step 3.0: Compute Innovation Covariance
+                #H_t = self.am[i].observation_jac(self.means[i])
                 H_t = self.am[i].observation_jac(self.means[i],init_pt)
                 inno_cov = H_t.dot(self.covs[i]).dot(H_t.T)+self.noise_obs
 

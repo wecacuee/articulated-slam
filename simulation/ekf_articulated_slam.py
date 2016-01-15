@@ -325,7 +325,6 @@ def articulated_slam(debug_inp=True):
             if ldmk_am[id] is None:
                 # Still need to estimate the motion class
                 obs = [r, theta]
-                pdb.set_trace()
                 motion_class.process_inp_data(obs, rob_state,np.vstack(ldmk_rob_obv))
                 #if id == 32:
                 #    print "Model Data", motion_class.am[0].model_data," Obs Num ",fidx
@@ -343,6 +342,7 @@ def articulated_slam(debug_inp=True):
                     # robot state
                     slam_cov = scipy.linalg.block_diag(slam_cov,curr_ld_cov) 
             else:
+		pdb.set_trace()
                 # This means this landmark is an actual observation that must be used for filtering
                 # the robot state as well as the motion parameter associated with the observed landmark
 
@@ -360,7 +360,6 @@ def articulated_slam(debug_inp=True):
                 z_pred = np.array([np.sqrt(q_val),np.arctan2(diff_vec[1],diff_vec[0])-slam_state[2]])
                 # v2.0 : Need to modify to include z_pred using 3D rotation matrix obtained from the model
                 #z_pred = lk_pred[:,0:3].dot(np.dstack(ldmk_rob_obv)) + lk_pred[:,3]                
-                pdb.set_trace()
                 # Getting the jacobian matrix v 1.0
                 H_mat = np.zeros((2,index_set[-1]))
                 # v2.0 : New definition
