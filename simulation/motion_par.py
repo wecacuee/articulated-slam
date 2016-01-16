@@ -93,8 +93,6 @@ class Motion_Par:
                 pred_state[i] = pred_state[i]+(((dt**(j-i))*1.0)/math.factorial(j-i))*state[j]
                 # Adding noise to the final state
                 pred_state[i] = pred_state[i]+noise_input
-        # Updating self.state as well for prediction
-        self.state = pred_state.copy()
         return pred_state
 
     ##
