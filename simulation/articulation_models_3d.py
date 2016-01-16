@@ -475,7 +475,7 @@ class Revolute_Landmark(Articulation_Models):
             cross_mat = np.matrix([[0,-target_ax[2],target_ax[1]],
                             [target_ax[2],0,-target_ax[0]],
                             [-target_ax[1],target_ax[0],0]])
-            mat = np.dot(np.cos(inp_state[0])*cross_mat+\
+            mat[:,0] = np.dot(np.cos(inp_state[0])*cross_mat+\
                     np.sin(inp_state[0])*np.dot(cross_mat,cross_mat),initial_point)
 
 
