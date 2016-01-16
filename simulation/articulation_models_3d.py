@@ -426,8 +426,8 @@ class Revolute_Landmark(Articulation_Models):
         assert(self.config_pars is not None),'Do not call this function until we have sufficient data to estimate a model'
         if inp_state is None:        
             # First predict the motion parameter
-            pred_motion_pars = self.predict_motion_pars(assemble=None)
-            theta = pred_motion_pars[0][0]
+            pred_motion_pars = self.current_state() #predict_motion_pars(assemble=None)
+            theta = pred_motion_pars[0]
             # State model is x[k+1] = x_0 + [R*cos(theta);R*sin(theta)]
         
             # Forward Sample -- Includes noise
