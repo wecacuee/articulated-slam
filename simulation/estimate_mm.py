@@ -130,7 +130,6 @@ class Estimate_Mm:
                 inno_covariances.append(np.linalg.det(inno_cov))
 
         if (self.num_data>self.min_samples):
-            print "Revolute state is ",self.means[0]
             for i in range(len(self.am)):
                 self.prior[i] = self.prior[i]*lk_prob[i]
 
