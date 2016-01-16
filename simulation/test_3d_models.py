@@ -41,20 +41,20 @@ def test():
 
         chosen_am = ldmk_am.setdefault(0,None)
 
-    #    # For each landmark id, we want to check if the motion model has been estimated
+        # For each landmark id, we want to check if the motion model has been estimated
         if ldmk_am[0] is None:
-    #    # Still need to estimate the motion class
+        # Still need to estimate the motion class
             	motion_class.process_inp_data([0,0],rob_state,np.vstack(obs[0:3]),np.array([0,5,0]))
-    #       	      # Check if the model is estimated
+                # Check if the model is estimated
             	if sum(motion_class.prior>m_thresh)>0:
             	   ldmk_am[0] = motion_class.am[np.where(motion_class.prior>m_thresh)[0]]
             	   ld_ids.append(0)
             	   curr_ld_state = ldmk_am[0].current_state()
             	   curr_ld_cov = ldmk_am[0].current_cov()
-            	   print curr_ld_state,obs[0:3]
-	else:
-		lk_pred = ldmk_am[0].predict_model(obs[0:3])		
-       		print lk_pred,obs[0:3]	
+        else:
+		    # Need to convert state values (theta, thetad for revolute) into prediction values of x,y,z
+            lk_pred = ldmk_am[0].predict_model(curr_ld_state)		
+       	    print lk_pred,obs[0:3]
 
 
 if __name__ == "__main__":
