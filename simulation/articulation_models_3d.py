@@ -617,6 +617,187 @@ class Static_Landmark(Articulation_Models):
         return 0
 
 
+# Landmark motion model that is moving along a circular path
+class Chair_Landmark(Articulation_Models):
+    
+    ##
+    # @brief Constructor for Chair Landmark
+    #
+    # @param _temp_order Temporal order of the revolute motion parameter
+    # @param _noise_cov Noise covariance for forward propagation
+    # @param _dt Time sampling rate
+    # @param _min_speed_r Minimum speed in terms of the angle (0.02 Radian is 1.14 degrees)
+    # @param _min_speed_t Minimum speed in terms of linear motion
+    #
+    # @return 
+    def
+    __init__(self,inp_type='transform',_temp_order=2,_noise_cov=1.0,_dt=1,_min_speed_r=0.02,min_speed_t=0.1):
+        # For revolute joint, there is only one motion parameter which
+        # is the angle along the revolute axis
+        # For motion on the plane, its a 2D motion
+        _motion_pars = [mp.Motion_Par(_temp_order,_dt,_min_speed_r),\
+                mp.Motion_Par(_temp_order,_dt,_min_speed_r),\
+                mp.Motion_Par(_temp_order,_dt,_min_speed_r)]
+        self.addition_factor = 0
+        Articulation_Models.__init__(self,_motion_pars,inp_type,_noise_cov)
+    
+    ##
+    # @brief First fit the circle to the revolute data and then estimate the temporal
+    #           part and fit the temporal part as well
+    #
+    # @return 
+    def fit_model(self):
+        # asserting that we have atleast the minimum required observation for estimation
+        assert(self.num_data>=self.min_data_samples),"Need more data to estimate the model"
+        # First fitting the spatial model
+        # Getting axes-angle representation of the rotation matrix
+        (axes_rot,ang) = uk.rotation_to_axis_angle(self.model_data[-1,0:3,0:3])
+        # Fitting plane to last two translations
+        # We can use the information that axes of rotation is normal to plane
+        self.vec1 = self.model_data[-1,:,3].copy()
+        self.vec2 = np.cross(axes_rot,self.vec1)
+        self.config_pars = {'axis':axes_rot,'vec1':self.vec1,'vec2':self.vec2}
+        # Now estimating the motion parameter as well
+        for curr_data in self.model_data:
+            curr_motion_pars = self.get_motion_pars(curr_data)
+            for i in range(len(curr_motion_pars)):
+                self.motion_pars[i].process_inp_data(curr_motion_pars[i])
+
+
+        
+    def update_model_pars(self):
+        # Asserting that we have a model
+        assert(self.config_pars is not None),'Do not call this function until we have sufficient data to estimate a model'
+        # Keeping the same parameters for now
+        #self.config_pars = self.config_pars # To Do: Update the parameters location online
+        # Update the motion parameter anyway
+        self.motion_pars[0].process_inp_data(self.get_motion_pars(self.model_data[-1,:]))
+    
+    def predict_motion_pars(self,inp_state=None,assemble=1):
+        # Predicting just the motion parameters
+        pred_motion_pars = [0]*len(self.motion_pars)
+        for i in range(len(self.motion_pars)):
+            # Using just the actual prediction of motion parameter and not the
+            # velocity, acc or higher derivatives
+            pred_motion_pars[i] = self.motion_pars[i].propagate(inp_state)
+
+        # Assembling if the assembly is required
+        if assemble is not None:
+            pred_motion_pars = np.ravel(np.asarray(pred_motion_pars))
+        
+        return pred_motion_pars    
+    
+    def predict_model(self,inp_state=None):
+        # Asserting that we have a model
+        assert(self.config_pars is not None),'Do not call this function until we have sufficient data to estimate a model'
+        if inp_state is None:        
+            # First predict the motion parameter
+            pred_motion_pars = self.current_state() #predict_motion_pars(assemble=None)
+            theta = pred_motion_pars[0]
+            # State model is x[k+1] = x_0 + [R*cos(theta);R*sin(theta)]
+        
+            # Forward Sample -- Includes noise
+            # np.random.multivariate_normal(np.array([mean_x,mean_y]),noise_cov)
+        else:
+            theta = inp_state[0]
+
+        if self.inp_type is 'point':
+            output_plane = np.array([self.config_pars['center'][0]+self.config_pars['radius']*np.cos(theta),
+            self.config_pars['center'][1]+self.config_pars['radius']*np.sin(theta)])
+            output = output_plane[0]*self.config_pars['vec1']+ \
+                    output_plane[1]*self.config_pars['vec2']+self.plane_point
+        else:
+            # The output is axes angle representation of rotation and
+            # translation is constant
+            output = np.zeros((3,4))
+            output[0:3,0:3] = uk.rot_axes_angle(self.config_pars['axis'],theta)
+            output[:,3] = self.config_pars['translation']
+
+        
+        # Returning just the mean state for now
+        return output
+    
+    def model_linear_matrix(self,assemble=1):
+        mmat = [0]*len(self.motion_pars)
+        for i in range(len(self.motion_pars)):
+            mmat[i] = self.motion_pars[i].model_linear_matrix()
+        if assemble is not None:
+            mmat = scipy.linalg.block_diag(*mmat)
+
+        return mmat
+
+    def observation_jac(self,inp_state,initial_point):
+        # Assuming that first input state is the angle \theta
+        # Asserting that we have a model
+        assert(self.config_pars is not None),'No model estimated yet'
+        mat = np.zeros((3,self.motion_pars[0].order))
+        if self.inp_type is 'point':
+            mat[:,0:1] = np.vstack(-self.config_pars['radius']*np.sin(inp_state[0])*self.config_pars['vec1']+\
+                    self.config_pars['radius']*np.cos(inp_state[0])*self.config_pars['vec2'])
+        else:
+            # Initial point is a must as rotation matrix is involved in the
+            # derivative as well unlike the prismatic joint
+            target_ax = self.config_pars['axis']
+            cross_mat = np.matrix([[0,-target_ax[2],target_ax[1]],
+                            [target_ax[2],0,-target_ax[0]],
+                            [-target_ax[1],target_ax[0],0]])
+            mat[:,0] = np.dot(np.cos(inp_state[0])*cross_mat+\
+                    np.sin(inp_state[0])*np.dot(cross_mat,cross_mat),initial_point)
+
+
+        return mat
+
+
+    def find_quad(self,angle):
+        angle = (angle)%(2*np.pi)
+        if angle<=np.pi/2:
+            quad = 1
+        elif (np.pi/2<angle) and (angle<=np.pi):
+            quad = 2
+        elif (np.pi<angle) and (angle<=3*(np.pi/2)):
+            quad = 3
+        else:
+            quad = 4
+        return quad
+
+    ##
+    # @brief Estimate the motion parameter (angle) given the point on the circle
+    #
+    # @param curr_data Current observation
+    #
+    # @return 
+    def get_motion_pars(self,curr_data):
+        # Asserting that we have a model
+        assert(self.config_pars is not None),'No model estimated yet'
+        val = np.arccos((np.matrix.trace(curr_data[0:3,0:3])-1)/2.0)
+        
+        if val<0:
+            val = val+2*np.pi
+            # Need to take special care because angle wraps back at pi
+        if self.motion_pars[0].num_data>0:
+            if self.motion_pars[0].num_data<self.motion_pars[0].min_data_samples:
+                last_val = self.motion_pars[0].model_data[self.motion_pars[0].num_data-1]
+            else:
+                last_val = self.motion_pars[0].model_data[-1]
+            if abs(last_val-val)>3:
+                val = val+self.addition_factor
+                if abs(last_val-val)>3:
+                    if ((self.find_quad(val)==4 and self.find_quad(last_val)<3)) or \
+                            ((self.find_quad(val)==3) and (self.find_quad(last_val)==1)):
+                        self.addition_factor = self.addition_factor-2*np.pi
+                        val = val-2*np.pi
+                    else:
+                        self.addition_factor = self.addition_factor+2*np.pi
+                        val = val+2*np.pi
+        # Getting translation parameters as well
+        # T = v_1 x + v_2 y where v_1 and v_2 are perpendicular vectors in plane
+        vec1_par = np.dot(curr_data[:,3],self.config_pars['vec1'])
+        vec2_par = np.dot(curr_data[:,3],self.config_pars['vec2'])
+        curr_motion_pars = [val,vec1_par,vec2_par]
+
+        return curr_motion_pars
+
+
 if __name__=="__main__":
     # Lets simulate some data from prismatic actuation
     model1 = Revolute_Landmark(inp_type='transform')
