@@ -130,7 +130,6 @@ class Estimate_Mm:
                 lk_prob[i] = sp.multivariate_normal.pdf(residual[-1],mean = np.array([0,0,0]),
                         cov = inno_cov)
                 inno_covariances.append(np.linalg.det(inno_cov))
-
         if (self.num_data>self.min_samples):
             for i in range(len(self.am)):
                 self.prior[i] = self.prior[i]*lk_prob[i]
@@ -148,7 +147,7 @@ if __name__=="__main__":
     init_pt = np.array([x_0+r,y_0,1])
     for i in range(30):
         # Revolute
-        curr_obs = np.array([r*np.cos(-i*w)+x_0,r*np.sin(-i*w)+y_0,1])
+        #curr_obs = np.array([r*np.cos(-i*w)+x_0,r*np.sin(-i*w)+y_0,1])
         # Static
         #curr_obs = np.array([x_0,y_0,1])
 
@@ -159,4 +158,4 @@ if __name__=="__main__":
         if i>8:
             pdb.set_trace()
             print "Revolute joint observed position ",\
-                    motion_class.am[0].predict_model(motion_class.means[0]), "obs = ",curr_obs
+                    motion_class.am[1].predict_model(motion_class.means[1]), "obs = ",curr_obs
