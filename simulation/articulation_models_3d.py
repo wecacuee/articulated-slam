@@ -365,10 +365,14 @@ class Revolute_Landmark(Articulation_Models):
             # Now fitting the circle with the plane fitted values
             # Creating two vectors in plane
             self.plane_vec1 = self.model_data[-1,:]-self.plane_point
+            # The case when plane_point coincides exactly with last sample
+            if np.linalg.norm(self.plane_vec1)<1e-3:
+                # Lets choose a random vector perpendicular to plane normal
+                self.plane_vec1 = np.cross(np.random.rand(3),self.plane_normal)
+
+            self.plane_vec1 = self.plane_vec1/np.linalg.norm(self.plane_vec1)
             self.plane_vec2 = np.cross(self.plane_vec1,self.plane_normal)
-            if np.linalg.norm(self.plane_vec1)>1e-3 and np.linalg.norm(self.plane_vec2)>1e-3:
-                self.plane_vec1 = self.plane_vec1/np.linalg.norm(self.plane_vec1)
-                self.plane_vec2 = self.plane_vec2/np.linalg.norm(self.plane_vec2)
+            self.plane_vec2 = self.plane_vec2/np.linalg.norm(self.plane_vec2)
             opt_vals, ier = optimize.leastsq(self.f_2,np.array([0,0]))
             self.circle_center = opt_vals[0]*self.plane_vec1 + opt_vals[1]*self.plane_vec2 +self.plane_point
 
