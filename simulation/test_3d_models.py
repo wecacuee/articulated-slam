@@ -19,8 +19,8 @@ def gen_data(model='rev'):
         # Model parameters
         r = 1
         w = np.pi/6
-        x_0 = 2
-        y_0 = 2
+        x_0 = 2.0
+        y_0 = 2.0
         
         # Case 1: robot @ origin and point is always in view
         # Data assumption is rotation about z-axis since view model hasn't been updated
@@ -33,14 +33,18 @@ def gen_data(model='rev'):
             yield np.array([r*np.cos(-i*w)+x_0,r*np.sin(-i*w)+y_0,1,r*np.cos(0)+x_0,r*np.sin(0)+y_0,1])
 
     elif model=='static':
-        x_0 = 2
-        y_0 = 2
+        x_0 = 2.0
+        y_0 = 2.0
         for i in range(30):
             yield np.array([x_0,y_0,1,x_0,y_0,1])
 
     else:
-        print 'not yet completed'
-
+        x_0 = 2.0
+        y_0 = 2.0
+        v_y = 0.2
+        v_x = 0.1
+        for i in range(30):
+            yield np.array([x_0+i*v_x,y_0+i*v_y,1,x_0,y_0,1])
 
 
 def test():
@@ -77,12 +81,12 @@ def test():
     #        lk_pred = ldmk_am[0].predict_model(motion_class.means[0])		
     #   	    print lk_pred,obs[0:3]
     
-    data = gen_data('static')
+    data = gen_data('pris')
     # Case 1: robot at origin
-    robot_state = np.array([0,0,0])
+    #robot_state = np.array([0,0,0])
 
     # Case 2: Robot away from origin with some theta
-    #robot_state = np.array([1,5,np.pi])
+    robot_state = np.array([1,5,np.pi])
     for packet in data:
         
         curr_obs = packet[0:3]
@@ -93,7 +97,6 @@ def test():
         chosen_am = ldmk_am.setdefault(0,None)
 
         motion_class.process_inp_data([0,0],robot_state,curr_obs,init_pt)
-        print motion_class.prior
         if ldmk_am[0] is None:
         # Still estimating model
             if sum(motion_class.prior>0.6)>0:
@@ -111,7 +114,7 @@ def test():
             pos_list = np.ndarray.tolist(robot_state[0:2]) 
             pos_list.append(0.0)
                    
-            #print model,R_temp.T.dot(lk_pred)+np.array(pos_list),curr_obs        
+            print model,R_temp.T.dot(lk_pred)+np.array(pos_list),curr_obs        
 
         """ Legacy code (examples)
         # Revolute
