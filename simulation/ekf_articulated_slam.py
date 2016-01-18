@@ -342,7 +342,6 @@ def articulated_slam(debug_inp=True):
                     # robot state
                     slam_cov = scipy.linalg.block_diag(slam_cov,curr_ld_cov) 
             else:
-		pdb.set_trace()
                 # This means this landmark is an actual observation that must be used for filtering
                 # the robot state as well as the motion parameter associated with the observed landmark
 

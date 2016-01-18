@@ -630,8 +630,7 @@ class Chair_Landmark(Articulation_Models):
     # @param _min_speed_t Minimum speed in terms of linear motion
     #
     # @return 
-    def
-    __init__(self,inp_type='transform',_temp_order=2,_noise_cov=1.0,_dt=1,_min_speed_r=0.02,min_speed_t=0.1):
+    def __init__(self,inp_type='transform',_temp_order=2,_noise_cov=1.0,_dt=1,_min_speed_r=0.02,min_speed_t=0.1):
         # For revolute joint, there is only one motion parameter which
         # is the angle along the revolute axis
         # For motion on the plane, its a 2D motion

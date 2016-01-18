@@ -33,7 +33,8 @@ def robot_to_world(robot_state,gen_obv):
                 [0,0,1]])
     # v2.0 
     #return np.reshape(R.T.dot(gen_obv) + np.array([[x],[y]]),[1,2])[0]
-    return np.reshape(R.T.dot(gen_obv) + np.array([[x],[y],[0]]),[1,3])[0]
+    # State is (x,y,0) since we assume robot is on the ground
+    return R.T.dot(gen_obv - np.array([x,y,0])) 
 
 # x,y in cartesian to robot bearing and range
 def cartesian_to_bearing(obs,robot_state):
@@ -80,10 +81,11 @@ class Estimate_Mm:
         inno_covariances = list()
         # All the motion models work in x,y but we get bearing and range from sensor
         # v1.0 
-	#inp_data = bearing_to_cartesian(inp_data_bearing,robot_state)
-	# v2.0 Modified bearing_to_catersian function to use only ldmk_rob_obv variable
-        #inp_data = robot_to_world(robot_state,ldmk_rob_obv)
-        inp_data = ldmk_rob_obv.copy()
+	    #inp_data = bearing_to_cartesian(inp_data_bearing,robot_state)
+	    # v2.0 Modified bearing_to_catersian function to use only ldmk_rob_obv variable
+        #pdb.set_trace()
+        inp_data = robot_to_world(robot_state,ldmk_rob_obv)
+        #inp_data = ldmk_rob_obv.copy()
 
         # Pass this data to all the models
         for i in range(len(self.am)):
@@ -147,14 +149,14 @@ if __name__=="__main__":
     for i in range(30):
         # Revolute
         curr_obs = np.array([r*np.cos(-i*w)+x_0,r*np.sin(-i*w)+y_0,1])
-
         # Static
-        #curr_obs = np.array([x_0,y_0])
+        #curr_obs = np.array([x_0,y_0,1])
 
         # Prismatic - starting from x_0,y_0 ,slope of line at w
         #curr_obs = np.array([x_0-i*r*np.cos(w),y_0+i*r*np.sin(w)])
         motion_class.process_inp_data(cartesian_to_bearing(curr_obs,robot_state),robot_state,curr_obs,init_pt)
         print "Rev: ",motion_class.prior[0],"Pris: ",motion_class.prior[1],"Static: ",motion_class.prior[2]
         if i>8:
+            pdb.set_trace()
             print "Revolute joint observed position ",\
                     motion_class.am[0].predict_model(motion_class.means[0]), "obs = ",curr_obs
