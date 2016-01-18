@@ -636,8 +636,13 @@ class Chair_Landmark(Articulation_Models):
         # is the angle along the revolute axis
         # For motion on the plane, its a 2D motion
         _motion_pars = [mp.Motion_Par(_temp_order,_dt,_min_speed_r),\
-                mp.Motion_Par(_temp_order,_dt,_min_speed_r),\
-                mp.Motion_Par(_temp_order,_dt,_min_speed_r)]
+                mp.Motion_Par(_temp_order,_dt,_min_speed_t),\
+                mp.Motion_Par(_temp_order,_dt,_min_speed_t)]
+        # We need a mechanism to extract specific elements out of overall motion
+        # vector
+        self.motion_pars_ind = np.zeros((len(_motion_pars)+1,))
+        for i in range(len(_motion_pars)):
+            self.motion_pars_ind[i+1] = self.motion_pars_ind[i]+_motion_pars[i].order 
         self.addition_factor = 0
         Articulation_Models.__init__(self,_motion_pars,inp_type,_noise_cov)
     
@@ -692,29 +697,19 @@ class Chair_Landmark(Articulation_Models):
         assert(self.config_pars is not None),'Do not call this function until we have sufficient data to estimate a model'
         if inp_state is None:        
             # First predict the motion parameter
-            pred_motion_pars = self.current_state() #predict_motion_pars(assemble=None)
-            theta = pred_motion_pars[0]
-            # State model is x[k+1] = x_0 + [R*cos(theta);R*sin(theta)]
-        
-            # Forward Sample -- Includes noise
-            # np.random.multivariate_normal(np.array([mean_x,mean_y]),noise_cov)
-        else:
-            theta = inp_state[0]
+            inp_state = self.current_state() #predict_motion_pars(assemble=None)
+        theta = inp_state[self.motion_pars_ind[0]]
+        v1_coeff = inp_state[self.motion_pars_ind[1]]
+        v2_coeff = inp_state[self.motion_pars_ind[2]]
 
-        if self.inp_type is 'point':
-            output_plane = np.array([self.config_pars['center'][0]+self.config_pars['radius']*np.cos(theta),
-            self.config_pars['center'][1]+self.config_pars['radius']*np.sin(theta)])
-            output = output_plane[0]*self.config_pars['vec1']+ \
-                    output_plane[1]*self.config_pars['vec2']+self.plane_point
-        else:
-            # The output is axes angle representation of rotation and
-            # translation is constant
-            output = np.zeros((3,4))
-            output[0:3,0:3] = uk.rot_axes_angle(self.config_pars['axis'],theta)
-            output[:,3] = self.config_pars['translation']
-
-        
-        # Returning just the mean state for now
+        # Getting the rotation and translation part of the motion based on
+        # order of various motion parameters
+        # The output is axes angle representation of rotation and
+        # translation is constant
+        output = np.zeros((3,4))
+        output[0:3,0:3] = uk.rot_axes_angle(self.config_pars['axis'],theta)
+        output[:,3] = self.config_pars['vec1']*v1_coeff+\
+                self.config_pars['vec2']*v2_coeff
         return output
     
     def model_linear_matrix(self,assemble=1):
@@ -730,21 +725,19 @@ class Chair_Landmark(Articulation_Models):
         # Assuming that first input state is the angle \theta
         # Asserting that we have a model
         assert(self.config_pars is not None),'No model estimated yet'
-        mat = np.zeros((3,self.motion_pars[0].order))
-        if self.inp_type is 'point':
-            mat[:,0:1] = np.vstack(-self.config_pars['radius']*np.sin(inp_state[0])*self.config_pars['vec1']+\
-                    self.config_pars['radius']*np.cos(inp_state[0])*self.config_pars['vec2'])
-        else:
-            # Initial point is a must as rotation matrix is involved in the
-            # derivative as well unlike the prismatic joint
-            target_ax = self.config_pars['axis']
-            cross_mat = np.matrix([[0,-target_ax[2],target_ax[1]],
-                            [target_ax[2],0,-target_ax[0]],
-                            [-target_ax[1],target_ax[0],0]])
-            mat[:,0] = np.dot(np.cos(inp_state[0])*cross_mat+\
+        mat = np.zeros((3,self.motion_pars_ind[-1]))
+        # Initial point is a must as rotation matrix is involved in the
+        # derivative as well unlike the prismatic joint
+        target_ax = self.config_pars['axis']
+        cross_mat = np.matrix([[0,-target_ax[2],target_ax[1]],
+                        [target_ax[2],0,-target_ax[0]],
+                        [-target_ax[1],target_ax[0],0]])
+        mat[:,self.motion_pars_ind[0]] = np.dot(np.cos(inp_state[0])*cross_mat+\
                     np.sin(inp_state[0])*np.dot(cross_mat,cross_mat),initial_point)
-
-
+        # Derivative w.r.t to translation joint motion parameters
+        mat[:,self.motion_pars_ind[1]] = np.vstack(self.config_pars['vec1'])
+        mat[:,self.motion_pars_ind[2]] = np.vstack(self.config_pars['vec2'])
+        
         return mat
 
 
@@ -774,6 +767,7 @@ class Chair_Landmark(Articulation_Models):
         if val<0:
             val = val+2*np.pi
             # Need to take special care because angle wraps back at pi
+        # motion_pars[0] is the revolute joint
         if self.motion_pars[0].num_data>0:
             if self.motion_pars[0].num_data<self.motion_pars[0].min_data_samples:
                 last_val = self.motion_pars[0].model_data[self.motion_pars[0].num_data-1]
