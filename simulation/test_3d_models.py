@@ -12,6 +12,20 @@ import pdb
 import utils_plot as up
 import scipy.linalg
 import matplotlib.pyplot as plt
+import itertools
+
+def gen_init(model='rev'):
+    if model=='rev':
+        r =  1
+        w = np.pi/6
+        x_0 = 0.0
+        y_0 = 2.0
+        return np.array([r*np.cos(0)+x_0,r*np.sin(0)+y_0,1])
+    elif model=='static':
+        return np.array([2.0,2.0,0.0])
+    else:
+        return np.array([0.0,2.0,0.0])
+
 
 def gen_simple_data(model='rev'):
     # Generate output with initial point appended
@@ -30,22 +44,22 @@ def gen_simple_data(model='rev'):
 
         # Case 2: robot is not @ origin but point is always in view
         for i in range(30):
-            yield np.array([r*np.cos(-i*w)+x_0,r*np.sin(-i*w)+y_0,1,r*np.cos(0)+x_0,r*np.sin(0)+y_0,1])
+            yield np.array([r*np.cos(-i*w)+x_0,r*np.sin(-i*w)+y_0,1])
 
     elif model=='static':
         x_0 = 2.0
         y_0 = 2.0
         z_0 = 0.0
         for i in range(30):
-            yield np.array([x_0,y_0,z_0,x_0,y_0,z_0])
+            yield np.array([x_0,y_0,z_0])
 
     else:               # For point moving out/in  view
-        x_0 = 0.0       #0/3
+        x_0 = 2.0       #0/3
         y_0 = 2.0       #2/2
         v_y = 0.1       #0/0
         v_x = 0.1       #0.1/-0.1
         for i in range(30):
-            yield np.array([x_0+i*v_x,y_0+i*v_y,0,x_0,y_0,0])
+            yield np.array([x_0+i*v_x,y_0+i*v_y,0])
 
 def in_view(rob_state,ldmk_pos):
     #pt = np.array([2.0,2.0,0.0])
@@ -69,7 +83,25 @@ def in_view(rob_state,ldmk_pos):
     X = np.around(ap2vec.dot(axisvec)/np.linalg.norm(axisvec)/np.linalg.norm(ap2vec),3) >= np.around(np.cos(aperture),3)
   
     Y = np.around(ap2vec.dot(axisvec)/np.linalg.norm(axisvec),3) <= np.around(np.linalg.norm(axisvec))
-    return X and Y                        
+    return X and Y
+
+
+def gen_id():
+    for i in range(30):
+        yield np.array([0,1])    
+                    
+def gen_cmplx_data(model1='rev',model2='rev'):
+    data = gen_simple_data(model1)
+    
+    data2 = gen_simple_data(model2) 
+    
+    for pt1,pt2 in zip(data,data2):
+        yield np.vstack((pt1,pt2))
+
+def gen_init_coll(pt1,pt2):
+    for i in range(30):
+        yield np.vstack((pt1,pt2))
+
 
 def test():
     # Generate the test data
@@ -104,8 +136,19 @@ def test():
 	#	    # Need to convert state values (theta, thetad for revolute) into prediction values of x,y,z
     #        lk_pred = ldmk_am[0].predict_model(motion_class.means[0])		
     #   	    print lk_pred,obs[0:3]
+    model = [0,0]
+    error = [0.0,0.0]
+    error_count = [0,0]
+
+    # Need to modify data generation
+    data = gen_cmplx_data('pris','rev')
+    data_init_pt = gen_init('pris')
+    data2_init_pt = gen_init('rev')   
     
-    data = gen_simple_data('pris')
+    
+    ids = gen_id()
+    init_pt = gen_init_coll(data_init_pt,data2_init_pt) 
+
     # Case 1: robot at origin
     robot_state = np.array([0,0,np.pi*90/180])
 
@@ -114,52 +157,53 @@ def test():
 
     # Noise
     mu = 0.0
-    sigma = 0.6
+    sigma = 0.1
     noise = np.random.normal(mu,sigma,3)
     print "Noise is :", noise 
-    error = 0.0
-    error_count = 1
+    
 
-    for packet in data:
+    for fidx,data,init_point in zip(ids,data,init_pt):
         
-        curr_obs = packet[0:3]
-        init_pt = packet[3:]
 
-        curr_obs = curr_obs + noise 
 
         m_thresh = 0.6
+        for fid,dat,init_pt in itertools.izip(fidx,data,init_point):
+            
+            curr_obs = data[fid]
+            curr_obs = curr_obs + noise 
         
-        if in_view(robot_state,curr_obs):
-            motion_class = ldmk_estimater.setdefault(0, mm.Estimate_Mm())
+            if in_view(robot_state,curr_obs):
+                motion_class = ldmk_estimater.setdefault(fid, mm.Estimate_Mm())
 
-            chosen_am = ldmk_am.setdefault(0,None)
+                chosen_am = ldmk_am.setdefault(fid,None)
 
-            motion_class.process_inp_data([0,0],robot_state,curr_obs,init_pt)
-            if ldmk_am[0] is None:
-            # Still estimating model
-                if sum(motion_class.prior>m_thresh)>0:
-                    model = np.where(motion_class.prior>m_thresh)[0]
-                    ldmk_am[0] = motion_class.am[model]
+                motion_class.process_inp_data([0,0],robot_state,curr_obs,init_pt)
+                if ldmk_am[fid] is None:
+                # Still estimating model
+                    if sum(motion_class.prior>m_thresh)>0:
+                        model[fid] = np.where(motion_class.prior>m_thresh)[0]
+                        ldmk_am[fid] = motion_class.am[model[fid]]
+                else:
+                    # LK_pred comes out in the robot_frame. We need to convert it back to world frame to match the world coordinate observations
+                    lk_pred = ldmk_am[fid].predict_model(motion_class.means[model[fid]])
+                    
+                    R_temp = np.array([[np.cos(-robot_state[2]), -np.sin(-robot_state[2]),0],
+                         [np.sin(-robot_state[2]), np.cos(-robot_state[2]),0],
+                         [0,0,1]])
+                    
+                    pos_list = np.ndarray.tolist(robot_state[0:2]) 
+                    pos_list.append(0.0)
+                    res = R_temp.T.dot(lk_pred)+np.array(pos_list)
+                    error[fid] = error[fid] + np.linalg.norm(res - curr_obs)
+                    error_count[fid] = error_count[fid] + 1
             else:
-                # LK_pred comes out in the robot_frame. We need to convert it back to world frame to match the world coordinate observations
-                lk_pred = ldmk_am[0].predict_model(motion_class.means[model])
-                
-                R_temp = np.array([[np.cos(-robot_state[2]), -np.sin(-robot_state[2]),0],
-                     [np.sin(-robot_state[2]), np.cos(-robot_state[2]),0],
-                     [0,0,1]])
-                
-                pos_list = np.ndarray.tolist(robot_state[0:2]) 
-                pos_list.append(0.0)
-                res = R_temp.T.dot(lk_pred)+np.array(pos_list)
-                error = error + np.linalg.norm(res - curr_obs)
-                error_count = error_count + 1
-        else:
-            print "Not in view"
+                print "Not in view"
 
-    if error_count!=1:
-        print("Error is %f"%(error/(error_count-1)))
-    else:
-        print "No predictions were made since point was not in view sufficiently"
+    print "Error", np.array(error)/np.array(error_count)
+    #if error_count!=1:
+    #    print("Error is %f"%(error/(error_count-1)))
+    #else:
+    #    print "No predictions were made since point was not in view sufficiently"
 
 
 if __name__ == "__main__":
