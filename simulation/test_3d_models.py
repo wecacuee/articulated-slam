@@ -19,7 +19,7 @@ def gen_simple_data(model='rev'):
         # Model parameters
         r = 1
         w = np.pi/6
-        x_0 = 2.0
+        x_0 = 0.0
         y_0 = 2.0
         
         # Case 1: robot @ origin and point is always in view
@@ -39,11 +39,11 @@ def gen_simple_data(model='rev'):
         for i in range(30):
             yield np.array([x_0,y_0,z_0,x_0,y_0,z_0])
 
-    else:
-        x_0 = 2.0
-        y_0 = 2.0
-        v_y = 0.0
-        v_x = 5.0
+    else:               # For point moving out/in  view
+        x_0 = 0.0       #0/3
+        y_0 = 2.0       #2/2
+        v_y = 0.1       #0/0
+        v_x = 0.1       #0.1/-0.1
         for i in range(30):
             yield np.array([x_0+i*v_x,y_0+i*v_y,0,x_0,y_0,0])
 
@@ -105,18 +105,30 @@ def test():
     #        lk_pred = ldmk_am[0].predict_model(motion_class.means[0])		
     #   	    print lk_pred,obs[0:3]
     
-    data = gen_simple_data('prismatic')
+    data = gen_simple_data('pris')
     # Case 1: robot at origin
     robot_state = np.array([0,0,np.pi*90/180])
 
     # Case 2: Robot away from origin with some theta
     #robot_state = np.array([1,5,np.pi*90/180])
+
+    # Noise
+    mu = 0.0
+    sigma = 0.6
+    noise = np.random.normal(mu,sigma,3)
+    print "Noise is :", noise 
+    error = 0.0
+    error_count = 1
+
     for packet in data:
         
         curr_obs = packet[0:3]
         init_pt = packet[3:]
 
+        curr_obs = curr_obs + noise 
+
         m_thresh = 0.6
+        
         if in_view(robot_state,curr_obs):
             motion_class = ldmk_estimater.setdefault(0, mm.Estimate_Mm())
 
@@ -138,11 +150,16 @@ def test():
                 
                 pos_list = np.ndarray.tolist(robot_state[0:2]) 
                 pos_list.append(0.0)
-                print motion_class.prior
-                print model,R_temp.T.dot(lk_pred)+np.array(pos_list),curr_obs        
+                res = R_temp.T.dot(lk_pred)+np.array(pos_list)
+                error = error + np.linalg.norm(res - curr_obs)
+                error_count = error_count + 1
         else:
             print "Not in view"
 
+    if error_count!=1:
+        print("Error is %f"%(error/(error_count-1)))
+    else:
+        print "No predictions were made since point was not in view sufficiently"
 
 
 if __name__ == "__main__":
