@@ -13,6 +13,7 @@ import utils_plot as up
 import scipy.linalg
 import matplotlib.pyplot as plt
 import itertools
+from mpl_toolkits.mplot3d import axes3d
 
 def gen_init(model='rev'):
     if model=='rev':
@@ -102,8 +103,32 @@ def gen_init_coll(pt1,pt2):
     for i in range(30):
         yield np.vstack((pt1,pt2))
 
+def plot_show():
+    fig = plt.figure()
+    return fig,plt
+
+def visualize_new(colors,pt,plot_data):
+    col = ['k','r','y','b']
+    for i in range(pt.shape[0]):
+        X,Y,Z = [pt[i][0],pt[i][1],pt[i][2]]
+        plot_data.append((X,Y,Z,col[colors[i]],'o'))
+    return plot_data
+
+def disp(plot_data):
+    fig = plt.figure()
+    ax = fig.add_subplot(111,projection='3d')
+
+    for X,Y,Z,ccol,mrk in plot_data:
+        ax.scatter(X,Y,Z,c=ccol,marker=mrk)    
+
+    plt.show()
+
 
 def test():
+    # For visualization
+    joint_color = [np.array(l) for l in (
+                                        [255, 0, 0], [0, 255, 0], [0, 0, 255])]
+    plot_data =[(0,0,0,'k','o')] 
     # Generate the test data
     #ldmk_obs =  gen_data()
     #
@@ -165,12 +190,11 @@ def test():
     for fidx,data,init_point in zip(ids,data,init_pt):
         
 
-
+        colors = []
         m_thresh = 0.6
         for fid,dat,init_pt in itertools.izip(fidx,data,init_point):
-            
-            curr_obs = data[fid]
-            curr_obs = curr_obs + noise 
+            curr_obs = dat
+            #curr_obs = curr_obs + noise 
         
             if in_view(robot_state,curr_obs):
                 motion_class = ldmk_estimater.setdefault(fid, mm.Estimate_Mm())
@@ -198,7 +222,26 @@ def test():
                     error_count[fid] = error_count[fid] + 1
             else:
                 print "Not in view"
+        
+            ## Visualization
+            track = 1
+            for prob in ldmk_estimater[fid].prior[:3]:
+                if prob > m_thresh:
+                    colors.append(track)
+                    break
+                track = track + 1
+            if track == 4:
+                colors.append(0)
+            #color = np.int64((p1*rev_color
+            #                   + p2*pris_color
+            #                   + p3*stat_color))
+            #color = color - np.min(color)
+            #colors.append(color)
 
+        # Visualize the complete map after each frame
+        plot_data = visualize_new(colors,data,plot_data) 
+
+    disp(plot_data)
     print "Error", np.array(error)/np.array(error_count)
     #if error_count!=1:
     #    print("Error is %f"%(error/(error_count-1)))
