@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(aae)
+include(ExternalProject)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -11,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   pcl_conversions
   brics_actuator
+  rosbag
   )
 
 ## System dependencies are found with CMake's conventions
@@ -104,8 +106,10 @@ include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
 # )
 
 ## include all the source code files
-file(GLOB target_files
-    "src/*.cpp"
+set(target_files
+    src/camera_pose.cpp
+    src/cloud_segment.cpp
+    src/scene_segmenter.cpp
     )
 
 ## Declare a cpp executable
@@ -120,6 +124,17 @@ add_executable(segment ${target_files})
  target_link_libraries(segment
    ${catkin_LIBRARIES}
    ${Boost_LIBRARIES}
+ )
+
+ ExternalProject_Add(densetraj
+     PREFIX densetraj
+     # Download step
+     # URL https://lear.inrialpes.fr/people/wang/download/improved_trajectory_release.tar.gz
+     GIT_REPOSITORY https://opticnerve.eecs.umich.edu:8888/dhiman/dense-trajectories.git
+     # Configure step
+     CONFIGURE_COMMAND true
+     # Build step
+     BUILD_IN_SOURCE 1
  )
 
 #############
