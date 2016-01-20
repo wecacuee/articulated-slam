@@ -28,13 +28,9 @@ $(PROJMIDDIR)/%.bag: $(PROJDATADIR)/%.bag
 	    roslaunch launch/bag2video.launch bag:=$< out:=$(subst 0000.png,%04d.png,$@)
 
 # video -> dense trajectories
-%/densetraj.gz %/densetraj0000.png: %/inputbagframe.avi build/densetraj/src/densetraj/release/DenseTrackStab
+%/densetraj.gz %/densetraj0000.png: %.bag build/densetraj/src/densetraj/build/devel/lib/dense-trajectories/DenseTrackStab
 	mkdir -p $(dir $@) && \
-	    build/densetraj/src/densetraj/release/DenseTrackStab $< -O $*/densetraj%04d.png > $*/densetraj.gz
-
-# Hack to avoid implicit recursion 
-%/inputbagframe.avi: %/inputbagframe0000.png
-	avconv -framerate 12 -i $(subst 0000.png,%04d.png,$<) -r 30 -vb 2M $@
+	     build/densetraj/src/densetraj/build/devel/lib/dense-trajectories/DenseTrackStab $< -O $*/densetraj%04d.png > $*/densetraj.gz
 
 # Common conversion recipe from frames to video
 %.avi: %0000.png
