@@ -6,7 +6,7 @@ PROJMIDDIR:=$(MIDDIR)/articulatedslam/2016-01-15
 
 .SECONDARY:
 
-bags:=all_dynamic_2016-01-15-16-07-26# 2016-01-15-16-54-57 2016-01-15-17-02-57 2016-01-15-17-11-53 2016-01-15-17-12-48 all_dynamic_2016-01-15-15-51-33 all_static_2016-01-15-15-39-50 only_rev_prism_2016-01-15-16-27-26 rev_and_chair_2016-01-15-17-03-58
+bags:=all_dynamic_2016-01-15-16-07-26 2016-01-15-16-54-57 2016-01-15-17-02-57 2016-01-15-17-11-53 2016-01-15-17-12-48 all_dynamic_2016-01-15-15-51-33 all_static_2016-01-15-15-39-50 only_rev_prism_2016-01-15-16-27-26 rev_and_chair_2016-01-15-17-03-58
 targets:=$(foreach b,$(bags),$(PROJMIDDIR)/$(b)/densetraj.gz) $(foreach b,$(bags),$(PROJMIDDIR)/$(b)/densetraj.avi) $(foreach b,$(bags),$(PROJMIDDIR)/$(b)/extracttrajectories_GFTT_SIFT.avi) $(foreach b,$(bags),$(PROJMIDDIR)/$(b)/extracttrajectories_GFTT_SIFT.pickle)
 all: $(targets)
 

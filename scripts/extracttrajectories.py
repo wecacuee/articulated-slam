@@ -4,6 +4,7 @@ import cPickle
 from itertools import izip
 import subprocess
 import glob
+from collections import deque
 
 import cv2
 import rospy
@@ -25,20 +26,66 @@ def os_handledirs(filename):
     if not os.path.exists(dirname): os.makedirs(dirname)
     return filename
 
-def rosbag_topic(bagfile, imgtopic):
+class SyncSortedTimedMessages(object):
+    def __init__(self):
+        self.buffers = [deque(),deque()]
+
+    def add_timed_messages(self, msgid, msg, t):
+        othermsgid = 1 - msgid
+        otherbuffer = self.buffers[othermsgid]
+        thisbuffer = self.buffers[msgid]
+        thisbuffer.append((msg,t))
+        msg, t = thisbuffer.popleft()
+
+        # if we have a newer message than this in the buffer
+        if len(otherbuffer) \
+           and any([x[1] >= t for x in otherbuffer]):
+
+            # Find the closest message by time
+            othermsg, other_ts = min(
+                otherbuffer,
+                key=lambda x: abs(x[1].to_sec() - t.to_sec()))
+
+            # Retain only newer messages that found a match
+            self.buffers[othermsgid] = deque(
+                [(om, ot) for om, ot in otherbuffer if ot >= other_ts])
+
+            # print("Found synced messages %f %f" % (t.to_sec(), other_ts.to_sec()))
+            # print("Buffer lengths %d %d" % (len(self.buffers[0]),
+            #                                 len(self.buffers[1])))
+            synced = range(len(self.buffers))
+            synced[msgid] = (msg, t)
+            synced[othermsgid] = (othermsg, other_ts)
+            return synced[0], synced[1]
+        else:
+            thisbuffer.appendleft((msg, t))
+            return
+
+def rosbag_topic(bagfile, imgtopic, depthtopic):
     """ Extract opencv image from bagfile """
     bag = rosbag.Bag(bagfile)
-    topic, msg, t = bag.read_messages(topics=[imgtopic]).next()
-    bridge = CvBridge()
-    cvimage = bridge.imgmsg_to_cv2(msg, "bgr8")
-    h,w,l = cvimage.shape
-    bag = rosbag.Bag(bagfile)
 
-    for topic, msg, t in bag.read_messages(topics=[imgtopic]
+    bridge = CvBridge()
+    sync = SyncSortedTimedMessages()
+    messageid = {imgtopic:0, depthtopic:1}
+    for topic, msg, t in bag.read_messages(topics=[imgtopic, depthtopic]
                                        #, start_time=rospy.Time(1452892057.27)
                                           ):
-        cvimage = bridge.imgmsg_to_cv2(msg, "bgr8")
-        yield t, cvimage
+        # print('Got msgid=%d' % messageid[topic])
+        syncedmsg = sync.add_timed_messages(messageid[topic], msg, t)
+        if not syncedmsg:
+            continue
+
+        (imgmsg, img_ts), (depthmsg, d_ts) = syncedmsg
+
+        cvimage = bridge.imgmsg_to_cv2(imgmsg, "bgr8")
+        cvdepth = bridge.imgmsg_to_cv2(depthmsg, "passthrough")
+        cvdepth = np.copy(cvdepth)
+        cvdepth[np.isnan(cvdepth)] = 0
+        assert(~np.any(np.isnan(cvdepth)))
+        cvimage = cv2.resize(cvimage, dsize=cvdepth.shape[1::-1])
+
+        yield img_ts, cvimage, cvdepth
 
 def list_bool_indexing(list_, bool_indices):
     """ numpy like list indexing with list of bools """
@@ -59,15 +106,17 @@ def setminus_by_indices(B, indices):
 
 class _Track(object):
     """ Container for list of cv2.KeyPoint and time """
-    def __init__(self, opencv_keyPoint, time, desc):
-        self.kp = [opencv_keyPoint]
+    def __init__(self, time, xy, depth, desc):
+        self.kp_pt = [xy]
         self.ts = [time]
+        self.depth = [depth]
         self.last_desc = desc
         #assert(desc.shape == (128,))
 
-    def append(self, opencv_keyPoint, time, desc):
-        self.kp.append(opencv_keyPoint)
+    def append(self, time, xy, depth, desc):
+        self.kp_pt.append(xy)
         self.ts.append(time)
+        self.depth.append(depth)
         #assert(desc.shape == (128,))
         self.last_desc = desc
 
@@ -91,19 +140,19 @@ class TrackCollection(object):
         #assert(len(self._tracks_alive) == len(self._tracks))
         pass
 
-    def add_new_tracks(self, new_tracks, time, new_desc):
-        print("%d tracks added" % len(new_tracks))
+    def add_new_tracks(self, time, new_tracks, new_depths, new_desc):
+        # print("%d tracks added" % len(new_tracks))
         self.timestamps.append(time)
         self._alive_track_index.extend(
             range(len(self._tracks), len(self._tracks) + len(new_tracks)))
-        self._tracks.extend([_Track(t, time, desc) for t, desc in
-                             izip(new_tracks, new_desc)])
+        self._tracks.extend([_Track(time, t, depth, desc) for t, depth, desc in
+                             izip(new_tracks, new_depths, new_desc)])
         #self._tracks_alive.extend([True] * len(new_tracks))
 
         self.assert_state()
 
     def extend_tracks(self, time, prev_match_indices, matched_points,
-                      matched_desc):
+                      matched_depths, matched_desc):
         """ 
         prev_match_indices : indices into prev_alive_indices
                              that survived
@@ -118,15 +167,15 @@ class TrackCollection(object):
         survived_track_indices = [
             prev_alive_indices[i] for i in prev_match_indices]
 
-        print("%d/%d survived" % (len(survived_track_indices),
-                                   len(prev_alive_indices)))
+        # print("%d/%d survived" % (len(survived_track_indices),
+        #                            len(prev_alive_indices)))
         self._dead_tracks(prev_match_indices, prev_alive_indices)
 
-
-        for i,kp,desc in izip(survived_track_indices,
-                              matched_points,
-                              matched_desc):
-            self._tracks[i].append(kp, time, desc)
+        for i,kp_pt,depth_pt,desc in izip(survived_track_indices,
+                                 matched_points,
+                                 matched_depths,
+                                 matched_desc):
+            self._tracks[i].append(time, kp_pt, depth_pt, desc)
 
         self.assert_state()
 
@@ -136,7 +185,7 @@ class TrackCollection(object):
         #       prev_alive_indices \ prev_alive_indices[prev_match_indices])
         track_indices_that_died = setminus_by_indices(prev_alive_indices,
                                                       prev_match_indices)
-        print("%d tracks died" % len(track_indices_that_died))
+        # print("%d tracks died" % len(track_indices_that_died))
         for i in track_indices_that_died:
             #self._tracks_alive[i] = False
             self._alive_track_index.remove(i)
@@ -149,7 +198,7 @@ class TrackCollection(object):
         #tracks = list_bool_indexing(self._tracks, self._tracks_alive)
         tracks = list_int_indexing(self._tracks, self._alive_track_index)
         #assert(set(tracks) == set(tracks2))
-        print("%d/%d alive tracks" % (len(tracks), len(self._tracks)))
+        # print("%d/%d alive tracks" % (len(tracks), len(self._tracks)))
         return tracks
 
     def tracks(self):
@@ -160,14 +209,17 @@ class TrackCollectionSerializer(object):
         timestamps = sorted(set(trackcollection.timestamps))
         file.write("\t".join(map(str, timestamps)) + "\n")
         for track in trackcollection.tracks():
-            tracklen = len(track.kp)
+            tracklen = len(track.kp_pt)
+            if tracklen < 2:
+                continue # do not need single point tracks
             trackstartidx = timestamps.index(track.ts[0])
             trackendidx = timestamps.index(track.ts[-1])
             points = list()
-            for kp in track.kp:
-                points.extend([kp.pt[0], kp.pt[1]])
+            for kp_pt in track.kp_pt:
+                points.extend([kp_pt[0], kp_pt[1]])
 
-            cols = [tracklen, trackstartidx, trackendidx] + points
+            cols = [tracklen, trackstartidx, trackendidx] + points \
+                    + track.depth
             file.write("\t".join(map(str, cols)) + "\n")
 
     def load(self, file):
@@ -177,17 +229,18 @@ class TrackCollectionSerializer(object):
         for line in file:
             cols = line.split("\t")
             tracklen, trackstartidx, trackendidx = map(int, cols[:3])
-            points = map(float, cols[3:])
+            points = map(float, cols[3:3+2*tracklen])
             pointpairs = zip(points[:2*tracklen:2], points[1:2*tracklen:2])
+            depths = map(float, cols[3+2*tracklen:3+3*tracklen])
             timelist = timestamps[trackstartidx:trackstartidx + tracklen]
-            track = zip(pointpairs, timelist)
+            track = zip(pointpairs, depths, timelist)
             trackcollection.append(track)
 
         return trackcollection
 
 
 
-def cv2_drawMatches(img1, kp1, img2, kp2, matches, outimg,
+def cv2_drawMatches(img1, kp1_pt, img2, kp2_pt, matches, outimg,
                     matchColor=(0,255, 0),
                     singlePointColor=(255, 0, 0),
                     matchesMask = None, flags=0):
@@ -205,13 +258,13 @@ def cv2_drawMatches(img1, kp1, img2, kp2, matches, outimg,
         elif mask[0] or mask[1]:
             # one of them is masked
             plot_ind = 1 if mask[0] else 0
-            kp = [kp1[idx1], kp2[idx2]][plot_ind]
-            (x, y) = kp.pt
+            kp_pt = [kp1_pt[idx1], kp2_pt[idx2]][plot_ind]
+            (x, y) = kp_pt
             cv2.circle(outimg, (int(x), int(y)), 4, singlePointColor, 1)
         else:
             # none masked
-            (x1, y1) = kp1[idx1].pt
-            (x2, y2) = kp2[idx2].pt
+            (x1, y1) = kp1_pt[idx1]
+            (x2, y2) = kp2_pt[idx2]
 
             cv2.circle(outimg, (int(x1), int(y1)), 4, matchColor, 1)
             cv2.circle(outimg, (int(x2), int(y2)), 4, matchColor, 1)
@@ -228,22 +281,22 @@ def cv2_drawTracks(img, tracks, latestpointcolor, oldpointcolor,
         prev_kp = None
         color_kp = col
         colinc = ((np.asarray(latestpointcolor) - col) 
-                  / max(min_color_gradient, len(track.kp)))
+                  / max(min_color_gradient, len(track.kp_pt)))
 
         # Plot only last 40 key points
-        for kp in track.kp[-plot_last_kp:]:
-            (x2, y2) = kp.pt
+        for kp_pt in track.kp_pt[-plot_last_kp:]:
+            (x2, y2) = kp_pt
             if prev_kp is not None:
                 # none masked
-                (x1, y1) = prev_kp.pt
+                (x1, y1) = prev_kp
                 cv2.line(img, (int(x1), int(y1)), (int(x2), int(y2)),
                      color_kp, 2)
             else:
-                cv2.circle(img, (int(x2), int(y2)), 2, color_kp, 2)
+                cv2.circle(img, (int(x2), int(y2)), 2, color_kp, -1)
 
-            prev_kp = kp
+            prev_kp = kp_pt
             color_kp = color_kp + colinc
-        cv2.circle(img, (int(x2), int(y2)), 2, color_kp, 2)
+        cv2.circle(img, (int(x2), int(y2)), 2, color_kp, -1)
 
     return img
 
@@ -275,15 +328,14 @@ class TrajectoryExtractor(object):
     def __init__(self):
         pass
 
-    def init(self, bagfile, imgtopic, feature2d_detector, detector_config,
+    def init(self, img_shape, feature2d_detector, detector_config,
              feature2d_descriptor, framesout,
              max_dist_as_img_fraction):
         ##
         # Initialization
         ## 
 
-        t, img = rosbag_topic(bagfile, imgtopic).next()
-        self.max_dist = max(img.shape) / max_dist_as_img_fraction
+        self.max_dist = max(img_shape) / max_dist_as_img_fraction
 
         self.detector = cv2.FeatureDetector_create(feature2d_detector)
         for name,value in detector_config[feature2d_detector].items():
@@ -297,7 +349,6 @@ class TrajectoryExtractor(object):
                                         dict(checks=50))
         self.tracks = TrackCollection() # 
 
-
         # clear files
         self.framesout = framesout
         assert("%04d" in framesout)
@@ -309,43 +360,45 @@ class TrajectoryExtractor(object):
         kp = self.detector.detect(img, None)
         kp, desc_array = self.descriptor.compute(img, kp)
         desc_list = [desc_array[i, :] for i in xrange(desc_array.shape[0])]
-        return kp, desc_list
+        return [k.pt for k in kp], desc_list
 
     def isempty(self):
         return self.tracks.isempty()
     
     def get_prev_keyPoint_desc(self):
         prev_tracks = self.tracks.get_alive_tracks()
-        prev_kp = [t.kp[-1] for t in prev_tracks]
+        prev_kp = [t.kp_pt[-1] for t in prev_tracks]
         prev_desc = np.vstack([t.last_desc for t in prev_tracks])
         return prev_kp, prev_desc
 
-    def matchKeyPoints(self, kp, desc_list, prev_kp, prev_desc):
+    def matchKeyPoints(self, kp_pt, desc_list, prev_kp_pt, prev_desc):
         # Matching and filtering based on distance
         matches = self.matcher.match(np.asarray(desc_list, dtype=np.float32),
                                 np.asarray(prev_desc, dtype=np.float32))
 
         is_close_match = lambda m: (
             np.linalg.norm(
-            np.asarray(kp[m.queryIdx].pt) -
-            np.asarray(prev_kp[m.trainIdx].pt)) < self.max_dist)
+            np.asarray(kp_pt[m.queryIdx]) -
+            np.asarray(prev_kp_pt[m.trainIdx])) < self.max_dist)
         matches = [m for m in matches if is_close_match(m)]
         prev_match_indices = [m.trainIdx for m in matches]
         match_indices = [m.queryIdx for m in matches]
         return prev_match_indices, match_indices
 
-    def updateTracks(self, timestamp, kp, desc_list, prev_match_indices,
-                     match_indices):
+    def updateTracks(self, timestamp, kp_pt, depth_pt, desc_list,
+                     prev_match_indices, match_indices):
         # Maintaining tracks database
         if len(match_indices):
             self.tracks.extend_tracks(timestamp, prev_match_indices, 
-                                 list_int_indexing(kp, match_indices),
+                                 list_int_indexing(kp_pt, match_indices),
+                                 list_int_indexing(depth_pt, match_indices),
                                  list_int_indexing(desc_list, match_indices))
 
         
-        new_tracks = setminus_by_indices(kp, match_indices)
+        new_tracks = setminus_by_indices(kp_pt, match_indices)
+        new_depths = setminus_by_indices(depth_pt, match_indices)
         new_desc = setminus_by_indices(desc_list, match_indices)
-        self.tracks.add_new_tracks(new_tracks, timestamp, new_desc)
+        self.tracks.add_new_tracks(timestamp, new_tracks, new_depths, new_desc)
 
     def visualize(self, img, framecount):
         ##
@@ -374,6 +427,7 @@ def main():
     videoout_temp = list_get(sys.argv, 2, "/tmp/%s_%s_out.avi")
     pickleout_temp = list_get(sys.argv, 3, "/tmp/%s_%s_out.pickle")
     imgtopic = '/camera/rgb/image_rect_color'
+    depthtopic = '/camera/depth_registered/image_raw'
     framesout = "/tmp/aae_extracttrajectories/frames%04d.png"
     # maximum distance between matching feature points
     max_dist_as_img_fraction = 20 
@@ -410,21 +464,26 @@ def main():
 
 
 
+
     traj_extract = TrajectoryExtractor()
-    traj_extract.init(bagfile, imgtopic, feature2d_detector, detector_config,
+
+    t, img, depth = rosbag_topic(bagfile, imgtopic, depthtopic).next()
+    traj_extract.init(img.shape, feature2d_detector, detector_config,
                       feature2d_descriptor, framesout,
                       max_dist_as_img_fraction)
     framecount = 0
-    for timestamp, img in rosbag_topic(bagfile, imgtopic):
-        kp, desc_list = traj_extract.detectAndCompute(img)
+    for timestamp, img, depth in rosbag_topic(bagfile, imgtopic, depthtopic):
+        kp_pt, desc_list = traj_extract.detectAndCompute(img)
+        depth_pt = [depth[y,x] for x,y in kp_pt]
         if traj_extract.isempty():
-            traj_extract.updateTracks(timestamp, kp, desc_list, [], [])
+            traj_extract.updateTracks(timestamp, kp_pt, depth_pt, desc_list,
+                                      [], [])
         else:
-            prev_kp, prev_desc = traj_extract.get_prev_keyPoint_desc()
+            prev_kp_pt, prev_desc = traj_extract.get_prev_keyPoint_desc()
             prev_match_indices, match_indices = \
-                    traj_extract.matchKeyPoints(kp, desc_list, prev_kp,
+                    traj_extract.matchKeyPoints(kp_pt, desc_list, prev_kp_pt,
                                                 prev_desc)
-            traj_extract.updateTracks(timestamp, kp, desc_list,
+            traj_extract.updateTracks(timestamp, kp_pt, depth_pt, desc_list,
                                       prev_match_indices, match_indices)
             traj_extract.visualize(img, framecount)
             framecount += 1
