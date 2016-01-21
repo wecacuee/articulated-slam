@@ -31,7 +31,7 @@ def gen_init(model='rev'):
         y_0 = 2.0
         return np.array([r*np.cos(0)+x_0,r*np.sin(0)+y_0,1])
     elif model=='static':
-        return np.array([2.0,2.0,0.0])
+        return np.array([2.0,2.0,2.0])
     else:
         return np.array([0.0,2.0,0.0])
 
@@ -42,8 +42,11 @@ def gen_simple_data(model='rev'):
         # Model parameters
         r = 1
         w = np.pi/6
-        x_0 = 0.0
-        y_0 = 2.0
+        #x_0 = 0.0
+        x_0 = 0.0#1*np.random.random_sample()
+        y_0 = 2.0#1*np.random.random_sample()
+        z_0 = 1#*np.random.random_sample()
+        #y_0 = 2.0
         
         # Case 1: robot @ origin and point is always in view
         # Data assumption is rotation about z-axis since view model hasn't been updated
@@ -53,22 +56,26 @@ def gen_simple_data(model='rev'):
 
         # Case 2: robot is not @ origin but point is always in view
         for i in range(30):
-            yield np.array([r*np.cos(-i*w)+x_0,r*np.sin(-i*w)+y_0,1])
+            yield np.array([r*np.cos(-i*w)+x_0,r*np.sin(-i*w)+y_0,z_0])
 
     elif model=='static':
-        x_0 = 2.0
-        y_0 = 2.0
-        z_0 = 0.0
+        x_0 = 2#*np.random.random_sample() 
+        y_0 = 2#*np.random.random_sample() 
+        z_0 = 1.0#2*np.random.random_sample() 
         for i in range(30):
             yield np.array([x_0,y_0,z_0])
 
     else:               # For point moving out/in  view
-        x_0 = 2.0       #0/3
-        y_0 = 2.0       #2/2
+        x_0 = 2#*np.random.random_sample()
+        y_0 = 2#*np.random.random_sample()
+        z_0 = 0.0#2*np.random.random_sample()
+        #x_0 = 2.0       #0/3
+        #y_0 = 2.0       #2/2
         v_y = 0.1       #0/0
         v_x = 0.1       #0.1/-0.1
+        v_z = 0.0
         for i in range(30):
-            yield np.array([x_0+i*v_x,y_0+i*v_y,0])
+            yield np.array([x_0+i*v_x,y_0+i*v_y,z_0+i*v_z])
 
 def in_view(rob_state,ldmk_pos,plot_data):
     #pt = np.array([2.0,2.0,0.0])
@@ -99,19 +106,19 @@ def in_view(rob_state,ldmk_pos,plot_data):
 
 def gen_id():
     for i in range(30):
-        yield np.array([0,1])    
+        yield np.array([0,1,2])    
                     
-def gen_cmplx_data(model1='rev',model2='rev'):
+def gen_cmplx_data(model1='rev',model2='rev',model3='rev'):
     data = gen_simple_data(model1)
-    
     data2 = gen_simple_data(model2) 
-    
-    for pt1,pt2 in zip(data,data2):
-        yield np.vstack((pt1,pt2))
+    data3 = gen_simple_data(model3)
+ 
+    for pt1,pt2,pt3 in zip(data,data2,data3):
+        yield np.vstack((pt1,pt2,pt3))
 
-def gen_init_coll(pt1,pt2):
+def gen_init_coll(pt1,pt2,pt3):
     for i in range(30):
-        yield np.vstack((pt1,pt2))
+        yield np.vstack((pt1,pt2,pt3))
 
 def plot_show():
     fig = plt.figure()
@@ -188,7 +195,7 @@ def robot_motion_prop(prev_state,prev_state_cov,robot_input,delta_t=1):
         G = np.array([[1,0,(v/w)*(-np.cos(theta)+np.cos(theta+w*delta_t))],\
                 [0,1,(v/w)*(-np.sin(theta)+np.sin(theta+w*delta_t))],\
                 [0,0,1]])
-        # Derivative of forward dynamics model w.r.t robot input
+        # Derivatmmy fallonive of forward dynamics model w.r.t robot input
         # Page 206, Eq 7.11
         V = np.array([[(-np.sin(theta)+np.sin(theta+w*delta_t))/w,\
                 (v*(np.sin(theta)-np.sin(theta+w*delta_t)))/(w**2)+((v*np.cos(theta+w*delta_t)*delta_t)/w)],\
@@ -205,18 +212,25 @@ def test():
     m_thresh = 0.6
 
     # Write to file for evaluation
-    #f_gt = open('gt_pris.txt','w')
-    #f_pred = open('pred_pris.txt','w')
+    f_gt_pris = open('gt_pris.txt','w')
+    f_pred_pris = open('pred_pris.txt','w')
+    f_gt_rev = open('gt_rev.txt','w')
+    f_pred_rev = open('pred_rev.txt','w')
+    f_gt_st = open('gt_st.txt','w')
+    f_pred_st = open('pred_st.txt','w')
+    f_gt_state = open('gt_state.txt','w')
+    f_pred_state = open('pred_state.txt','w')
 
 
     # Generate map using a single function
     # 
     # Need to modify data generation
-    data = gen_cmplx_data('pris','rev')
-    data_init_pt = gen_init('pris')
-    data2_init_pt = gen_init('rev')   
+    data = gen_cmplx_data('pris','rev','static')
+    #data_init_pt = gen_init('pris')
+    #data2_init_pt = gen_init('rev')   
+    #data3_init_pt = gen_init('static')
     ids = gen_id()
-    init_pt = gen_init_coll(data_init_pt,data2_init_pt) 
+    #init_pt = gen_init_coll(data_init_pt,data2_init_pt,data3_init_pt) 
  
     ldmk_estimater = dict(); # id -> mm.Estimate_Mm()
     ldmk_am = dict(); # id->am Id here maps to the chosen Articulated model for the landmark
@@ -245,8 +259,8 @@ def test():
     true_robot_states = []
     slam_robot_states = []
 
-
-    model = [0,0]
+    init_pt = [0,0,0]
+    model = [0,0,0]
     #error = [0.0,0.0]
     #error_count = [0,0]
 
@@ -259,7 +273,7 @@ def test():
     #print "Noise is :", noise 
     frame = 1 
     true_state = robot_state_and_input[:3]
-    for fidx,data,init_point in zip(ids,data,init_pt):
+    for fidx,data in zip(ids,data):
         rob_state = robot_state_and_input[:3]
         robot_input = np.array([0.0,0.0])
         # robot_input = rob_state_and_input[3:]
@@ -268,7 +282,8 @@ def test():
         #robview
         slam_state[0:3],slam_cov[0:3,0:3] = robot_motion_prop(slam_state[0:3],slam_cov[0:3,0:3],robot_input)
         true_state,_cov = robot_motion_prop(true_state,slam_cov[0:3,0:3],robot_input)
-        #plot_data.append((true_state[0],true_state[1],0,'k','+'))
+        #plot_data.append((slam_state[0],slam_state[1],0,'k','+'))
+        #plot_data.append((true_state[0],true_state[1],0,'r','+'))
 
 
         if len(ld_ids)>0:
@@ -286,7 +301,11 @@ def test():
         ld_ids_preds = []
         ids_list = []
 
-        for fid,dat,init_pt in itertools.izip(fidx,data,init_point):
+        for fid,dat in itertools.izip(fidx,data):
+            # Initializing init point
+            if frame == 1:
+                init_pt[fid] = dat
+
             curr_obs = dat
             #curr_obs = curr_obs + noise 
         
@@ -340,9 +359,17 @@ def test():
                     slam_cov = np.dot(np.identity(slam_cov.shape[0])-np.dot(K_mat,H_mat),slam_cov)
                 
 
-                    #if fid==1:
-                    #    f_gt.write(str(frame)+" "+str(curr_obs[0])+" "+str(curr_obs[1])+" "+str(curr_obs[2])+"\n")
-                    #    f_pred.write(str(frame)+" "+str(lk_pred[0])+" "+str(lk_pred[1])+" "+str(lk_pred[2])+"\n")
+                    if fid==0:
+                        f_gt_pris.write(str(frame)+" "+str(curr_obs[0])+" "+str(curr_obs[1])+" "+str(curr_obs[2])+"\n")
+                        f_pred_pris.write(str(frame)+" "+str(lk_pred[0])+" "+str(lk_pred[1])+" "+str(lk_pred[2])+"\n")
+                    if fid==1:
+                        f_gt_rev.write(str(frame)+" "+str(curr_obs[0])+" "+str(curr_obs[1])+" "+str(curr_obs[2])+"\n")
+                        f_pred_rev.write(str(frame)+" "+str(lk_pred[0])+" "+str(lk_pred[1])+" "+str(lk_pred[2])+"\n")
+                    if fid==2:
+                        f_gt_st.write(str(frame)+" "+str(curr_obs[0])+" "+str(curr_obs[1])+" "+str(curr_obs[2])+"\n")
+                        f_pred_st.write(str(frame)+" "+str(lk_pred[0])+" "+str(lk_pred[1])+" "+str(lk_pred[2])+"\n")
+                f_gt_state.write(str(frame)+" "+str(true_state[0])+" "+str(true_state[1])+" "+str(0)+"\n")
+                f_pred_state.write(str(frame)+" "+str(slam_state[0])+" "+str(slam_state[1])+" "+str(0)+"\n")
             
                     # LK_pred comes out in the robot_frame. We need to convert it back to world frame to match the world coordinate observations
             else:
@@ -368,9 +395,15 @@ def test():
         # Visualize the complete map after each frame
         plot_data = visualize_new(colors,data,plot_data) 
         frame = frame + 1
-    #f_gt.close()
-    #f_pred.close()
-    disp(plot_data)
+    f_gt_pris.close()
+    f_pred_pris.close()
+    f_gt_rev.close()
+    f_pred_rev.close()
+    f_gt_st.close()
+    f_pred_st.close()
+    f_gt_state.close()
+    f_pred_state.close()
+    disp(plot_data,True)
     
 
 
