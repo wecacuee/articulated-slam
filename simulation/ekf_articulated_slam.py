@@ -43,7 +43,6 @@ def threeptmap():
                      deltheta=-10*np.pi/180,     # rotation per frame
                      delpos=[0,0])               # translation per frame
                ]
-    # Possible issue: Revolute joint appears as 160,20 in the first frame. Is that right???
 
     lmmap = landmarkmap.map_from_conf(map_conf, nframes)
     lmvis = landmarkmap.LandmarksVisualizer([0,0], [200, 200], frame_period=-1,
@@ -260,6 +259,7 @@ def articulated_slam(debug_inp=True):
     for fidx, (rs, thetas, ids, rob_state_and_input, ldmks,ldmk_robot_obs) in enumerate(rob_obs_iter[1:]): 
     # v2.0 Expected format
     #for fidx,(idx,rob_state_and_input, ldmks, ldmk_robot_obs) in enumerate(rob_obs_iter[1:]):    
+        pdb.set_trace()
 
         rob_state = rob_state_and_input[:3]
         robot_input = rob_state_and_input[3:]
