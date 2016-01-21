@@ -4,28 +4,21 @@ MIDDIR:=/home/vikasdhi/mid
 PROJDATADIR:=$(DATADIR)/articulatedslam/2016-01-15
 PROJMIDDIR:=$(MIDDIR)/articulatedslam/2016-01-15
 
-bags:=all_dynamic_2016-01-15-16-07-26 2016-01-15-16-54-57 2016-01-15-17-02-57 2016-01-15-17-11-53 2016-01-15-17-12-48 all_dynamic_2016-01-15-15-51-33 all_static_2016-01-15-15-39-50 only_rev_prism_2016-01-15-16-27-26 rev_and_chair_2016-01-15-17-03-58
-targets:=$(foreach b,$(bags),$(PROJMIDDIR)/$(b)/densetraj.gz) $(foreach b,$(bags),$(PROJMIDDIR)/$(b)/densetraj.avi)
+.SECONDARY:
+
+bags:=all_dynamic_2016-01-15-16-07-26# 2016-01-15-16-54-57 2016-01-15-17-02-57 2016-01-15-17-11-53 2016-01-15-17-12-48 all_dynamic_2016-01-15-15-51-33 all_static_2016-01-15-15-39-50 only_rev_prism_2016-01-15-16-27-26 rev_and_chair_2016-01-15-17-03-58
+targets:=$(foreach b,$(bags),$(PROJMIDDIR)/$(b)/densetraj.gz) $(foreach b,$(bags),$(PROJMIDDIR)/$(b)/densetraj.avi) $(foreach b,$(bags),$(PROJMIDDIR)/$(b)/extracttrajectories_GFTT_SIFT.avi) $(foreach b,$(bags),$(PROJMIDDIR)/$(b)/extracttrajectories_GFTT_SIFT.pickle)
 all: $(targets)
-outputtraj:=$(PROJMIDDIR)/2016-01-15-17-12-48_extracttraj.pickle
-densetrajout:=$(PROJMIDDIR)/2016-01-15-17-12-48/densetraj.gz
 
 # Data dir to MID DIR
 $(PROJMIDDIR)/%.bag: $(PROJDATADIR)/%.bag
 	if [ -e $@ ] ; then true; else ln -sT $< $@; fi
 
 # Recipe to convert bag to 2D SIFT trajectories
-%/extracttrajectories0000.png %_extracttraj.pickle: %.bag simulation/extracttrajectories.py
+%/extracttrajectories_GFTT_SIFT.avi %/extracttrajectories_GFTT_SIFT.pickle: %.bag scripts/extracttrajectories.py
 	mkdir -p $(dir $@) && \
 	    source /opt/ros/indigo/setup.bash && \
-	    python simulation/extracttrajectories.py $< $(subst 0000.png,%04d.png,$@)
-
-
-# bag -> video
-%/inputbagframe0000.png: %.bag launch/bag2video.launch
-	mkdir -p $(dir $@) && \
-	    source /opt/ros/indigo/setup.bash && \
-	    roslaunch launch/bag2video.launch bag:=$< out:=$(subst 0000.png,%04d.png,$@)
+	    python scripts/extracttrajectories.py $< $*/extracttrajectories_%s_%s.avi $*/extracttrajectories_%s_%s.pickle
 
 # video -> dense trajectories
 %/densetraj.gz %/densetraj0000.png: %.bag build/densetraj/src/densetraj/build/devel/lib/dense-trajectories/DenseTrackStab
