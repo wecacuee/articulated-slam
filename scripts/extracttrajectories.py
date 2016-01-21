@@ -158,7 +158,7 @@ class TrackCollection(object):
 class TrackCollectionSerializer(object):
     def dump(self, file, trackcollection):
         timestamps = sorted(set(trackcollection.timestamps))
-        file.writeline("\t".join(timestamps))
+        file.write("\t".join(map(str, timestamps)) + "\n")
         for track in trackcollection.tracks():
             tracklen = len(track.kp)
             trackstartidx = timestamps.index(track.ts[0])
@@ -168,7 +168,7 @@ class TrackCollectionSerializer(object):
                 points.extend([kp.pt[0], kp.pt[1]])
 
             cols = [tracklen, trackstartidx, trackendidx] + points
-            file.writeline("\t".join(cols))
+            file.write("\t".join(map(str, cols)) + "\n")
 
     def load(self, file):
         trackcollection = list()
@@ -176,8 +176,8 @@ class TrackCollectionSerializer(object):
         timestamps = line.split("\t")
         for line in file:
             cols = line.split("\t")
-            tracklen, trackstartidx, trackendidx = cols[:3]
-            points = cols[3:]
+            tracklen, trackstartidx, trackendidx = map(int, cols[:3])
+            points = map(float, cols[3:])
             pointpairs = zip(points[:2*tracklen:2], points[1:2*tracklen:2])
             timelist = timestamps[trackstartidx:trackstartidx + tracklen]
             track = zip(pointpairs, timelist)
