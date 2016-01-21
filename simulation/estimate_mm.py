@@ -98,41 +98,38 @@ class Estimate_Mm:
                 self.covs[i] = np.diag(np.tile(self.am[i].noise_cov,(self.means[i].shape[0],)))
                 # Process samples if its more the minimum required number of samples
             else :
-                try:
-                    # Perform EKF for estimating which model to use
-                    # Step 1: Propagate State
-                    # All these motion models only have one motion parameter
-                    self.means[i] = self.am[i].predict_motion_pars(self.means[i])
-                    # Step 2: Propagate Covariance
-                    model_lin_mat = self.am[i].model_linear_matrix()
-                    self.covs[i] = model_lin_mat.dot(self.covs[i]).dot(model_lin_mat.T)+\
-                                    np.diag(np.tile(self.am[i].noise_cov,(self.means[i].shape[0],)))
-                    # Step 3.0: Compute Innovation Covariance
-                    #H_t = self.am[i].observation_jac(self.means[i])
-                    H_t = self.am[i].observation_jac(self.means[i],init_pt)
-                    inno_cov = H_t.dot(self.covs[i]).dot(H_t.T)+self.noise_obs
+                 # Perform EKF for estimating which model to use
+                 # Step 1: Propagate State
+                 # All these motion models only have one motion parameter
+                 self.means[i] = self.am[i].predict_motion_pars(self.means[i])
+                 # Step 2: Propagate Covariance
+                 model_lin_mat = self.am[i].model_linear_matrix()
+                 self.covs[i] = model_lin_mat.dot(self.covs[i]).dot(model_lin_mat.T)+\
+                                 np.diag(np.tile(self.am[i].noise_cov,(self.means[i].shape[0],)))
+                 # Step 3.0: Compute Innovation Covariance
+                 #H_t = self.am[i].observation_jac(self.means[i])
+                 H_t = self.am[i].observation_jac(self.means[i],init_pt)
+                 inno_cov = H_t.dot(self.covs[i]).dot(H_t.T)+self.noise_obs
 
-                    # Step 3: Compute Kalman Gain
-                    K_t = np.dot(np.dot(self.covs[i],np.transpose(H_t)),np.linalg.inv(inno_cov))
-                    # Step 4: Update State
-                    residual.append( inp_data -
-                            self.am[i].predict_model(self.means[i]))
-                    #print "Prediction is ", self.am[i].predict_model(self.means[i])," mean is ", \
-                    #        self.means[i]," input data is ",inp_data
-                    self.means[i] = self.means[i]+np.dot(K_t,residual[-1])
-                    # Step 5: Update State Covariance
-                    self.covs[i] = np.dot(np.identity(self.means[i].shape[0])\
-                            -np.dot(K_t,H_t),self.covs[i])
+                 # Step 3: Compute Kalman Gain
+                 K_t = np.dot(np.dot(self.covs[i],np.transpose(H_t)),np.linalg.inv(inno_cov))
+                 # Step 4: Update State
+                 residual.append( inp_data -
+                         self.am[i].predict_model(self.means[i]))
+                 #print "Prediction is ", self.am[i].predict_model(self.means[i])," mean is ", \
+                 #        self.means[i]," input data is ",inp_data
+                 self.means[i] = self.means[i]+np.dot(K_t,residual[-1])
+                 # Step 5: Update State Covariance
+                 self.covs[i] = np.dot(np.identity(self.means[i].shape[0])\
+                         -np.dot(K_t,H_t),self.covs[i])
 
-                    # Update the model contribution -- 11.6.2-2 of Estimation with Applications to
-                    # tracking and navigation
+                 # Update the model contribution -- 11.6.2-2 of Estimation with Applications to
+                 # tracking and navigation
 
-                    # Likelihood function and probability
-                    lk_prob[i] = sp.multivariate_normal.pdf(residual[-1],mean = np.array([0,0,0]),
-                            cov = inno_cov)
-                    inno_covariances.append(np.linalg.det(inno_cov))
-                except ValueError:
-                    pass
+                 # Likelihood function and probability
+                 lk_prob[i] = sp.multivariate_normal.pdf(residual[-1],mean = np.array([0,0,0]),
+                         cov = inno_cov)
+                 inno_covariances.append(np.linalg.det(inno_cov))
 
         if (self.num_data>self.min_samples):
             for i in range(len(self.am)):
