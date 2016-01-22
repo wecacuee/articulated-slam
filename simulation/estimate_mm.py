@@ -148,7 +148,7 @@ if __name__=="__main__":
     init_pt = np.array([x_0+r,y_0,1])
     for i in range(30):
         # Revolute
-        #curr_obs = np.array([r*np.cos(-i*w)+x_0,r*np.sin(-i*w)+y_0,1])
+        curr_obs = np.array([r*np.cos(-i*w)+x_0,r*np.sin(-i*w)+y_0,1])
         # Static
         #curr_obs = np.array([x_0,y_0,1])
 
@@ -157,6 +157,5 @@ if __name__=="__main__":
         motion_class.process_inp_data(cartesian_to_bearing(curr_obs,robot_state),robot_state,curr_obs,init_pt)
         print "Rev: ",motion_class.prior[0],"Pris: ",motion_class.prior[1],"Static: ",motion_class.prior[2]
         if i>8:
-            pdb.set_trace()
-            print "Revolute joint observed position ",\
-                    motion_class.am[1].predict_model(motion_class.means[1]), "obs = ",curr_obs
+            print "Revolute joint prediction ",\
+                    motion_class.am[0].predict_model(motion_class.means[0]), "obs = ",curr_obs
