@@ -145,6 +145,7 @@ if __name__=="__main__":
     motion_class = Estimate_Mm()
     # Lets generate data from a revolute joint centered at (2,2), radius 1, moving at pi/6 pace
     r = 1;x_0 = 2;y_0 = 2;w = np.pi/6
+    models = ['Revolute','Prismatic','Static']
     init_pt = np.array([x_0+r,y_0,1])
     for i in range(30):
         # Revolute
@@ -157,5 +158,5 @@ if __name__=="__main__":
         motion_class.process_inp_data(cartesian_to_bearing(curr_obs,robot_state),robot_state,curr_obs,init_pt)
         print "Rev: ",motion_class.prior[0],"Pris: ",motion_class.prior[1],"Static: ",motion_class.prior[2]
         if i>8:
-            print "Revolute joint prediction ",\
-                    motion_class.am[0].predict_model(motion_class.means[0]), "obs = ",curr_obs
+            print("Joint prediction: Model %s "%(models[np.where(motion_class.prior>0.6)[0]]))
+	    print "Predicted values: ",motion_class.am[0].predict_model(motion_class.means[0])," obs = ",curr_obs	
