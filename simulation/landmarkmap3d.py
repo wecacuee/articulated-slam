@@ -97,49 +97,38 @@ class RobotView(object):
     def in_view(self, points):
     # Need to change this to view in 3D ??
         """ Returns true for points that are within view """
-        import pdb; pdb.set_trace()
-        apex = self._pos
+        apex = np.hstack(self._pos)
         [_,_,theta] = self._dir
         phi = 90*np.pi/180
         base = np.array([[self._maxdist*np.cos(theta)*np.sin(phi)],
                         [self._maxdist*np.sin(theta)*np.sin(phi)],
                         [self._maxdist*np.cos(phi)]])
-        base = base + np.array(apex)
-        ap2vec = apex - points
-        axisvec = apex - base
-         
-        #---->
+        base = np.hstack(base) + np.array(apex)
+        in_view_pts = np.zeros(points.shape[1],dtype=bool) 
+	for it in range(points.shape[1]):
+		in_view_pts[it] = False	
+        	ap2vec = apex - points[:,it]
+        	axisvec = apex - base
+	        policy1 = np.around(ap2vec.dot(axisvec)/np.linalg.norm(axisvec)/np.linalg.norm(ap2vec),3) >= np.around(np.cos(self._maxangle),3)
+        	policy2 = np.around(ap2vec.dot(axisvec)/np.linalg.norm(axisvec),3) <= np.around(np.linalg.norm(axisvec),3)
+        	in_view_pts[it] = policy1 & policy2
 
-        policy1 = ap2vec.dot(axisvec)/np.linalg.norm(axisvec)/np.linalg.norm(ap2vec) > np.cos(aperture)
-        policy2 = ap2vec.dot(axisvec)/np.linalg.norm(axisvec) < np.linalg.norm(axisvec)
-        in_view_pts = policy1 & policy2
-
-        
-
-
-        #cpoints = points - pos
-        #dists = np.sqrt(np.sum(cpoints**2, axis=0))
-
-        ## Taking dot product for cosine angle
-        #cosangles = dir.T.dot(cpoints) / dists
-        #cosangles = cosangles[0, :]
-
-        ## The cos angle is negative only when landmark lies behind the robot's heading direction. 
-        ## Max distance landmarks can be retained. There is no argument or counter-argument yet for in/ex-clusion
-        #in_view_pts = (cosangles > np.cos(self._maxangle)) & (dists <= self._maxdist)
-    
         if len(in_view_pts.shape) > 1:
             import pdb;pdb.set_trace()
         
+	return in_view_pts
 
-        return in_view_pts
+    
+        
+
 
 def R2D_angle(theta):
     '''
     Return rotation matrix for theta
     '''
-    return np.array([[ np.cos(theta),  -np.sin(theta)],
-                     [ np.sin(theta),   np.cos(theta)]])
+    return np.array([[ np.cos(theta),  -np.sin(theta),0],
+                     [ np.sin(theta),   np.cos(theta),0],
+		     [0,0,1]])
 
 def robot_trajectory(positions, lin_vel, angular_vel):
     '''
@@ -287,7 +276,6 @@ def T_from_angle_pos(thetas, pos):
 def get_robot_observations(lmmap, robtraj, maxangle, maxdist, lmvis=None):
     """ Return a tuple of r, theta and ids for each frame"""
     """ v2.0 Return a tuple of lndmks in robot frame and ids for each frame"""
-    import pdb; pdb.set_trace()
     for ldmks, posdir_and_inputs in itertools.izip(lmmap.get_landmarks(), 
                                        robtraj):
         
@@ -302,21 +290,22 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, lmvis=None):
             cv2.waitKey(lmvis.frame_period)
         in_view_ldmks = robview.in_view(ldmks)
         selected_ldmks = ldmks[:, in_view_ldmks]
-        pos = posdir[0].reshape(2,1)
+        pos = posdir[0].reshape(3,1)
         
+    	import pdb; pdb.set_trace()
         # v1.0 Need to update after new model has been implemented
-        dists = np.sqrt(np.sum((selected_ldmks - pos)**2, 0))
+        #dists = np.sqrt(np.sum((selected_ldmks - pos)**2, 0))
         dir = posdir[1]
         #angles = np.arccos(dir.dot((selected_ldmks - pos))/dists)
-        obsvecs = selected_ldmks - pos
+        #obsvecs = selected_ldmks - pos
         rob_theta = np.arctan2(dir[1], dir[0])
-        angles = np.arctan2(obsvecs[1, :], obsvecs[0, :]) - rob_theta
+        #angles = np.arctan2(obsvecs[1, :], obsvecs[0, :]) - rob_theta
         ldmks_idx = np.where(in_view_ldmks)
         
         # Changed selected_ldmks to robot coordinate frame -> looks like we need to directly send           obsvecs with rotation according to heading
-        # v2.0 Rename gen_obs 
-        # NOTE: Modify R2D_Angle function based on dimensions of feature space
-        ldmk_robot_obs = R2D_angle(rob_theta).dot(obsvecs)
+        # v2.0 Rename gen_obs
+	# ---> 
+        ldmk_robot_obs = R2D_angle(rob_theta).dot(selected_ldmks)
 
         yield (dists, angles, ldmks_idx[0], [float(pos[0]), float(pos[1]),
                                              rob_theta,
