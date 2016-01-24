@@ -7,6 +7,7 @@ import random
 import collections
 import pdb
 import time
+import sample_shapes
 
 # Sampling method
 def ransac_samples(data,n):
@@ -321,6 +322,47 @@ def matrix_pts(sampled_pts):
 
     return data
 
+# Generate revolute, prismatic, static and planar motion model data, including
+# point trajectories and transforms over time
+def gen_motion_data(joint_type='p',motion_par_trajectory=None, 
+        shape_type='cylinder',shape_pars=np.array([1,5])):
+    # Sampling points from a shape
+    sampled_pts = sample_shapes.sample_points(shape_pars,shape_type)
+    transformed_pts = sampled_pts.copy()
+    # Number of time steps we are going to generate data
+    max_steps = 30
+    time_steps = 0
+    # Three angles for rotation
+    jointvars = np.zeros((6,))
+    while time_steps<max_steps:
+        # in case motion_trajectory is already specified
+        if motion_par_trajectory is None:
+            if joint_type is 'p':
+                # Lets move it along 45 degrees in x-y plane
+                dc = np.array([1,1,0])/np.sqrt(2)
+                jointvars[-3:]+=dc
+            elif joint_type is 'r':
+                # Lets rotate along z axis
+                jointvars[2]+=np.pi/18
+            elif joint_type is 'f':
+                # This is for planar joint
+                jointvars[2]+=np.pi/18
+                # Moving along a circle in plane
+                jointvars[3] = np.cos(time_steps*(np.pi/30))
+                jointvars[4] = np.sin(time_steps*(np.pi/30))
+            else:
+                # Default case is for the joint to be static
+                pass
+        else:
+            jointvars = motion_par_trajectory[time_setps]
+        # Rotation matrix
+        R_mat = rot_matrix(jointvars[0],jointvars[1],jointvars[2])
+        # First rotation and then the translation part
+        T_mat = jointvars[-3:]
+        transformed_pts = sampled_pts*R_mat+T_mat
+        # Returning transformed points, transform matrix, and original points
+        yield (transformed_pts,np.column_stack((R_mat,T_mat)),sampled_pts) 
+        time_steps+=1
 
 if __name__ == '__main__':
     # Main script
