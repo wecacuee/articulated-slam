@@ -84,7 +84,7 @@ class LandmarkMap(object):
                     landmarks = np.hstack((landmarks, lmk))
                 yield landmarks
             except StopIteration:
-                brea
+                break
 
 class RobotView(object):
     """ Describes the cone in view by robot """
@@ -98,7 +98,8 @@ class RobotView(object):
     # Need to change this to view in 3D ??
         """ Returns true for points that are within view """
         apex = np.hstack(self._pos)
-        [_,_,theta] = self._dir
+        diff_dir = self._dir - np.vstack(apex)
+        theta = np.arctan2(diff_dir[1],diff_dir[0])        
         phi = 90*np.pi/180
         base = np.array([[self._maxdist*np.cos(theta)*np.sin(phi)],
                         [self._maxdist*np.sin(theta)*np.sin(phi)],
@@ -292,7 +293,6 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, lmvis=None):
         selected_ldmks = ldmks[:, in_view_ldmks]
         pos = posdir[0].reshape(3,1)
         
-    	import pdb; pdb.set_trace()
         # v1.0 Need to update after new model has been implemented
         #dists = np.sqrt(np.sum((selected_ldmks - pos)**2, 0))
         dir = posdir[1]
@@ -304,10 +304,10 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, lmvis=None):
         
         # Changed selected_ldmks to robot coordinate frame -> looks like we need to directly send           obsvecs with rotation according to heading
         # v2.0 Rename gen_obs
-	# ---> 
         ldmk_robot_obs = R2D_angle(rob_theta).dot(selected_ldmks)
-
-        yield (dists, angles, ldmks_idx[0], [float(pos[0]), float(pos[1]),
+    
+        # Ignoring robot's Z component
+        yield (ldmks_idx[0], [float(pos[0]), float(pos[1]),
                                              rob_theta,
                                              float(robot_inputs[0]),
                                              float(robot_inputs[1])], ldmks,ldmk_robot_obs)

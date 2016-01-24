@@ -34,7 +34,7 @@ def robot_to_world(robot_state,gen_obv):
     # v2.0 
     #return np.reshape(R.T.dot(gen_obv) + np.array([[x],[y]]),[1,2])[0]
     # State is (x,y,0) since we assume robot is on the ground
-    return R.T.dot(gen_obv - np.array([x,y,0])) 
+    return R.T.dot(gen_obv[0] - np.array([x,y,0]))
 
 # x,y in cartesian to robot bearing and range
 def cartesian_to_bearing(obs,robot_state):
