@@ -1,7 +1,7 @@
 '''
 Perform the actual SLAM on the landmarks and robot positions
 '''
-import landmarkmap
+import landmarkmap3d as landmarkmap
 import cv2
 import numpy as np
 import scipy.stats as sp
@@ -61,7 +61,20 @@ def bearing_to_cartesian(obs,robot_state):
     x = robot_state[0]; y= robot_state[1]; theta = robot_state[2]
     # Observation is of range and bearing angle
     r = obs[0]; phi = obs[1]
+     
     return np.array([x+r*np.cos(theta+phi),y+r*np.sin(theta+phi)])
+
+def robot_to_world(robot_state,gen_obv):
+    # Robot state consists of (x,y,\theta) where \theta is heading angle
+    x = robot_state[0]; y= robot_state[1]; theta = robot_state[2]
+
+    # v2.0 Using inverse rotation matrix to retrieve landmark world frame co    ordinates
+    R = np.array([[np.cos(theta), -np.sin(theta),0],
+                [np.sin(theta), np.cos(theta),0],
+                [0,0,1]])
+    # v2.0 
+    # State is (x,y,0) since we assume robot is on the ground
+    return R.T.dot(gen_obv[0] - np.array([x,y,0]))
 
 
 # x,y in cartesian to robot bearing and range
@@ -112,6 +125,35 @@ def threeptmap():
     maxdist = 120
 
     return nframes, lmmap, lmvis, robtraj, maxangle, maxdist
+
+
+def threeptmap3d():
+    nframes = 30
+    map_conf = [
+ 
+ 
+                ##Prismatic
+                #dict(ldmks=np.array([[0,0,0]]).T,
+                #initthetas=[0,0,0],
+                #initpos=[-1,0,0],
+                #delthetas=[0,0,0],
+                #delpos=[0,-0.1,0])]
+ 
+                #static
+                dict(ldmks=np.array([[0,0,0,]]).T,
+                initthetas=[0,0,0],
+                initpos=[x,y,z],
+                delthetas=[0,0,0],
+                delpos=[0,0,0])
+                for x,y,z in [0,1,0],[2,2,2]]
+ 
+    lmmap = landmarkmap.map_from_conf(map_conf,nframes)
+    # For now static robot 
+    robtraj = landmarkmap.robot_trajectory(np.array([[0,0,0],[-1,-1,0]]),0.0,0)
+    maxangle = 45*np.pi/180
+    maxdist = 120
+    return nframes,lmmap,robtraj,maxangle,maxdist
+
 
 def visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state_2D,
                               slam_cov_2D, colors):
@@ -186,12 +228,13 @@ Pass in optional parameter for collecting debug output for all the landmarks
 def slam(debug_inp=True):
 
     # Getting the map
-    nframes, lmmap, lmvis, robtraj, maxangle, maxdist = threeptmap()
+    #nframes, lmmap, lmvis, robtraj, maxangle, maxdist = threeptmap3d()
+    nframes, lmmap, robtraj, maxangle, maxdist = threeptmap3d()
 
     ldmk_am = dict(); # To keep a tab on the landmarks that have been previously seen
 
-    rev_color, pris_color, stat_color = [np.array(l) for l in (
-        [255, 0, 0], [0, 255, 0], [0, 0, 255])]
+    #rev_color, pris_color, stat_color = [np.array(l) for l in (
+    #    [255, 0, 0], [0, 255, 0], [0, 0, 255])]
     # to get the landmarks with ids that are being seen by robot
     rob_obs_iter = landmarkmap.get_robot_observations(
         lmmap, robtraj, maxangle, maxdist, 
@@ -199,11 +242,11 @@ def slam(debug_inp=True):
                                               # disable visualization
                                               lmvis=None)
     rob_obs_iter = list(rob_obs_iter)
-    frame_period = lmvis.frame_period
+    #frame_period = lmvis.frame_period
     # EKF parameters for filtering
 
     # Initially we only have the robot state
-    (_, _, _, rob_state_and_input, _) = rob_obs_iter[0]
+    (_, _, _, rob_state_and_input, init_pt) = rob_obs_iter[0]
     slam_state =  np.array(rob_state_and_input[:3]) # \mu_{t} state at current time step
     # Covariance following discussion on page 317
     # Assuming that position of the robot is exactly known
@@ -211,26 +254,27 @@ def slam(debug_inp=True):
     ld_ids = [] # Landmark ids which will be used for EKF motion propagation step
     index_set = [slam_state.shape[0]] # To update only the appropriate indices of state and covariance 
     # Observation noise
-    Q_obs = np.array([[5.0,0],[0,np.pi]])
+    Q_obs = np.array([[5.0,0,0],[0,5.0,0],[0,0,5.0]])
     # For plotting
     obs_num = 0
     # Initial covariance for landmarks (x,y) position
-    initial_cov = np.array([[100,0],[0,100]])
+    initial_cov = np.array([[100,0,0],[0,100,0],[0,0,100]])
     # For error estimation in robot localization
     true_robot_states = []
     slam_robot_states = []
 
     # Processing all the observations
     # We need to skip the first observation because it was used to initialize SLAM State
-    for fidx, (rs, thetas, ids, rob_state_and_input, ldmks) in enumerate(rob_obs_iter[1:]): 
+    for fidx, (ids, rob_state_and_input, ldmks) in enumerate(rob_obs_iter[1:]): 
         rob_state = rob_state_and_input[:3]
         robot_input = rob_state_and_input[3:]
         print '+++++++++++++ fidx = %d +++++++++++' % fidx
         print 'Robot true state:', rob_state
-        print 'Observations:', zip(rs, thetas, ids)
+        #print 'Observations:', zip(rs, thetas, ids)
+        print 'Observations:', ldmk_robot_obs
         posdir = map(np.array, ([rob_state[0], rob_state[1]],
                                 [np.cos(rob_state[2]), np.sin(rob_state[2])]))
-        robview = landmarkmap.RobotView(posdir[0], posdir[1], maxangle, maxdist)
+        #robview = landmarkmap.RobotView(posdir[0], posdir[1], maxangle, maxdist)
         
         # Following EKF steps now
 
@@ -242,8 +286,9 @@ def slam(debug_inp=True):
         # Collecting all the predictions made by the landmark
         ids_list = []
         # Processing all the observations
-        for r, theta, id in zip(rs, thetas, ids):
+        for id,ldmk_rob_obv in zip(ids,np.dstack(ldmk_robot_obs)):
             # Observation corresponding to current landmark is
+            #-------->
             obs = np.array([r, theta])
             '''
             Step 1: Process Observations to first determine the motion model of each landmark
@@ -259,7 +304,7 @@ def slam(debug_inp=True):
                 ldmk_am[id] = 2
                 ld_ids.append(id)
                 # Getting the current state to be added to the SLAM state (x,y) position of landmark
-                curr_ld_state = bearing_to_cartesian(obs,rob_state)
+                curr_ld_state = robot_to_world(rob_state,ldmk_rob_obv)
                 curr_ld_cov = initial_cov 
                 index_set.append(index_set[-1]+curr_ld_state.shape[0])
                 # Extend Robot state by adding the motion parameter of the landmark
@@ -275,38 +320,52 @@ def slam(debug_inp=True):
                 # Getting the motion parameters associated with this landmark
                 curr_ind = ld_ids.index(id)
                 # Following steps from Table 10.2 from book Probabilistic Robotics
-                lk_pred = bearing_to_cartesian(obs,slam_state[0:3])
-                diff_vec = lk_pred-slam_state[0:2]
-                q_val = np.dot(diff_vec,diff_vec)
-                z_pred = np.array([np.sqrt(q_val),np.arctan2(diff_vec[1],diff_vec[0])-slam_state[2]])
+                lk_pred = robot_to_world(slam_state[0:3],ldmk_rob_obv)
+                
+                R_temp = np.array([[np.cos(-slam_state[2]), -np.sin(-slam_state[2]),0],
+                         [np.sin(-slam_state[2]), np.cos(-slam_state[2]),0],
+                         [0,0,1]])
+
+                 pos_list = np.ndarray.tolist(slam_state[0:2])
+                 pos_list.append(0.0)
+                 z_pred = R_temp.T.dot(lk_pred)+np.array(pos_list)
+
+                #diff_vec = lk_pred-slam_state[0:2]
+                #q_val = np.dot(diff_vec,diff_vec)
+                #z_pred = np.array([np.sqrt(q_val),np.arctan2(diff_vec[1],diff_vec[0])-slam_state[2]])
                 # Getting the jacobian matrix 
-                H_mat = np.zeros((2,index_set[-1]))
+                H_mat = np.zeros((3,index_set[-1]))
                 # w.r.t robot state
-                H_mat[0,0:3] = (1.0/q_val)*np.array([-np.sqrt(q_val)*diff_vec[0],\
-                        -np.sqrt(q_val)*diff_vec[1],0])
-                H_mat[1,0:3] = (1.0/q_val)*np.array([diff_vec[1],-diff_vec[0],-q_val])
+                curr_obs = ldmk_rob_obv[0]
+                theta = slam_state[2]
+                H_mat[0,0:3] = np.array([1,0,-np.sin(theta)*curr_obs[0] - np.cos(theta)*curr_obs[1]])
+                H_mat[1,0:3] = np.array([0,1,(np.cos(theta)-np.sin(theta))*curr_obs[0] - (np.cos(theta)+np.sin(theta))*curr_obs[1]])
+                H_mat[2,0:3] = np.array([0,0,(np.sin(theta)+np.cos(theta))*curr_obs[0] + (np.cos(theta)+np.sin(theta))*curr_obs[1]])
+                H_mat[:,index_set[curr_ind]:index_set[curr_ind+1]] = np.dot(np.diag(np.ones(3)),ldmk_am[id].observation_jac(slam_state[index_set[curr_ind]:index_set[curr_ind+1]],init_pt[id]))
+
+
                 # w.r.t landmark associated states
                 # Differentiation w.r.t landmark x and y first
-                H_mat[:,index_set[curr_ind]:index_set[curr_ind+1]] = (1.0/q_val)*np.array(\
-                        [[np.sqrt(q_val)*diff_vec[0],np.sqrt(q_val)*diff_vec[1]],\
-                        [-diff_vec[1],diff_vec[0]]])
+                #H_mat[:,index_set[curr_ind]:index_set[curr_ind+1]] = (1.0/q_val)*np.array(\
+                #        [[np.sqrt(q_val)*diff_vec[0],np.sqrt(q_val)*diff_vec[1]],\
+                #        [-diff_vec[1],diff_vec[0]]])
 
                 # Innovation covariance
                 inno_cov = np.dot(H_mat,np.dot(slam_cov,H_mat.T))+Q_obs
                 # Kalman Gain
                 K_mat = np.dot(np.dot(slam_cov,H_mat.T),np.linalg.inv(inno_cov))
                 # Updating SLAM state
-                slam_state = slam_state+np.dot(K_mat,(obs-z_pred))
+                slam_state = slam_state+np.hstack((np.dot(K_mat,np.vstack((ldmk_rob_obv-z_pred)))))
                 # Updating SLAM covariance
                 slam_cov = np.dot(np.identity(slam_cov.shape[0])-np.dot(K_mat,H_mat),slam_cov)
             # end of if else ldmk_am[id]
 
-            p1, p2, p3 = (0,0,1) # We are assuming everything to be static
-            color = np.int64((p1*rev_color
-                     + p2*pris_color
-                     + p3*stat_color))
-            color = color - np.min(color)
-            colors.append(color)
+            #p1, p2, p3 = (0,0,1) # We are assuming everything to be static
+            #color = np.int64((p1*rev_color
+            #         + p2*pris_color
+            #         + p3*stat_color))
+            #color = color - np.min(color)
+            #colors.append(color)
             ids_list.append(id)
 
         # end of loop over observations in single frame
