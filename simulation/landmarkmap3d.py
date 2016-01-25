@@ -95,7 +95,6 @@ class RobotView(object):
         self._maxdist = maxdist
 
     def in_view(self, points):
-    # Need to change this to view in 3D ??
         """ Returns true for points that are within view """
         apex = np.hstack(self._pos)
         diff_dir = self._dir - np.vstack(apex)
@@ -304,8 +303,7 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, lmvis=None):
         
         # Changed selected_ldmks to robot coordinate frame -> looks like we need to directly send           obsvecs with rotation according to heading
         # v2.0 Rename gen_obs
-        ldmk_robot_obs = R2D_angle(rob_theta).dot(selected_ldmks)
-    
+        ldmk_robot_obs = R2D_angle(-rob_theta).dot(selected_ldmks-pos)
         # Ignoring robot's Z component
         yield (ldmks_idx[0], [float(pos[0]), float(pos[1]),
                                              rob_theta,

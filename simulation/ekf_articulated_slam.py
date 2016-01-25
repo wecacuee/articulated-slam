@@ -6,6 +6,11 @@ inside SLAM, by first
 - Using observations to update the EKF state (consisting of robot pose and motion parameters)
 
 - Code is similar to threeptmap.py
+                # v1.0 Need to update mode to v2.0
+                #round(ap2vec.dot(axisvec)/np.linalg.norm(axisvec),3) <= np.around(np.linalg.norm(axisvec),3)
+ v1.0 Need to update mode to v2.0
+                #slam_state = slam_state+np.dot(K_mat,(np.array([r,theta])-z_pred))
+                #slam_state = slam_state+np.dot(K_mat,(np.array([r,theta])-z_pred))
 '''
 
 import numpy as np
@@ -61,16 +66,29 @@ import matplotlib.pyplot as plt
 
 def threeptmap3d():
     nframes = 30
-    map_conf = [#static
-                dict(ldmks=np.array([[0,0,0,]]).T,
-                initthetas=[0,0,0],
-                initpos=[x,y,z],
-                delthetas=[0,0,0],
-                delpos=[0,0,0])
-                for x,y,z in [0,1,0],[2,2,2]]
+    map_conf = [#Revolute
+                dict(ldmks=np.array([[0,0,0]]).T,
+                initthetas=[])
+
+
+                ##Prismatic
+                #dict(ldmks=np.array([[0,0,0]]).T,
+                #initthetas=[0,0,0],
+                #initpos=[-1,0,0],
+                #delthetas=[0,0,0],
+                #delpos=[0,-0.1,0])]
+
+                ##static
+                #dict(ldmks=np.array([[0,0,0,]]).T,
+                #initthetas=[0,0,0],
+                #initpos=[x,y,z],
+                #delthetas=[0,0,0],
+                #delpos=[0,0,0])
+                #for x,y,z in [0,1,0],[2,2,2]]
+    
     lmmap = landmarkmap.map_from_conf(map_conf,nframes)
     # For now static robot 
-    robtraj = landmarkmap.robot_trajectory(np.array([[0,0,0],[0,1,0]]),0,0)
+    robtraj = landmarkmap.robot_trajectory(np.array([[0,0,0],[-1,-1,0]]),0.0,0)
     maxangle = 45*np.pi/180
     maxdist = 120
     return nframes,lmmap,robtraj,maxangle,maxdist
@@ -274,7 +292,6 @@ def articulated_slam(debug_inp=True):
     # For error estimation in robot localization
     true_robot_states = []
     slam_robot_states = []
-
     # Processing all the observations
     # v1.0 Need to update to v2.0 with no rs and thetas
     #for fidx, (rs, thetas, ids, rob_state_and_input, ldmks,ldmk_robot_obs) in enumerate(rob_obs_iter[1:]): 
@@ -289,9 +306,6 @@ def articulated_slam(debug_inp=True):
         # v2.0 
         print 'Observations:',ldmk_robot_obs
         
-        #posdir = map(np.array, ([rob_state[0], rob_state[1]],
-        #                        [np.cos(rob_state[2]), np.sin(rob_state[2])]))
-
         # Handle new robot view code appropriately
 	    #robview = landmarkmap.RobotView(posdir[0], posdir[1], maxangle, maxdist)
         
@@ -327,8 +341,6 @@ def articulated_slam(debug_inp=True):
         ids_list = []
     
         # Processing all the observations
-        # v1.0 Update to v2.0 to exclude r and theta  
-        #for r, theta, id, ldmk_rob_obv in zip(rs, thetas, ids, np.dstack(ldmk_robot_obs)[0]):
         # v2.0
         for id, ldmk_rob_obv in zip(ids,np.dstack(ldmk_robot_obs)):
            
@@ -345,9 +357,6 @@ def articulated_slam(debug_inp=True):
             if ldmk_am[id] is None:
                 # Still need to estimate the motion class
                 motion_class.process_inp_data([0,0], rob_state,ldmk_rob_obv,init_pt[id])
-                #if id == 32:
-                #    print "Model Data", motion_class.am[0].model_data," Obs Num ",fidx
-                #    pdb.set_trace()
                 # Check if the model is estimated
                 if sum(motion_class.prior>m_thresh)>0:
                     model[id] = np.where(motion_class.prior>m_thresh)[0]	
@@ -372,12 +381,6 @@ def articulated_slam(debug_inp=True):
                 ld_preds.append(lk_pred)
                 ld_ids_preds.append(curr_ind)
 
-                # v1.0
-		        #diff_vec = lk_pred-slam_state[0:2]
-                        #q_val = np.dot(diff_vec,diff_vec)
-                        
-		        # v1.0
-                        #z_pred = np.array([np.sqrt(q_val),np.arctan2(diff_vec[1],diff_vec[0])-slam_state[2]])
 		        # v2.0
                 R_temp = np.array([[np.cos(-slam_state[2]), -np.sin(-slam_state[2]),0],
                         [np.sin(-slam_state[2]), np.cos(-slam_state[2]),0],
@@ -388,24 +391,8 @@ def articulated_slam(debug_inp=True):
                 z_pred = R_temp.T.dot(lk_pred)+np.array(pos_list)
 
                 
-                # Getting the jacobian matrix v 1.0
-                #H_mat = np.zeros((2,index_set[-1]))
                 # v2.0 : New definition
-                import pdb; pdb.set_trace()
-                #H_mat = np.zeros((3,index_set[-1]))
-                H_mat = np.zeros((3,6))
-                
-                # w.r.t robot state
-                #H_mat[0,0:3] = (1.0/q_val)*np.array([-np.sqrt(q_val)*diff_vec[0],\
-                #        -np.sqrt(q_val)*diff_vec[1],0])
-                #H_mat[1,0:3] = (1.0/q_val)*np.array([diff_vec[1],-diff_vec[0],-q_val])
-                # w.r.t landmark associated states
-                # Differentiation w.r.t landmark x and y first
-                #diff_landmark = (1.0/q_val)*np.array([[np.sqrt(q_val)*diff_vec[0],\
-                #        np.sqrt(q_val)*diff_vec[1]],[-diff_vec[1],diff_vec[0]]])
-                #H_mat[:,index_set[curr_ind]:index_set[curr_ind+1]] = np.dot(diff_landmark,\
-                #        ldmk_am[id].observation_jac(slam_state[index_set[curr_ind]:index_set[curr_ind+1]])) 
-
+                H_mat = np.zeros((3,index_set[-1]))
                 # v2.0 Need to modify based on 3D rotation matrix jacobian: Need to find the updated theta value
                 curr_obs = ldmk_rob_obv[0]
                 theta = slam_state[2]
@@ -421,10 +408,8 @@ def articulated_slam(debug_inp=True):
                 K_mat = np.dot(np.dot(slam_cov,H_mat.T),np.linalg.inv(inno_cov))
                 
                 # Updating SLAM state
-                # v1.0 Need to update mode to v2.0
-                #slam_state = slam_state+np.dot(K_mat,(np.array([r,theta])-z_pred))
                 # v2.0
-                slam_state = slam_state + np.hstack((np.dot(K_mat,(np.vstack(ldmk_rob_obv-z_pred)))))               
+                slam_state = slam_state + np.hstack((np.dot(K_mat,(np.vstack((ldmk_rob_obv-z_pred)[0])))))               
                 # Updating SLAM covariance
                 slam_cov = np.dot(np.identity(slam_cov.shape[0])-np.dot(K_mat,H_mat),slam_cov)
             # end of if else ldmk_am[id]
