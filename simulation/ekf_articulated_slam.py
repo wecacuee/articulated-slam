@@ -12,7 +12,6 @@ inside SLAM, by first
                 #slam_state = slam_state+np.dot(K_mat,(np.array([r,theta])-z_pred))
                 #slam_state = slam_state+np.dot(K_mat,(np.array([r,theta])-z_pred))
 '''
-
 import numpy as np
 import cv2
 import landmarkmap3d as landmarkmap
@@ -66,11 +65,13 @@ import matplotlib.pyplot as plt
 
 def threeptmap3d():
     nframes = 30
-    map_conf = [#Revolute
-                dict(ldmks=np.array([[0,0,0]]).T,
-                initthetas=[])
-
-
+    map_conf=   [#static
+                dict(ldmks=np.array([[0,0,0,]]).T,
+                initthetas=[0,0,0],
+                initpos=[x,y,z],
+                delthetas=[0,0,0],
+                delpos=[0,0,0])
+                for x,y,z in [0,1,0],[2,2,2]]
                 ##Prismatic
                 #dict(ldmks=np.array([[0,0,0]]).T,
                 #initthetas=[0,0,0],
@@ -78,13 +79,6 @@ def threeptmap3d():
                 #delthetas=[0,0,0],
                 #delpos=[0,-0.1,0])]
 
-                ##static
-                #dict(ldmks=np.array([[0,0,0,]]).T,
-                #initthetas=[0,0,0],
-                #initpos=[x,y,z],
-                #delthetas=[0,0,0],
-                #delpos=[0,0,0])
-                #for x,y,z in [0,1,0],[2,2,2]]
     
     lmmap = landmarkmap.map_from_conf(map_conf,nframes)
     # For now static robot 
@@ -92,6 +86,13 @@ def threeptmap3d():
     maxangle = 45*np.pi/180
     maxdist = 120
     return nframes,lmmap,robtraj,maxangle,maxdist
+
+def Rtoquad(R):
+	qw = np.sqrt(1+R[0,0,]+R[1,1]+R[2,2])/2.0
+	qx = (R[2,1] - R[1,2])/4/qw
+	qy = (R[0,2] - R[2,0])/4/qw
+	qz = (R[1,0] - R[0,1])/4/qw
+	return (qw,qx,qy,qz)
 
 #def visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state_2D,
 #                              slam_cov_2D, colors,obs_num):
@@ -385,7 +386,9 @@ def articulated_slam(debug_inp=True):
                 R_temp = np.array([[np.cos(-slam_state[2]), -np.sin(-slam_state[2]),0],
                         [np.sin(-slam_state[2]), np.cos(-slam_state[2]),0],
                         [0,0,1]])
-                    
+				
+                ##quat = Rtoquat(R_temp)    
+
                 pos_list = np.ndarray.tolist(slam_state[0:2])
                 pos_list.append(0.0)
                 z_pred = R_temp.T.dot(lk_pred)+np.array(pos_list)
