@@ -139,6 +139,8 @@ def robot_trajectory(positions, lin_vel, angular_vel):
     from_pos = positions[:-1]
     to_pos = positions[1:]
     for fp, tp in zip(from_pos, to_pos):
+        fp = np.array(fp)
+        tp = np.array(tp)
         dir = (tp - fp) / vnorm(tp-fp)
 
         if prev_dir is not None:
@@ -155,7 +157,7 @@ def robot_trajectory(positions, lin_vel, angular_vel):
             # differences is same, the product is +ve and the robot must
             # keep rotating otherwise we have rotated too far and we must
             # stop.
-            while np.cross(dir, to_dir) * np.cross(prev_dir, to_dir) > 0:
+            while np.dot(np.cross(dir, to_dir), np.cross(prev_dir, to_dir)) > 0:
                 yield (pos, dir, 0, angular_vel)
                 dir = R2D_angle(angular_vel).dot(dir)
             dir = to_dir
@@ -278,7 +280,6 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, lmvis=None):
     """ v2.0 Return a tuple of lndmks in robot frame and ids for each frame"""
     for ldmks, posdir_and_inputs in itertools.izip(lmmap.get_landmarks(), 
                                        robtraj):
-        
         posdir = posdir_and_inputs[:2]
         robot_inputs = posdir_and_inputs[2:]
         # Handle in new visualizer

@@ -74,7 +74,7 @@ def robot_to_world(robot_state,gen_obv):
                 [0,0,1]])
     # v2.0 
     # State is (x,y,0) since we assume robot is on the ground
-    return R.T.dot(gen_obv[0] - np.array([x,y,0]))
+    return R.dot(gen_obv[0] - np.array([x,y,0]))
 
 
 # x,y in cartesian to robot bearing and range
@@ -133,25 +133,27 @@ def Rtoquat(R):
     return (qx,qy,qz,qw)
 
 def threeptmap3d():
-    nframes = 30
-    map_conf = [#Prismatic
+    nframes = 100
+    map_conf=   [#static
+                dict(ldmks=np.array([[0,0,0,]]).T,
+                initthetas=[0,0,0],
+                initpos=[x,y,z],
+                delthetas=[0,0,0],
+                delpos=[0,0,0])
+                for x,y,z in zip([10]*10 + range(10,191,20)+[190]*10+range(10,191,20),
+                                 range(10,191,20)+[190]*10+range(10,191,20)+[10]*10,
+                                 [5]*10 + range(1,11,1)+[1]*10+range(1,11,1))
+                ]+[#Prismatic
                 dict(ldmks=np.array([[0,0,0]]).T,
                 initthetas=[0,0,0],
                 initpos=[-1,0,0],
                 delthetas=[0,0,0],
                 delpos=[0,-0.5,0])]
- 
-               # #static
-               # dict(ldmks=np.array([[0,0,0,]]).T,
-               # initthetas=[0,0,0],
-               # initpos=[x,y,z],
-               # delthetas=[0,0,0],
-               # delpos=[0,0,0])
-               # for x,y,z in [0,1,0],[2,2,2]]
+
  
     lmmap = landmarkmap.map_from_conf(map_conf,nframes)
     # For now static robot 
-    robtraj = landmarkmap.robot_trajectory(np.array([[0,0,0],[-1,-1,0]]),0.01,0)
+    robtraj = landmarkmap.robot_trajectory(np.array([[60,140,0],[0,175,0],[-60,140,0],[-60,-140,0],[60,-140,0]]),2,np.pi/10)
     maxangle = 45*np.pi/180
     maxdist = 120
     return nframes,lmmap,robtraj,maxangle,maxdist

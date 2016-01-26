@@ -64,15 +64,17 @@ import matplotlib.pyplot as plt
 
 
 def threeptmap3d():
-    nframes = 30
-    #map_conf=   [#static
-                #dict(ldmks=np.array([[0,0,0,]]).T,
-                #initthetas=[0,0,0],
-                #initpos=[x,y,z],
-                #delthetas=[0,0,0],
-                #delpos=[0,0,0])
-                #for x,y,z in [0,1,0],[2,2,2]]
-    map_conf = [#Prismatic
+    nframes = 100
+    map_conf=   [#static
+                dict(ldmks=np.array([[0,0,0,]]).T,
+                initthetas=[0,0,0],
+                initpos=[x,y,z],
+                delthetas=[0,0,0],
+                delpos=[0,0,0])
+                for x,y,z in zip([10]*10 + range(10,191,20)+[190]*10+range(10,191,20),
+                                 range(10,191,20)+[190]*10+range(10,191,20)+[10]*10,
+                                 [5]*10 + range(1,11,1)+[1]*10+range(1,11,1))
+                ]+[#Prismatic
                 dict(ldmks=np.array([[0,0,0]]).T,
                 initthetas=[0,0,0],
                 initpos=[-1,0,0],
@@ -82,7 +84,7 @@ def threeptmap3d():
     
     lmmap = landmarkmap.map_from_conf(map_conf,nframes)
     # For now static robot 
-    robtraj = landmarkmap.robot_trajectory(np.array([[0,0,0],[-1,-1,0]]),0.01,0)
+    robtraj = landmarkmap.robot_trajectory(np.array([[60,140,0],[0,175,0],[-60,140,0],[-60,-140,0],[60,-140,0]]),2,np.pi/10)
     maxangle = 45*np.pi/180
     maxdist = 120
     return nframes,lmmap,robtraj,maxangle,maxdist
@@ -279,8 +281,8 @@ def articulated_slam(debug_inp=True):
     # EKF parameters for filtering
 
     # Initially we only have the robot state
-    (_, rob_state_and_input, _,init_pt) = rob_obs_iter[0]
-    model = np.zeros(init_pt.shape[0])
+    (_, rob_state_and_input, init_pt,_) = rob_obs_iter[0]
+    model = np.zeros(init_pt.shape[1])
     slam_state =  np.array(rob_state_and_input[:3]) # \mu_{t} state at current time step
     
     # Covariance following discussion on page 317
@@ -360,7 +362,7 @@ def articulated_slam(debug_inp=True):
             # For each landmark id, we want to check if the motion model has been estimated
             if ldmk_am[id] is None:
                 # Still need to estimate the motion class
-                motion_class.process_inp_data([0,0], rob_state,ldmk_rob_obv,init_pt[id])
+                motion_class.process_inp_data([0,0], rob_state,ldmk_rob_obv,init_pt[0,id])
                 # Check if the model is estimated
                 if sum(motion_class.prior>m_thresh)>0:
                     model[id] = np.where(motion_class.prior>m_thresh)[0]	
@@ -404,7 +406,7 @@ def articulated_slam(debug_inp=True):
                 H_mat[0,0:3] = np.array([1,0,-np.sin(theta)*curr_obs[0] - np.cos(theta)*curr_obs[1]])
                 H_mat[1,0:3] = np.array([0,1,(np.cos(theta)-np.sin(theta))*curr_obs[0] - (np.cos(theta)+np.sin(theta))*curr_obs[1]])
                 H_mat[2,0:3] = np.array([0,0,(np.sin(theta)+np.cos(theta))*curr_obs[0] + (np.cos(theta)+np.sin(theta))*curr_obs[1]])
-                H_mat[:,index_set[curr_ind]:index_set[curr_ind+1]] = np.dot(np.diag(np.ones(3)),ldmk_am[id].observation_jac(slam_state[index_set[curr_ind]:index_set[curr_ind+1]],init_pt[id]))
+                H_mat[:,index_set[curr_ind]:index_set[curr_ind+1]] = np.dot(np.diag(np.ones(3)),ldmk_am[id].observation_jac(slam_state[index_set[curr_ind]:index_set[curr_ind+1]],init_pt[0,id]))
 
 
                 # Innovation covariance
