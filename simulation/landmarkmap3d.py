@@ -105,8 +105,12 @@ class RobotView(object):
         # Default equation is for z = 0
         self._robot_plane = np.array([[0, 0, 1, 0]]).T
         self.T = np.eye(4)
-        self.T[:3, :3] = rodrigues([0, 0, 1], theta)
+        self.T[:3, :3] = rodrigues([0, -1, 0], theta).T.dot(
+            rodrigues([-1, 0, 0], np.pi / 2).T)
         self.T[:3, 3] = self.robot_plane_basis().dot(pos)
+
+        self._win_name = "d"
+        self._wait_period = 30
 
     def robot_plane_basis(self):
         xaxis = np.array([[1, 0, 0]]).T
@@ -146,19 +150,26 @@ class RobotView(object):
         projected = self.projected(points3D)
         pt2 = projected + radius
         for i in range(pt2.shape[1]):
-            cv2.rectangle(img, tuple(projected[:, i]), tuple(pt2[:, i]), colors[i],
-                          thickness=-1)
+            cv2.rectangle(img, tuple(np.int64(projected[:, i])),
+                          tuple(np.int64(pt2[:, i])),
+                          (0, 0, 255), thickness=-1)
+        return img
+
+    def visualize(self, img):
+        cv2.imshow(self._win_name, img)
+        cv2.waitKey(self._wait_period)
 
     def in_view(self, points3D):
         """ Returns true for points that are within view """
         projected = self.projected(points3D)
+        points3D_cam = homo2euc(self.T.dot(euc2homo(points3D)))
         # within image and closer than maxZ
-        in_view = ((projected[0, :] >= 0)
-                   & (projected[0, :] < self._imgshape[1])
-                   & (projected[1, :] >= 0)
-                   & (projected[1, :] < self._imgshape[0])
-                   & (points3D[2, :] >= 0.5)
-                   & (points3D[2, :] < self.maxZ))
+        in_view = ((projected[0, :] >= 0) 
+                   & (projected[0, :] < self._imgshape[1]) 
+                   & (projected[1, :] >= 0) 
+                   & (projected[1, :] < self._imgshape[0]) 
+                   & (points3D_cam[2, :] >= 0.5) 
+                   & (points3D_cam[2, :] < self.maxZ))
         return in_view
 
 def rotmat_z(theta):
@@ -245,7 +256,7 @@ class LandmarksVisualizer(object):
         cv2.waitKey(-1)
 
     def set_camera_pos(self, axis_angle, pos):
-        self.camera_R = rodrigues(np.asarray(axis_angle[:3]), axis_angle[3])
+        self.camera_R = rodrigues(np.asarray(axis_angle[:3]), axis_angle[3]).T
         self.camera_t = - self.camera_R.dot(pos)
 
     def projectToImage(self, points3D):
@@ -311,11 +322,8 @@ class LandmarksVisualizer(object):
         pt1_plus_dir1 = self.projectToImage(
             pos +  dir * maxdist)
         dir1 = pt1_plus_dir1 - pt1
-        maxdist1 = np.linalg.norm(dir1)
-        pt2 = self.truncated_direction(pt1, dir1, maxdist1)
+        pt2 = self.truncated_direction(pt1, dir1, 1)
         return pt2
-
-
 
     def drawrobot(self, robview, img):
         pos, dir = robview.pos_dir_z()
