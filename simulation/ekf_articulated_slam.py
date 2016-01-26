@@ -65,34 +65,34 @@ import matplotlib.pyplot as plt
 
 def threeptmap3d():
     nframes = 30
-    map_conf=   [#static
-                dict(ldmks=np.array([[0,0,0,]]).T,
-                initthetas=[0,0,0],
-                initpos=[x,y,z],
-                delthetas=[0,0,0],
-                delpos=[0,0,0])
-                for x,y,z in [0,1,0],[2,2,2]]
-                ##Prismatic
-                #dict(ldmks=np.array([[0,0,0]]).T,
+    #map_conf=   [#static
+                #dict(ldmks=np.array([[0,0,0,]]).T,
                 #initthetas=[0,0,0],
-                #initpos=[-1,0,0],
+                #initpos=[x,y,z],
                 #delthetas=[0,0,0],
-                #delpos=[0,-0.1,0])]
+                #delpos=[0,0,0])
+                #for x,y,z in [0,1,0],[2,2,2]]
+    map_conf = [#Prismatic
+                dict(ldmks=np.array([[0,0,0]]).T,
+                initthetas=[0,0,0],
+                initpos=[-1,0,0],
+                delthetas=[0,0,0],
+                delpos=[0,-0.5,0])]
 
     
     lmmap = landmarkmap.map_from_conf(map_conf,nframes)
     # For now static robot 
-    robtraj = landmarkmap.robot_trajectory(np.array([[0,0,0],[-1,-1,0]]),0.0,0)
+    robtraj = landmarkmap.robot_trajectory(np.array([[0,0,0],[-1,-1,0]]),0.01,0)
     maxangle = 45*np.pi/180
     maxdist = 120
     return nframes,lmmap,robtraj,maxangle,maxdist
 
-def Rtoquad(R):
+def Rtoquat(R):
 	qw = np.sqrt(1+R[0,0,]+R[1,1]+R[2,2])/2.0
 	qx = (R[2,1] - R[1,2])/4/qw
 	qy = (R[0,2] - R[2,0])/4/qw
 	qz = (R[1,0] - R[0,1])/4/qw
-	return (qw,qx,qy,qz)
+	return (qx,qy,qz,qw)
 
 #def visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state_2D,
 #                              slam_cov_2D, colors,obs_num):
@@ -246,6 +246,9 @@ Performing Articulated SLAM
 Pass in optional parameter for collecting debug output for all the landmarks
 '''
 def articulated_slam(debug_inp=True):
+    # Writing to file variables
+    f_gt = open('gt.txt','w')
+    f_slam = open('slam.txt','w')    
 
     # Motion probability threshold
     m_thresh = 0.60 # Choose the articulation model with greater than this threhsold's probability
@@ -386,8 +389,7 @@ def articulated_slam(debug_inp=True):
                 R_temp = np.array([[np.cos(-slam_state[2]), -np.sin(-slam_state[2]),0],
                         [np.sin(-slam_state[2]), np.cos(-slam_state[2]),0],
                         [0,0,1]])
-				
-                ##quat = Rtoquat(R_temp)    
+
 
                 pos_list = np.ndarray.tolist(slam_state[0:2])
                 pos_list.append(0.0)
@@ -439,6 +441,17 @@ def articulated_slam(debug_inp=True):
         ##up.slam_cov_plot(slam_state,slam_cov,obs_num,rob_state,ld_preds,ld_ids_preds)
         #visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state[:2],
         #                          slam_cov[:2, :2], colors,obs_num)
+        R_temp_true = np.array([[np.cos(-rob_state[2]), -np.sin(-rob_state[2]),0],
+                      [np.sin(-rob_state[2]), np.cos(-rob_state[2]),0],
+                      [0,0,1]]) 
+        R_temp = np.array([[np.cos(-slam_state[2]), -np.sin(-slam_state[2]),0],
+                      [np.sin(-slam_state[2]), np.cos(-slam_state[2]),0],
+                      [0,0,1]])
+
+        quat_true = Rtoquat(R_temp_true)
+        quat_slam = Rtoquat(R_temp)    
+        f_gt.write(str(fidx+1)+" "+str(rob_state[0])+" "+str(rob_state[1])+" "+str(0)+" "+str(quat_true[0])+" "+str(quat_true[1])+" "+str(quat_true[2])+" "+str(quat_true[3])+" "+"\n")
+        f_slam.write(str(fidx+1)+" "+str(slam_state[0])+" "+str(slam_state[1])+" "+str(0)+" "+str(quat_slam[0])+" "+str(quat_slam[1])+" "+str(quat_slam[2])+" "+str(quat_slam[3])+" "+"\n")
         true_robot_states.append(rob_state)
         slam_robot_states.append(slam_state[0:3].tolist())
     # end of loop over frames
@@ -452,6 +465,8 @@ def articulated_slam(debug_inp=True):
                 if ldmk_am[ldmk_id] is None:
                     print "Could not estimate model for landmark ", ldmk_id,\
                             "with ", ldmk.num_data, " samples"
+    f_gt.close()
+    f_slam.close()
     return (true_robot_states,slam_robot_states)
 
 

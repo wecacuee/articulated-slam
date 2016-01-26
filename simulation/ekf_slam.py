@@ -125,31 +125,33 @@ def threeptmap():
     maxdist = 120
 
     return nframes, lmmap, lmvis, robtraj, maxangle, maxdist
-
+def Rtoquat(R):
+    qw = np.sqrt(1+R[0,0,]+R[1,1]+R[2,2])/2.0
+    qx = (R[2,1] - R[1,2])/4/qw
+    qy = (R[0,2] - R[2,0])/4/qw
+    qz = (R[1,0] - R[0,1])/4/qw
+    return (qx,qy,qz,qw)
 
 def threeptmap3d():
     nframes = 30
-    map_conf = [
- 
- 
-                ##Prismatic
-                #dict(ldmks=np.array([[0,0,0]]).T,
-                #initthetas=[0,0,0],
-                #initpos=[-1,0,0],
-                #delthetas=[0,0,0],
-                #delpos=[0,-0.1,0])]
- 
-                #static
-                dict(ldmks=np.array([[0,0,0,]]).T,
+    map_conf = [#Prismatic
+                dict(ldmks=np.array([[0,0,0]]).T,
                 initthetas=[0,0,0],
-                initpos=[x,y,z],
+                initpos=[-1,0,0],
                 delthetas=[0,0,0],
-                delpos=[0,0,0])
-                for x,y,z in [0,1,0],[2,2,2]]
+                delpos=[0,-0.5,0])]
+ 
+               # #static
+               # dict(ldmks=np.array([[0,0,0,]]).T,
+               # initthetas=[0,0,0],
+               # initpos=[x,y,z],
+               # delthetas=[0,0,0],
+               # delpos=[0,0,0])
+               # for x,y,z in [0,1,0],[2,2,2]]
  
     lmmap = landmarkmap.map_from_conf(map_conf,nframes)
     # For now static robot 
-    robtraj = landmarkmap.robot_trajectory(np.array([[0,0,0],[-1,-1,0]]),0.0,0)
+    robtraj = landmarkmap.robot_trajectory(np.array([[0,0,0],[-1,-1,0]]),0.01,0)
     maxangle = 45*np.pi/180
     maxdist = 120
     return nframes,lmmap,robtraj,maxangle,maxdist
@@ -226,7 +228,9 @@ Performing EKF SLAM
 Pass in optional parameter for collecting debug output for all the landmarks
 '''
 def slam(debug_inp=True):
-
+    # Writing to file
+    f_gt = open('gt_orig.txt','w')
+    f_slam = open('slam_orig.txt','w')
     # Getting the map
     #nframes, lmmap, lmvis, robtraj, maxangle, maxdist = threeptmap3d()
     nframes, lmmap, robtraj, maxangle, maxdist = threeptmap3d()
@@ -246,7 +250,7 @@ def slam(debug_inp=True):
     # EKF parameters for filtering
 
     # Initially we only have the robot state
-    (_, _, _, rob_state_and_input, init_pt) = rob_obs_iter[0]
+    ( _, rob_state_and_input,_, init_pt) = rob_obs_iter[0]
     slam_state =  np.array(rob_state_and_input[:3]) # \mu_{t} state at current time step
     # Covariance following discussion on page 317
     # Assuming that position of the robot is exactly known
@@ -265,7 +269,7 @@ def slam(debug_inp=True):
 
     # Processing all the observations
     # We need to skip the first observation because it was used to initialize SLAM State
-    for fidx, (ids, rob_state_and_input, ldmks) in enumerate(rob_obs_iter[1:]): 
+    for fidx, (ids, rob_state_and_input, ldmks,ldmk_robot_obs) in enumerate(rob_obs_iter[1:]): 
         rob_state = rob_state_and_input[:3]
         robot_input = rob_state_and_input[3:]
         print '+++++++++++++ fidx = %d +++++++++++' % fidx
@@ -288,8 +292,7 @@ def slam(debug_inp=True):
         # Processing all the observations
         for id,ldmk_rob_obv in zip(ids,np.dstack(ldmk_robot_obs)):
             # Observation corresponding to current landmark is
-            #-------->
-            obs = np.array([r, theta])
+            #obs = np.array([r, theta])
             '''
             Step 1: Process Observations to first determine the motion model of each landmark
             During this step we will use robot's internal odometry to get the best position of 
@@ -326,9 +329,9 @@ def slam(debug_inp=True):
                          [np.sin(-slam_state[2]), np.cos(-slam_state[2]),0],
                          [0,0,1]])
 
-                 pos_list = np.ndarray.tolist(slam_state[0:2])
-                 pos_list.append(0.0)
-                 z_pred = R_temp.T.dot(lk_pred)+np.array(pos_list)
+                pos_list = np.ndarray.tolist(slam_state[0:2])
+                pos_list.append(0.0)
+                z_pred = R_temp.T.dot(lk_pred)+np.array(pos_list)
 
                 #diff_vec = lk_pred-slam_state[0:2]
                 #q_val = np.dot(diff_vec,diff_vec)
@@ -341,7 +344,7 @@ def slam(debug_inp=True):
                 H_mat[0,0:3] = np.array([1,0,-np.sin(theta)*curr_obs[0] - np.cos(theta)*curr_obs[1]])
                 H_mat[1,0:3] = np.array([0,1,(np.cos(theta)-np.sin(theta))*curr_obs[0] - (np.cos(theta)+np.sin(theta))*curr_obs[1]])
                 H_mat[2,0:3] = np.array([0,0,(np.sin(theta)+np.cos(theta))*curr_obs[0] + (np.cos(theta)+np.sin(theta))*curr_obs[1]])
-                H_mat[:,index_set[curr_ind]:index_set[curr_ind+1]] = np.dot(np.diag(np.ones(3)),ldmk_am[id].observation_jac(slam_state[index_set[curr_ind]:index_set[curr_ind+1]],init_pt[id]))
+                H_mat[:,index_set[curr_ind]:index_set[curr_ind+1]] = np.dot(np.diag(np.ones(3)),np.array([[1],[1],[1]]))
 
 
                 # w.r.t landmark associated states
@@ -355,7 +358,7 @@ def slam(debug_inp=True):
                 # Kalman Gain
                 K_mat = np.dot(np.dot(slam_cov,H_mat.T),np.linalg.inv(inno_cov))
                 # Updating SLAM state
-                slam_state = slam_state+np.hstack((np.dot(K_mat,np.vstack((ldmk_rob_obv-z_pred)))))
+                slam_state = slam_state+np.hstack((np.dot(K_mat,np.vstack((ldmk_rob_obv-z_pred)[0]))))
                 # Updating SLAM covariance
                 slam_cov = np.dot(np.identity(slam_cov.shape[0])-np.dot(K_mat,H_mat),slam_cov)
             # end of if else ldmk_am[id]
@@ -376,9 +379,25 @@ def slam(debug_inp=True):
         #up.slam_cov_plot(slam_state,slam_cov,obs_num,rob_state,ld_preds,ld_ids_preds)
         #visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state[:2],
         #                          slam_cov[:2, :2], colors)
+        R_temp_true = np.array([[np.cos(-rob_state[2]), -np.sin(-rob_state[2]),0],
+                      [np.sin(-rob_state[2]), np.cos(-rob_state[2]),0],
+                      [0,0,1]])
+        R_temp = np.array([[np.cos(-slam_state[2]), -np.sin(-slam_state[2]),0],
+                      [np.sin(-slam_state[2]), np.cos(-slam_state[2]),0],
+                      [0,0,1]])
+ 
+        quat_true = Rtoquat(R_temp_true)
+        quat_slam = Rtoquat(R_temp)
+        f_gt.write(str(fidx+1)+" "+str(rob_state[0])+" "+str(rob_state[1])+" "+str(0)+" "+str(quat_true[0])+" "+str(quat_true[1])+" "+str(quat_true[2])+" "+str(quat_true[3])+" "+"\n")
+        f_slam.write(str(fidx+1)+" "+str(slam_state[0])+" "+str(slam_state[1])+" "+str(0)+" "+str(quat_slam[0])+" "+str(quat_slam[1])+" "+str(quat_slam[2])+" "+str(quat_slam[3])+" "+"\n")
+ 
+
+
         true_robot_states.append(rob_state)
         slam_robot_states.append(slam_state[0:3].tolist())
     # end of loop over frames
+    f_gt.close()
+    f_slam.close()
     return (true_robot_states,slam_robot_states)
 
 
