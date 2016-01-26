@@ -65,35 +65,36 @@ import matplotlib.pyplot as plt
 
 def threeptmap3d():
     nframes = 100
-    map_conf=   [#static
-                dict(ldmks=np.array([[0,0,0,]]).T,
-                initthetas=[0,0,0],
-                initpos=[0,10,0],
-                delthetas=[0,0,0*np.pi/10],
-                delpos=[0.5,0,0])]
+    scale = 30.
     #map_conf=   [#static
-    #            dict(ldmks=np.array([[0,0,0,]]).T,
+    #            dict(ldmks=np.array([[0,0,0,]]).T / scale,
     #            initthetas=[0,0,0],
-    #            initpos=[x,y,z],
-    #            delthetas=[0,0,0],
-    #            delpos=[0,0,0])
-    #            for x,y,z in zip([10]*10 + range(10,191,20)+[190]*10+range(10,191,20),
-    #                             range(10,191,20)+[190]*10+range(10,191,20)+[10]*10,
-    #                             [5]*10 + range(1,11,1)+[1]*10+range(1,11,1))
-    #            ]+[#Prismatic
-    #            dict(ldmks=np.array([[0,0,0]]).T,
-    #            initthetas=[0,0,0],
-    #            initpos=[-1,0,0],
-    #            delthetas=[0,0,0],
-    #            delpos=[0,-0.5,0])]
+    #            initpos=[0,10,0],
+    #            delthetas=[0,0,0*np.pi/10],
+    #            delpos=[0.5,0,0])]
+    map_conf=   [#static
+                dict(ldmks=np.array([[0,0,0,]]).T/scale,
+                initthetas=[0,0,0],
+                initpos=np.array([x,y,z])/scale,
+                delthetas=[0,0,0],
+                delpos=[0,0,0])
+                for x,y,z in zip([10]*10 + range(10,191,20)+[190]*10+range(10,191,20),
+                                 range(10,191,20)+[190]*10+range(10,191,20)+[10]*10,
+                                 [5]*10 + range(1,11,1)+[1]*10+range(1,11,1))
+                ]+[#Prismatic
+                dict(ldmks=np.array([[0,0,0]]).T/scale,
+                initthetas=[0,0,0],
+                initpos=np.array([-1,0,0])/scale,
+                delthetas=[0,0,0],
+                delpos=np.array([0,-0.5,0])/scale)]
 
     
     lmmap = landmarkmap.map_from_conf(map_conf,nframes)
     # For now static robot 
-    robtraj = landmarkmap.robot_trajectory(np.array([[0,0,0],[20,20,0]]),0.01,np.pi/10)
+    robtraj = landmarkmap.robot_trajectory(np.array([[0,0,0],[20,20,0]])/scale,0.3/scale,np.pi/10)
     #robtraj = landmarkmap.robot_trajectory(np.array([[60,140,0],[0,175,0],[-60,140,0],[-60,-140,0],[60,-140,0]]),0.2,np.pi/10)
     maxangle = 45*np.pi/180
-    maxdist = 120 
+    maxdist = 120/scale 
     return nframes,lmmap,robtraj,maxangle,maxdist
 
 def Rtoquat(R):
@@ -178,6 +179,9 @@ def articulated_slam(debug_inp=True):
     # Writing to file variables
     f_gt = open('gt.txt','w')
     f_slam = open('slam.txt','w')    
+    img_shape = (960, 320)
+    f = 300
+    K = np.array([[f, 0, img_shape[1]/2], [0, f, img_shape[0]/2], [0, 0, 1]])
 
     # Motion probability threshold
     m_thresh = 0.60 # Choose the articulation model with greater than this threhsold's probability
@@ -196,10 +200,15 @@ def articulated_slam(debug_inp=True):
     
     # to get the landmarks with ids that are being seen by robot (Need to modify to match 3D viewing cone)
     # Handle viewable observations based on new code
-    rob_obs_iter = landmarkmap.get_robot_observations(lmmap, robtraj, maxangle, maxdist, 
+    rob_obs_iter = landmarkmap.get_robot_observations(lmmap, robtraj,
+                                                      maxangle, maxdist,
+                                                      img_shape, K,
                                               # Do not pass visualizer to
                                               # disable visualization
                                               lmvis=None)
+
+    lmvis = landmarkmap.LandmarksVisualizer([0,0], [7, 7], frame_period=-1,
+                                            imgshape=(700, 700))
     
     rob_obs_iter = list(rob_obs_iter)
     #frame_period = lmvis.frame_period
@@ -242,7 +251,12 @@ def articulated_slam(debug_inp=True):
         print 'Observations:',ldmk_robot_obs
         
         # Handle new robot view code appropriately
-	    #robview = landmarkmap.RobotView(posdir[0], posdir[1], maxangle, maxdist)
+        robview = landmarkmap.RobotView((rob_state[0], rob_state[1], 0),
+                                        rob_state[2], img_shape, K, maxdist)
+        img = lmvis.genframe(ldmks, robview)
+        imgr = lmvis.drawrobot(robview, img)
+        lmvis.imshow_and_wait(imgr)
+        robview.visualize(robview.drawlandmarks(ldmks))
         
         # Following EKF steps now
 
@@ -358,7 +372,7 @@ def articulated_slam(debug_inp=True):
             mm_probs.append(motion_class.prior)
 
             # commenting out old visualization code
-	    #motion_class = ldmk_estimater[id]
+            #motion_class = ldmk_estimater[id]
             #p1, p2, p3 = motion_class.prior[:3]
             #color = np.int64((p1*rev_color
             #         + p2*pris_color
