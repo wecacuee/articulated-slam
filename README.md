@@ -1,3 +1,17 @@
+TO DO
+ - 3D visualization (both robot trajectory and simulation map) - Robot POV and bird's eye view - Vikas (1)
+ - Email Steffen - Vikas (2)
+ - Massaging real data and GT association - Vikas (3)
+ - Visualization of landmark predictions - Vikas (4)
+ - Investigate why drifting slam states - Madan (1)
+ - Baseline 2  - constant velocity model (prismatic for all ldmks) - Madan (2)
+ - Simulation world - Entirely dynamic map generation and error metrics (keep robot static for ~30 frames) - Madan (3)
+ - Paper - writing and cleanup - Suren (1)
+ - Case - When static changes to prismatic/revolute observation likelihood - Suren (2)
+ - Clustering based on parameters and visualization - Suren (3)
+ 
+ 
+
 # Purpose
 ROS package to segment articulated objects from a scene
 
