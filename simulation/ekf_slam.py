@@ -85,46 +85,46 @@ def cartesian_to_bearing(obs,robot_state):
     m_x = obs[0]; m_y = obs[1]
     return np.array([np.sqrt((m_x-x)**2+(m_y-y)**2),np.arctan2(m_y-y,m_x-x)])
 
-def threeptmap():
-    nframes = 100
-    map_conf = [# static
-               # dict(ldmks=np.array([[0, 0]]).T,
-               #      inittheta=0,
-               # # Where do we obtain the x and y from?   
-               #      initpos=[x, y],
-               #      deltheta=0,
-               #      delpos=[0,0]) 
-               # for x,y in zip([10] * 10 + range(10, 191, 20) + [190]*10 +
-               #                range(10, 191, 20),
-               #                range(10, 191, 20) + [190]*10 + 
-               #                range(10, 191, 20) + [10] * 10
-               #               )
-               #]+ [# prismatic
-                dict(ldmks=np.array([[10,10]]).T,
-                     inittheta=0,
-                     initpos=[120,10],
-                     deltheta=0,
-                     delpos=[5,0])]
-                # revolute
-                dict(ldmks=np.array([[0,20]]).T, # point wrt rigid body frame
-                     inittheta=np.pi,            # initial rotation
-                     initpos=[160,40],            # origin of rigid body
-                     deltheta=-10*np.pi/180,     # rotation per frame
-                     delpos=[0,0])               # translation per frame
-               ]
-    lmmap = landmarkmap.map_from_conf(map_conf, nframes)
-    lmvis = landmarkmap.LandmarksVisualizer([0,0], [200, 200], frame_period=-1,
-                                         scale=3)
-    robtraj = landmarkmap.robot_trajectory(np.array([[110, 90], [140,60],
-                                                     [120,50], [110, 90], 
-                                                     [140, 60]]),
-                                           5, np.pi/10)
-    # angle on both sides of robot dir
-    maxangle = 45*np.pi/180
-    # max distance in pixels
-    maxdist = 120
-
-    return nframes, lmmap, lmvis, robtraj, maxangle, maxdist
+#def threeptmap():
+#    nframes = 100
+#    map_conf = [# static
+#               # dict(ldmks=np.array([[0, 0]]).T,
+#               #      inittheta=0,
+#               # # Where do we obtain the x and y from?   
+#               #      initpos=[x, y],
+#               #      deltheta=0,
+#               #      delpos=[0,0]) 
+#               # for x,y in zip([10] * 10 + range(10, 191, 20) + [190]*10 +
+#               #                range(10, 191, 20),
+#               #                range(10, 191, 20) + [190]*10 + 
+#               #                range(10, 191, 20) + [10] * 10
+#               #               )
+#               #]+ [# prismatic
+#               # dict(ldmks=np.array([[10,10]]).T,
+#               #      inittheta=0,
+#               #      initpos=[120,10],
+#               #      deltheta=0,
+#               #      delpos=[5,0])]
+#               # # revolute
+#               # dict(ldmks=np.array([[0,20]]).T, # point wrt rigid body frame
+#               #      inittheta=np.pi,            # initial rotation
+#               #      initpos=[160,40],            # origin of rigid body
+#               #      deltheta=-10*np.pi/180,     # rotation per frame
+#               #      delpos=[0,0])               # translation per frame
+#               #]
+#    lmmap = landmarkmap.map_from_conf(map_conf, nframes)
+#    lmvis = landmarkmap.LandmarksVisualizer([0,0], [200, 200], frame_period=-1,
+#                                         scale=3)
+#    robtraj = landmarkmap.robot_trajectory(np.array([[110, 90], [140,60],
+#                                                     [120,50], [110, 90], 
+#                                                     [140, 60]]),
+#                                           5, np.pi/10)
+#    # angle on both sides of robot dir
+#    maxangle = 45*np.pi/180
+#    # max distance in pixels
+#    maxdist = 120
+#
+#    return nframes, lmmap, lmvis, robtraj, maxangle, maxdist
 def Rtoquat(R):
     qw = np.sqrt(1+R[0,0,]+R[1,1]+R[2,2])/2.0
     qx = (R[2,1] - R[1,2])/4/qw
@@ -141,26 +141,26 @@ def threeptmap3d():
     #            delthetas=[0,0,np.pi/10],
     #            delpos=[0,0,0])]    
     map_conf=  [#static
-                dict(ldmks=np.array([[0,0,0,]]).T,
+               # dict(ldmks=np.array([[0,0,0,]]).T,
+               # initthetas=[0,0,0],
+               # initpos=[x,y,z],
+               # delthetas=[0,0,0],
+               # delpos=[0,0,0])
+               # for x,y,z in zip([10]*10 + range(10,191,20)+[190]*10+range(10,191,20),
+               #                  range(10,191,20)+[190]*10+range(10,191,20)+[10]*10,
+               #                  [5]*10 + range(1,11,1)+[1]*10+range(1,11,1))
+               #]+[#Prismatic
+               # dict(ldmks=np.array([[0,40,0]]).T,
+               # initthetas=[0,0,0],
+               # initpos=[0,0,0],
+               # delthetas=[0,0,0],
+               # delpos=[1,0,0])]
+               #]+[#Revolute
+                dict(ldmks=np.array([[40,40,0]]).T,
                 initthetas=[0,0,0],
-                initpos=[x,y,z],
-                delthetas=[0,0,0],
-                delpos=[0,0,0])
-                for x,y,z in zip([10]*10 + range(10,191,20)+[190]*10+range(10,191,20),
-                                 range(10,191,20)+[190]*10+range(10,191,20)+[10]*10,
-                                 [5]*10 + range(1,11,1)+[1]*10+range(1,11,1))
-                ]+[#Prismatic
-               dict(ldmks=np.array([[0,0,0]]).T,
-               initthetas=[0,0,0],
-               initpos=[0,40,0],
-               delthetas=[0,0,0],
-               delpos=[1,0,0])
-               ]+[#Revolute
-               dict(ldmks=np.array([[40,40,0]]).T,
-               initthetas=[0,0,0],
-               initpos=[0,0,0],
-               delthetas=[0,0,np.pi/10],
-               delpos=[0,0,0])]
+                initpos=[0,0,0],
+                delthetas=[0,0,np.pi/10],
+                delpos=[0,0,0])]
 
  
     lmmap = landmarkmap.map_from_conf(map_conf,nframes)
@@ -247,6 +247,9 @@ def slam(debug_inp=True):
     # Writing to file
     f_gt = open('gt_orig.txt','w')
     f_slam = open('slam_orig.txt','w')
+    f= 300
+    img_shape = (960, 320)
+    K = np.array([[f, 0, img_shape[1]/2], [0, f, img_shape[0]/2], [0, 0, 1]])
     # Getting the map
     #nframes, lmmap, lmvis, robtraj, maxangle, maxdist = threeptmap3d()
     nframes, lmmap, robtraj, maxangle, maxdist = threeptmap3d()
@@ -256,17 +259,14 @@ def slam(debug_inp=True):
     #rev_color, pris_color, stat_color = [np.array(l) for l in (
     #    [255, 0, 0], [0, 255, 0], [0, 0, 255])]
     # to get the landmarks with ids that are being seen by robot
-    rob_obs_iter = landmarkmap.get_robot_observations(
-        lmmap, robtraj, maxangle, maxdist, 
-                                              # Do not pass visualizer to
-                                              # disable visualization
-                                              lmvis=None)
+    rob_obs_iter = landmarkmap.get_robot_observations(lmmap, robtraj, maxangle, maxdist,img_shape,K,lmvis=None)
     rob_obs_iter = list(rob_obs_iter)
     #frame_period = lmvis.frame_period
     # EKF parameters for filtering
 
     # Initially we only have the robot state
-    ( _, rob_state_and_input,_, init_pt) = rob_obs_iter[0]
+    ( _, rob_state_and_input,init_pt,_) = rob_obs_iter[0]
+    init_pt = np.dstack(init_pt)[0]
     slam_state =  np.array(rob_state_and_input[:3]) # \mu_{t} state at current time step
     # Covariance following discussion on page 317
     # Assuming that position of the robot is exactly known
@@ -278,7 +278,7 @@ def slam(debug_inp=True):
     # For plotting
     obs_num = 0
     # Initial covariance for landmarks (x,y) position
-    initial_cov = np.array([[100,0,0],[0,100,0],[0,0,100]])
+    initial_cov = np.array([[5.0,0,0],[0,5.0,0],[0,0,5.0]])
     # For error estimation in robot localization
     true_robot_states = []
     slam_robot_states = []

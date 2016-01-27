@@ -1,14 +1,14 @@
 SHELL:= bash -i
-DATADIR:=/home/vikasdhi/data
+DATADIR:= /home/vikasdhi/data
 MIDDIR:=/home/vikasdhi/mid
-PROJDATADIR:=$(DATADIR)/articulatedslam/2016-01-15
-PROJMIDDIR:=$(MIDDIR)/articulatedslam/2016-01-15
+PROJDATADIR:=$(DATADIR)/articulatedslam/2016-01-22
+PROJMIDDIR:=$(MIDDIR)/articulatedslam/2016-01-22
 
 .SECONDARY:
 
-bags:=all_dynamic_2016-01-15-16-07-26 2016-01-15-16-54-57 2016-01-15-17-02-57 2016-01-15-17-11-53 2016-01-15-17-12-48 all_dynamic_2016-01-15-15-51-33 all_static_2016-01-15-15-39-50 only_rev_prism_2016-01-15-16-27-26 rev_and_chair_2016-01-15-17-03-58
-targets:=$(foreach b,$(bags),$(PROJMIDDIR)/$(b)/densetraj.gz) $(foreach b,$(bags),$(PROJMIDDIR)/$(b)/densetraj.avi) $(foreach b,$(bags),$(PROJMIDDIR)/$(b)/extracttrajectories_GFTT_SIFT.avi) $(foreach b,$(bags),$(PROJMIDDIR)/$(b)/extracttrajectories_GFTT_SIFT.pickle)
-all: $(targets)
+bags:=all_static_2016-01-22-13-49-34 planar_2016-01-22-14-43-28 prism_2016-01-22-14-20-53 rev_2016-01-22-13-56-28 rev_2016-01-22-14-04-54 rev_2016-01-22-14-10-45 rev2_2016-01-22-14-32-13 rev_pris_2016-01-22-13-40-33 rev_prism_planar_2016-01-22-15-05-59
+targets:=$(foreach b,$(bags),$(PROJMIDDIR)/$(b)/extracttrajectories_GFTT_SIFT.avi) $(foreach b,$(bags),$(PROJMIDDIR)/$(b)/extracttrajectories_GFTT_SIFT.pickle)#$(foreach b,$(bags),$(PROJMIDDIR)/$(b)/densetraj.gz) $(foreach b,$(bags),$(PROJMIDDIR)/$(b)/densetraj.avi)
+all: $(targets) 
 
 # Data dir to MID DIR
 $(PROJMIDDIR)/%.bag: $(PROJDATADIR)/%.bag
