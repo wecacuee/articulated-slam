@@ -4,6 +4,7 @@ Implement finite order temporal models of motion
 import numpy as np
 import math
 import matplotlib.pyplot as plt
+from matplotlib import rc
 from scipy import ndimage
 import scipy.stats as sp
 import pdb
@@ -189,39 +190,60 @@ def observation_jac(robot_state):
 
 
 if __name__=="__main__":
-    init_state = np.array([0])
     dt = 1.0 # Time steps of dt sec
-    const_vel = temporal_model(init_state,dt)
     # Reading the data from the excel file
     wb = xlrd.open_workbook('../temp/output_angles_ground_truth.xls')
     sh = wb.sheet_by_index(0)
     num_points = 30
-    inp_data = np.zeros(num_points+10)
-    lk_prob = np.zeros(num_points+10)
-    out_state = np.zeros(num_points+10)
+    num_models = 3 # Number of models we are choosing
+    inp_data = np.zeros((num_points+10))
+    lk_prob = np.zeros((num_points+10,num_models))
+    out_state = np.zeros((num_points+10,num_models))
     for i in range(1,num_points+1):
         inp_data[i-1] = sh.cell(0,i).value
     inp_data[-10:] = inp_data[-11]
     print inp_data
     num_points = num_points+10
     # Passing this data to the algorithm
-    for i in range(inp_data.shape[0]):
-        lk_prob[i] = const_vel.process_inp_data(inp_data[i])
-        out_state[i] = const_vel.state[0]
+    
+    # Creating models of various orders ranging from 1 to 3
+    for i in range(num_models):
+        init_state = np.zeros((i+1))
+        motion_model = temporal_model(init_state,dt)
+        for j in range(inp_data.shape[0]):
+            lk_prob[j,i] = motion_model.process_inp_data(inp_data[j])
+            out_state[j,i] = motion_model.state[0]
 
-    plt.subplot(2, 1, 1)
-    inp = plt.plot(inp_data,'b+',label='Input Data',linewidth=2.0)
-    out = plt.plot(np.arange(const_vel.min_data_samples,num_points),
-                   out_state[const_vel.min_data_samples:],
-                   'r', label='State Output', linewidth=2.0)
-    plt.xlabel("Time")
-    plt.ylabel("Value")
-    plt.legend(loc='upper left')
+    rc('text',usetex=True)
+    fig = plt.figure(1)
+    ax = fig.add_subplot(111)
+    inp = plt.plot(inp_data,'k-',label='Input Data',linewidth=2.0)
+    zero = plt.plot(np.arange(motion_model.min_data_samples,num_points),
+                   out_state[motion_model.min_data_samples:,0],
+                   'r+', label='Zero Order', linewidth=3.0)
+    first = plt.plot(np.arange(motion_model.min_data_samples,num_points),
+                   out_state[motion_model.min_data_samples:,1],
+                   'g*', label='First Order', linewidth=3.0)
+    second = plt.plot(np.arange(motion_model.min_data_samples,num_points),
+                   out_state[motion_model.min_data_samples:,2],
+                   'bd', label='Second Order', linewidth=3.0)
+    plt.xlabel(r"$Time \rightarrow$", fontsize=18)
+    plt.ylabel(r"$Value \rightarrow$",fontsize = 18)
+    plt.legend(loc='best')
+    plt.xticks(fontsize=18)
+    plt.yticks(fontsize=18)
+    plt.savefig('temporal_plots.png')
 
-    plt.subplot(2,1,2)
-    out = plt.plot(np.arange(const_vel.min_data_samples,num_points),
-                   lk_prob[const_vel.min_data_samples:],
-                   'r', linewidth=2.0)
+    fig = plt.figure(2)
+    zero = plt.plot(np.arange(motion_model.min_data_samples,num_points),
+                   lk_prob[motion_model.min_data_samples:,0],
+                   'r+', label='Zero Order', linewidth=2.0)
+    first = plt.plot(np.arange(motion_model.min_data_samples,num_points),
+                   lk_prob[motion_model.min_data_samples:,1],
+                   'g*', label='First Order', linewidth=2.0)
+    second = plt.plot(np.arange(motion_model.min_data_samples,num_points),
+                   lk_prob[motion_model.min_data_samples:,2],
+                   'bd', label='Second Order', linewidth=2.0)
     plt.xlim([0,num_points])
     plt.xlabel("Time")
     plt.ylabel("Prob")
