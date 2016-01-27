@@ -73,33 +73,33 @@ def threeptmap3d():
     #            delthetas=[0,0,0*np.pi/10],
     #            delpos=[0.5,0,0])]
     map_conf=   [#static
-                #dict(ldmks=np.array([[0,0,0,]]).T,
-                #initthetas=[0,0,0],
-                #initpos=np.array([x,y,z]),
-                #delthetas=[0,0,0],
-                #delpos=[0,0,0])
-                #for x,y,z in zip([10]*10 + range(10,191,20)+[190]*10+range(10,191,20),
-                #                 range(10,191,20)+[190]*10+range(10,191,20)+[10]*10,
-                #                 [5]*10 + range(1,11,1)+[1]*10+range(1,11,1))
-                #]+[#Prismatic
-                #dict(ldmks=np.array([[0,40,0]]).T,
-                #initthetas=[0,0,0],
-                #initpos=np.array([0,0,0]),
-                #delthetas=[0,0,0],
-                #delpos=np.array([1,0,0]))
-                #]+[#Revolute
-                dict(ldmks=np.array([[40,40,0]]).T,
+                dict(ldmks=np.array([[0,0,0,]]).T / scale,
                 initthetas=[0,0,0],
-                initpos=np.array([0,0,0]),
+                initpos=np.array([x,y,z]) / scale,
+                delthetas=[0,0,0],
+                delpos=np.array([0,0,0]) / scale)
+                for x,y,z in zip([10]*10 + range(10,191,20)+[190]*10+range(10,191,20),
+                                 range(10,191,20)+[190]*10+range(10,191,20)+[10]*10,
+                                 [5]*10 + range(1,11,1)+[1]*10+range(1,11,1))
+                ]+[#Prismatic
+                dict(ldmks=np.array([[0,40,0]]).T / scale,
+                initthetas=[0,0,0],
+                initpos=np.array([0,0,0]) / scale,
+                delthetas=[0,0,0],
+                delpos=np.array([1,0,0]) / scale)
+                ]+[#Revolute
+                dict(ldmks=np.array([[40,40,0]]).T / scale,
+                initthetas=[0,0,0],
+                initpos=np.array([0,0,0]) / scale,
                 delthetas=[0,0,np.pi/10],
-                delpos=np.array([0,0,0]))]
+                delpos=np.array([0,0,0]) / scale)]
     
     lmmap = landmarkmap.map_from_conf(map_conf,nframes)
     # For now static robot 
     #robtraj = landmarkmap.robot_trajectory(np.array([[0,0,0],[20,20,0]]),0.01,np.pi/10)
-    robtraj = landmarkmap.robot_trajectory(np.array([[60,140,0],[0,175,0],[-60,140,0],[-60,-140,0],[60,-140,0]]),0.2,np.pi/10)
+    robtraj = landmarkmap.robot_trajectory(np.array([[60,140,0],[0,175,0],[-60,140,0],[-60,-140,0],[60,-140,0]]) / scale,0.2,np.pi/10)
     maxangle = 45*np.pi/180
-    maxdist = 120
+    maxdist = 120 / scale
     return nframes,lmmap,robtraj,maxangle,maxdist
 
 def Rtoquat(R):
@@ -212,8 +212,8 @@ def articulated_slam(debug_inp=True):
                                               # disable visualization
                                               lmvis=None)
 
-#lmvis = landmarkmap.LandmarksVisualizer([0,0], [7, 7], frame_period=-1,
-#imgshape=(700, 700))
+    lmvis = landmarkmap.LandmarksVisualizer([0,0], [7, 7], frame_period=-1,
+                                            imgshape=(700, 700))
     
     rob_obs_iter = list(rob_obs_iter)
     #frame_period = lmvis.frame_period
@@ -255,12 +255,12 @@ def articulated_slam(debug_inp=True):
         print 'Observations:',ldmk_robot_obs
         
         # Handle new robot view code appropriately
-        #robview = landmarkmap.RobotView((rob_state[0], rob_state[1], 0),
-        #       rob_state[2], img_shape, K, maxdist)
-        #img = lmvis.genframe(ldmks, robview)
-        #imgr = lmvis.drawrobot(robview, img)
-        #lmvis.imshow_and_wait(imgr)
-        #robview.visualize(robview.drawlandmarks(ldmks))
+        robview = landmarkmap.RobotView((rob_state[0], rob_state[1], 0), maxangle,maxdist,
+               rob_state[2], img_shape, K, maxdist)
+        img = lmvis.genframe(ldmks, robview)
+        imgr = lmvis.drawrobot(robview, img)
+        lmvis.imshow_and_wait(imgr)
+        robview.visualize(robview.drawlandmarks(ldmks))
         
         # Following EKF steps now
 

@@ -16,7 +16,6 @@ from scipy import ndimage
 import scipy.stats as sp
 import pdb
 import warnings
-import xlrd
 
 ##
 # @brief Main class for motion parameter of an articulated model

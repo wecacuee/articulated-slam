@@ -93,10 +93,10 @@ class RobotView(object):
         pos   : 3D position in robot plane
         theta : angle of rotation relative to x-axis with axis of rotation 
         """
-        self._pos = pos.reshape((3,1))
-        self._dir = theta 
-        self._maxangle = maxangle
-        self._maxdist = maxdist
+        #self._pos = pos.reshape((3,1))
+        #self._dir = theta 
+        #self._maxangle = maxangle
+        #self._maxdist = maxdist
 
 
         assert pos[2] == 0, "Robot is on Z-axis"
@@ -186,30 +186,30 @@ class RobotView(object):
         projected = self.projected(points3D)
         points3D_cam = homo2euc(self.T_w2c.dot(euc2homo(points3D)))
         # within image and closer than maxZ
-        #in_view = ((projected[0, :] >= 0) 
-        #           & (projected[0, :] < self._imgshape[1]) 
-        #           & (projected[1, :] >= 0) 
-        #           & (projected[1, :] < self._imgshape[0]) 
-        #           & (points3D_cam[2, :] >= 0.5) 
-        #           & (points3D_cam[2, :] < self.maxZ))
-        #return in_view
-        points = points3D
-        apex = np.hstack(self._pos)
-        theta = self._dir        
-        phi = 90*np.pi/180
-        base = np.array([[self._maxdist*np.cos(theta)*np.sin(phi)],
-                        [self._maxdist*np.sin(theta)*np.sin(phi)],
-                        [self._maxdist*np.cos(phi)]])
-        base = np.hstack(base) + np.array(apex)
-        in_view_pts = np.zeros(points.shape[1],dtype=bool) 
-        for it in range(points.shape[1]):
-            in_view_pts[it] = False 
-            ap2vec = apex - points[:,it]
-            axisvec = apex - base
-            policy1 = np.around(ap2vec.dot(axisvec)/np.linalg.norm(axisvec)/np.linalg.norm(ap2vec),3) >= np.around(np.cos(self._maxangle),3)
-            policy2 = np.around(ap2vec.dot(axisvec)/np.linalg.norm(axisvec),3) <= np.around(np.linalg.norm(axisvec),3)
-            in_view_pts[it] = policy1 & policy2
-        return in_view_pts
+        in_view = ((projected[0, :] >= 0) 
+                   & (projected[0, :] < self._imgshape[1]) 
+                   & (projected[1, :] >= 0) 
+                   & (projected[1, :] < self._imgshape[0]) 
+                   & (points3D_cam[2, :] >= 0.5) 
+                   & (points3D_cam[2, :] < self.maxZ))
+        return in_view
+        #points = points3D
+        #apex = np.hstack(self._pos)
+        #theta = self._dir        
+        #phi = 90*np.pi/180
+        #base = np.array([[self._maxdist*np.cos(theta)*np.sin(phi)],
+        #                [self._maxdist*np.sin(theta)*np.sin(phi)],
+        #                [self._maxdist*np.cos(phi)]])
+        #base = np.hstack(base) + np.array(apex)
+        #in_view_pts = np.zeros(points.shape[1],dtype=bool) 
+        #for it in range(points.shape[1]):
+        #    in_view_pts[it] = False 
+        #    ap2vec = apex - points[:,it]
+        #    axisvec = apex - base
+        #    policy1 = np.around(ap2vec.dot(axisvec)/np.linalg.norm(axisvec)/np.linalg.norm(ap2vec),3) >= np.around(np.cos(self._maxangle),3)
+        #    policy2 = np.around(ap2vec.dot(axisvec)/np.linalg.norm(axisvec),3) <= np.around(np.linalg.norm(axisvec),3)
+        #    in_view_pts[it] = policy1 & policy2
+        #return in_view_pts
 
 def rotmat_z(theta):
     '''
@@ -461,7 +461,7 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, imgshape, K, lmvis
         yield (ldmks_idx[0], [float(pos[0]), float(pos[1]),
                                              rob_theta,
                                              float(robot_inputs[0]),
-                                             float(robot_inputs[1])],ldmks,ldmk_robot_obs)
+                                             float(robot_inputs[1])], ldmks,ldmk_robot_obs)
 
 def map_from_conf(map_conf, nframes):
     """ Generate LandmarkMap from configuration """
