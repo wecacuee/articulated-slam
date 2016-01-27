@@ -426,7 +426,8 @@ def T_from_angle_pos(thetas, pos):
 
 def get_robot_observations(lmmap, robtraj, maxangle, maxdist, imgshape, K, lmvis=None):
     """ Return a tuple of r, theta and ids for each frame"""
-    """ v2.0 Return a tuple of lndmks in robot frame and ids for each frame"""
+    """ v2.0 Return a ituple of lndmks in robot frame and ids for each frame"""
+    prev_theta =  None
     for ldmks, posdir_and_inputs in itertools.izip(lmmap.get_landmarks(), 
                                        robtraj):
         posdir = posdir_and_inputs[:2]
@@ -451,6 +452,20 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, imgshape, K, lmvis
         #angles = np.arccos(dir.dot((selected_ldmks - pos))/dists)
         #obsvecs = selected_ldmks - pos
         rob_theta = np.arctan2(dir[1], dir[0])
+        # Wrap around for theta (to make it continuous)
+        #if prev_theta is not None and dis:
+        #    if abs(prev_theta - rob_theta) > np.pi/4:
+        #        import pdb;pdb.set_trace()
+        #        if prev_theta > 0.0:
+        #            n_int = np.ceil((((prev_theta /np.pi)-1)/2.0))
+        #            rob_theta = (2*n_int+1)*np.pi + rob_theta + np.pi
+        #        else:
+        #            n_int = np.floor((((prev_theta /np.pi)-1)/2.0))
+        #            rob_theta = -(2*n_int+1)*np.pi + np.pi - rob_theta
+        #            
+
+        #prev_theta = rob_theta 
+        
         #angles = np.arctan2(obsvecs[1, :], obsvecs[0, :]) - rob_theta
         ldmks_idx = np.where(in_view_ldmks)
         

@@ -80,24 +80,24 @@ def threeptmap3d():
                 delpos=np.array([0,0,0]) / scale)
                 for x,y,z in zip([10]*10 + range(10,191,20)+[190]*10+range(10,191,20),
                                  range(10,191,20)+[190]*10+range(10,191,20)+[10]*10,
-                                 [5]*10 + range(1,11,1)+[1]*10+range(1,11,1))
-                ]+[#Prismatic
-                dict(ldmks=np.array([[0,40,0]]).T / scale,
-                initthetas=[0,0,0],
-                initpos=np.array([0,0,0]) / scale,
-                delthetas=[0,0,0],
-                delpos=np.array([1,0,0]) / scale)
-                ]+[#Revolute
-                dict(ldmks=np.array([[40,40,0]]).T / scale,
-                initthetas=[0,0,0],
-                initpos=np.array([0,0,0]) / scale,
-                delthetas=[0,0,np.pi/10],
-                delpos=np.array([0,0,0]) / scale)]
+                                 [5]*10 + range(1,11,1)+[1]*10+range(1,11,1))]
+                #]+[#Prismatic
+                #dict(ldmks=np.array([[0,40,0]]).T / scale,
+                #initthetas=[0,0,0],
+                #initpos=np.array([0,0,0]) / scale,
+                #delthetas=[0,0,0],
+                #delpos=np.array([1,0,0]) / scale)
+                #]+[#Revolute
+                #dict(ldmks=np.array([[40,40,0]]).T / scale,
+                #initthetas=[0,0,0],
+                #initpos=np.array([0,0,0]) / scale,
+                #delthetas=[0,0,np.pi/10],
+                #delpos=np.array([0,0,0]) / scale)]
     
     lmmap = landmarkmap.map_from_conf(map_conf,nframes)
     # For now static robot 
     #robtraj = landmarkmap.robot_trajectory(np.array([[0,0,0],[20,20,0]]),0.01,np.pi/10)
-    robtraj = landmarkmap.robot_trajectory(np.array([[60,140,0],[0,175,0],[-60,140,0],[-60,-140,0],[60,-140,0]]) / scale,0.2,np.pi/10)
+    robtraj = landmarkmap.robot_trajectory(np.array([[110,90,0],[140,60,0],[120,50,0],[110,90,0],[140,60,0]]) / scale,0.2,np.pi/10)
     maxangle = 45*np.pi/180
     maxdist = 120 / scale
     return nframes,lmmap,robtraj,maxangle,maxdist
@@ -248,7 +248,7 @@ def articulated_slam(debug_inp=True):
         rob_state = rob_state_and_input[:3]
         robot_input = rob_state_and_input[3:]
         print '+++++++++++++ fidx = %d +++++++++++' % fidx
-        print 'Robot true state:', rob_state
+        print 'Robot true state:', rob_state 
         # v1.0
         #print 'Observations:', zip(rs, thetas, ids)
         # v2.0 
@@ -306,9 +306,9 @@ def articulated_slam(debug_inp=True):
             external landmark as we can and try to get enough data to estimate landmark's motion
             model. 
             '''
-            motion_class.process_inp_data([0,0], rob_state,ldmk_rob_obv,init_pt[id])
             # For each landmark id, we want to check if the motion model has been estimated
             if ldmk_am[id] is None:
+                motion_class.process_inp_data([0,0], rob_state,ldmk_rob_obv,init_pt[id])
                 # Still need to estimate the motion class
                 #import pdb; pdb.set_trace()
                 # Check if the model is estimated
@@ -408,6 +408,7 @@ def articulated_slam(debug_inp=True):
         f_slam.write(str(fidx+1)+" "+str(slam_state[0])+" "+str(slam_state[1])+" "+str(0)+" "+str(quat_slam[0])+" "+str(quat_slam[1])+" "+str(quat_slam[2])+" "+str(quat_slam[3])+" "+"\n")
         true_robot_states.append(rob_state)
         slam_robot_states.append(slam_state[0:3].tolist())
+        print 'SLAM state:',slam_state
     # end of loop over frames
 
     # Debugging
