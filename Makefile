@@ -7,15 +7,19 @@ PROJMIDDIR:=$(MIDDIR)/articulatedslam/2016-01-22
 .SECONDARY:
 
 bags:=all_static_2016-01-22-13-49-34 planar_2016-01-22-14-43-28 prism_2016-01-22-14-20-53 rev_2016-01-22-13-56-28 rev_2016-01-22-14-04-54 rev_2016-01-22-14-10-45 rev2_2016-01-22-14-32-13 rev_pris_2016-01-22-13-40-33 rev_prism_planar_2016-01-22-15-05-59
-targets:=$(foreach b,$(bags),$(PROJMIDDIR)/$(b)/extracttrajectories_GFTT_SIFT.avi) $(foreach b,$(bags),$(PROJMIDDIR)/$(b)/extracttrajectories_GFTT_SIFT.pickle)#$(foreach b,$(bags),$(PROJMIDDIR)/$(b)/densetraj.gz) $(foreach b,$(bags),$(PROJMIDDIR)/$(b)/densetraj.avi)
+targets:=$(foreach b,$(bags),$(PROJMIDDIR)/$(b)/extracttrajectories_GFTT_SIFT.avi) $(foreach b,$(bags),$(PROJMIDDIR)/$(b)/extracttrajectories_GFTT_SIFT_timeseries.pickle)#$(foreach b,$(bags),$(PROJMIDDIR)/$(b)/densetraj.gz) $(foreach b,$(bags),$(PROJMIDDIR)/$(b)/densetraj.avi)
 all: $(targets) 
 
 # Data dir to MID DIR
 $(PROJMIDDIR)/%.bag: $(PROJDATADIR)/%.bag
 	if [ -e $@ ] ; then true; else ln -sT $< $@; fi
 
+%/extracttrajectories_GFTT_SIFT_timeseries.pickle: %/extracttrajectories_GFTT_SIFT.pickle scripts/track_collection_to_time_series.py
+	source /opt/ros/indigo/setup.bash && \
+	    python scripts/track_collection_to_time_series.py < $< > $@
+
 # Recipe to convert bag to 2D SIFT trajectories
-%/extracttrajectories_GFTT_SIFT.avi %/extracttrajectories_GFTT_SIFT.pickle: %.bag scripts/extracttrajectories.py
+%/extracttrajectories_GFTT_SIFT.avi %/extracttrajectories_GFTT_SIFT.pickle: %.bag
 	mkdir -p $(dir $@) && \
 	    source /opt/ros/indigo/setup.bash && \
 	    python scripts/extracttrajectories.py $< $*/extracttrajectories_%s_%s.avi $*/extracttrajectories_%s_%s.pickle
