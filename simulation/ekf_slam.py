@@ -88,23 +88,23 @@ def cartesian_to_bearing(obs,robot_state):
 def threeptmap():
     nframes = 100
     map_conf = [# static
-                dict(ldmks=np.array([[0, 0]]).T,
-                     inittheta=0,
-                # Where do we obtain the x and y from?   
-                     initpos=[x, y],
-                     deltheta=0,
-                     delpos=[0,0]) 
-                for x,y in zip([10] * 10 + range(10, 191, 20) + [190]*10 +
-                               range(10, 191, 20),
-                               range(10, 191, 20) + [190]*10 + 
-                               range(10, 191, 20) + [10] * 10
-                              )
-               ]+ [# prismatic
+               # dict(ldmks=np.array([[0, 0]]).T,
+               #      inittheta=0,
+               # # Where do we obtain the x and y from?   
+               #      initpos=[x, y],
+               #      deltheta=0,
+               #      delpos=[0,0]) 
+               # for x,y in zip([10] * 10 + range(10, 191, 20) + [190]*10 +
+               #                range(10, 191, 20),
+               #                range(10, 191, 20) + [190]*10 + 
+               #                range(10, 191, 20) + [10] * 10
+               #               )
+               #]+ [# prismatic
                 dict(ldmks=np.array([[10,10]]).T,
                      inittheta=0,
                      initpos=[120,10],
                      deltheta=0,
-                     delpos=[5,0]),
+                     delpos=[5,0])]
                 # revolute
                 dict(ldmks=np.array([[0,20]]).T, # point wrt rigid body frame
                      inittheta=np.pi,            # initial rotation
@@ -134,33 +134,39 @@ def Rtoquat(R):
 
 def threeptmap3d():
     nframes = 100
-    map_conf=   [#static
-                dict(ldmks=np.array([[0,10,0,]]).T,
-                initthetas=[0,0,0],
-                initpos=[0,0,0],
-                delthetas=[0,0,np.pi/10],
-                delpos=[0,0,0])]    
-    #map_conf=  [#static
-    #            dict(ldmks=np.array([[0,0,0,]]).T,
+    #map_conf=   [#static
+    #            dict(ldmks=np.array([[0,10,0,]]).T,
     #            initthetas=[0,0,0],
-    #            initpos=[x,y,z],
-    #            delthetas=[0,0,0],
-    #            delpos=[0,0,0])
-    #            for x,y,z in zip([10]*10 + range(10,191,20)+[190]*10+range(10,191,20),
-    #                             range(10,191,20)+[190]*10+range(10,191,20)+[10]*10,
-    #                             [5]*10 + range(1,11,1)+[1]*10+range(1,11,1))
-    #            ]+[#Prismatic
-    #           dict(ldmks=np.array([[0,0,0]]).T,
-    #           initthetas=[0,0,0],
-    #           initpos=[-1,0,0],
-    #           delthetas=[0,0,0],
-    #           delpos=[0,0.5,0])]
+    #            initpos=[0,0,0],
+    #            delthetas=[0,0,np.pi/10],
+    #            delpos=[0,0,0])]    
+    map_conf=  [#static
+                dict(ldmks=np.array([[0,0,0,]]).T,
+                initthetas=[0,0,0],
+                initpos=[x,y,z],
+                delthetas=[0,0,0],
+                delpos=[0,0,0])
+                for x,y,z in zip([10]*10 + range(10,191,20)+[190]*10+range(10,191,20),
+                                 range(10,191,20)+[190]*10+range(10,191,20)+[10]*10,
+                                 [5]*10 + range(1,11,1)+[1]*10+range(1,11,1))
+                ]+[#Prismatic
+               dict(ldmks=np.array([[0,0,0]]).T,
+               initthetas=[0,0,0],
+               initpos=[0,40,0],
+               delthetas=[0,0,0],
+               delpos=[1,0,0])
+               ]+[#Revolute
+               dict(ldmks=np.array([[40,40,0]]).T,
+               initthetas=[0,0,0],
+               initpos=[0,0,0],
+               delthetas=[0,0,np.pi/10],
+               delpos=[0,0,0])]
 
  
     lmmap = landmarkmap.map_from_conf(map_conf,nframes)
     # For now static robot 
-    robtraj = landmarkmap.robot_trajectory(np.array([[0,0,0],[20,20,0]]),0.01,np.pi/10)
-    #robtraj = landmarkmap.robot_trajectory(np.array([[60,140,0],[0,175,0],[-60,140,0],[-60,-140,0],[60,-140,0]]),0.2,np.pi/10)
+    #robtraj = landmarkmap.robot_trajectory(np.array([[0,0,0],[20,20,0]]),0.01,np.pi/10)
+    robtraj = landmarkmap.robot_trajectory(np.array([[60,140,0],[0,175,0],[-60,140,0],[-60,-140,0],[60,-140,0]]),0.2,np.pi/10)
     maxangle = 45*np.pi/180
     maxdist = 120 
     return nframes,lmmap,robtraj,maxangle,maxdist

@@ -65,33 +65,39 @@ import matplotlib.pyplot as plt
 
 def threeptmap3d():
     nframes = 100
-    map_conf=   [#static
-                dict(ldmks=np.array([[0,0,0,]]).T,
-                initthetas=[0,0,0],
-                initpos=[0,10,0],
-                delthetas=[0,0,0*np.pi/10],
-                delpos=[0.5,0,0])]
     #map_conf=   [#static
     #            dict(ldmks=np.array([[0,0,0,]]).T,
     #            initthetas=[0,0,0],
-    #            initpos=[x,y,z],
-    #            delthetas=[0,0,0],
-    #            delpos=[0,0,0])
-    #            for x,y,z in zip([10]*10 + range(10,191,20)+[190]*10+range(10,191,20),
-    #                             range(10,191,20)+[190]*10+range(10,191,20)+[10]*10,
-    #                             [5]*10 + range(1,11,1)+[1]*10+range(1,11,1))
-    #            ]+[#Prismatic
-    #            dict(ldmks=np.array([[0,0,0]]).T,
-    #            initthetas=[0,0,0],
-    #            initpos=[-1,0,0],
-    #            delthetas=[0,0,0],
-    #            delpos=[0,-0.5,0])]
+    #            initpos=[0,10,0],
+    #            delthetas=[0,0,0*np.pi/10],
+    #            delpos=[0.5,0,0])]
+    map_conf=   [#static
+                #dict(ldmks=np.array([[0,0,0,]]).T,
+                #initthetas=[0,0,0],
+                #initpos=[x,y,z],
+                #delthetas=[0,0,0],
+                #delpos=[0,0,0])
+                #for x,y,z in zip([10]*10 + range(10,191,20)+[190]*10+range(10,191,20),
+                #                 range(10,191,20)+[190]*10+range(10,191,20)+[10]*10,
+                #                 [5]*10 + range(1,11,1)+[1]*10+range(1,11,1))]
+                #]+[#Prismatic
+                dict(ldmks=np.array([[0,0,0]]).T,
+                initthetas=[0,0,0],
+                initpos=[0,40,0],
+                delthetas=[0,0,0],
+                delpos=[1,0,0])]
+                #]+[#Revolute
+                #dict(ldmks=np.array([[40,40,0]]).T,
+                #initthetas=[0,0,0],
+                #initpos=[0,0,0],
+                #delthetas=[0,0,np.pi/10],
+                #delpos=[0,0,0])]
 
     
     lmmap = landmarkmap.map_from_conf(map_conf,nframes)
     # For now static robot 
-    robtraj = landmarkmap.robot_trajectory(np.array([[0,0,0],[20,20,0]]),0.01,np.pi/10)
-    #robtraj = landmarkmap.robot_trajectory(np.array([[60,140,0],[0,175,0],[-60,140,0],[-60,-140,0],[60,-140,0]]),0.2,np.pi/10)
+    #robtraj = landmarkmap.robot_trajectory(np.array([[0,0,0],[20,20,0]]),0.01,np.pi/10)
+    robtraj = landmarkmap.robot_trajectory(np.array([[60,140,0],[0,175,0],[-60,140,0],[-60,-140,0],[60,-140,0]]),2,np.pi/10)
     maxangle = 45*np.pi/180
     maxdist = 120 
     return nframes,lmmap,robtraj,maxangle,maxdist
@@ -229,7 +235,6 @@ def articulated_slam(debug_inp=True):
     slam_robot_states = []
     # Processing all the observations
     # v1.0 Need to update to v2.0 with no rs and thetas
-    #for fidx, (rs, thetas, ids, rob_state_and_input, ldmks,ldmk_robot_obs) in enumerate(rob_obs_iter[1:]): 
     # v2.0 Expected format
     for fidx,(ids,rob_state_and_input, ldmks, ldmk_robot_obs) in enumerate(rob_obs_iter[1:]):    
         rob_state = rob_state_and_input[:3]
@@ -277,7 +282,7 @@ def articulated_slam(debug_inp=True):
     
         # Processing all the observations
         # v2.0
-        for id, ldmk_rob_obv in zip(ids,np.dstack(ldmk_robot_obs)):
+        for id, ldmk_rob_obv in zip(ids,np.dstack(ldmk_robot_obs)[0]):
            
             motion_class = ldmk_estimater.setdefault(id, mm.Estimate_Mm())
             # For storing the chosen articulated model
@@ -327,12 +332,11 @@ def articulated_slam(debug_inp=True):
                 pos_list = np.ndarray.tolist(slam_state[0:2])
                 pos_list.append(0.0)
                 z_pred = R_temp.dot(lk_pred-np.array(pos_list))
-
                 
                 # v2.0 : New definition
                 H_mat = np.zeros((3,index_set[-1]))
                 # v2.0 Need to modify based on 3D rotation matrix jacobian: Need to find the updated theta value
-                curr_obs = ldmk_rob_obv[0]
+                curr_obs = ldmk_rob_obv
                 theta = slam_state[2]
                 H_mat[0,0:3] = np.array([-np.cos(theta),-np.sin(theta),-np.sin(theta)*curr_obs[0]- np.cos(theta)*curr_obs[1]])
                 H_mat[1,0:3] = np.array([-np.sin(theta),+np.cos(theta),(np.cos(theta)*curr_obs[0])-(np.sin(theta)*curr_obs[1])])
@@ -351,7 +355,7 @@ def articulated_slam(debug_inp=True):
                 
                 # Updating SLAM state
                 # v2.0
-                slam_state = slam_state + np.hstack((np.dot(K_mat,(np.vstack((ldmk_rob_obv-z_pred)[0])))))               
+                slam_state = slam_state + np.hstack((np.dot(K_mat,(np.vstack((ldmk_rob_obv-z_pred))))))               
                 # Updating SLAM covariance
                 slam_cov = np.dot(np.identity(slam_cov.shape[0])-np.dot(K_mat,H_mat),slam_cov)
             # end of if else ldmk_am[id]
