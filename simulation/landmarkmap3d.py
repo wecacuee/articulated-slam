@@ -111,11 +111,13 @@ class RobotView(object):
         # Default equation is for z = 0
         self._robot_plane = np.array([[0, 0, 1, 0]]).T
         self.T_w2c = np.eye(4)
-        camera_rot = np.array([[0, -1, 0],
-                [0, 0, -1],
-                [1, 0, 0]])
-        self.T_w2c[:3, :3] = rodrigues([0, -1, 0], theta).dot(camera_rot).T
-        self.T_w2c[:3, 3] = self.robot_plane_basis().dot(pos)
+        R_w2c = rodrigues([0, 1, 0], theta).dot(
+            rodrigues([0, 1, 0], -np.pi/2)).dot(
+                rodrigues([1, 0, 0], np.pi/2))
+        self.T_w2c[:3, :3] = R_w2c
+        t_c2w = self.robot_plane_basis().dot(pos)
+        # t_w2c = - R_c2w.T.dot(t_c2w)
+        self.T_w2c[:3, 3] = - R_w2c.dot(t_c2w)
 
         self._win_name = "d"
         self._wait_period = 30
@@ -124,24 +126,26 @@ class RobotView(object):
         xaxis = np.array([[1, 0, 0]]).T
         yaxis = np.array([[0, 1, 0]]).T
         plane_normal = self._robot_plane[:3, :]
-        plane_normal /= np.linalg.norm(plane_normal)
+        plane_normal = plane_normal / np.linalg.norm(plane_normal)
         return np.hstack((xaxis - xaxis.T.dot(plane_normal), 
                           yaxis - yaxis.T.dot(plane_normal)))
 
     def pos_dir_z(self):
         zaxis = self._robot_plane[:3]
-        pos = self.T_w2c[:3, 3:]
+        # 0 = R_w2c * pos + t_w2c
+        # 0 = pos + R_w2c.T * t_w2c
+        pos = - self.T_w2c[:3, :3].T.dot(self.T_w2c[:3, 3:])
         pos_z = pos - zaxis.T.dot(pos)
-        xaxis = np.array([[1, 0, 0]]).T
-        dir = self.T_w2c[:3, :3].T.dot(zaxis)
-        dir_z = dir - zaxis.T.dot(dir)
+        zaxis = np.array([[0, 0, 1]]).T
+        dir_ = self.T_w2c[:3, :3].T.dot(zaxis)
+        dir_z = dir_ - zaxis.T.dot(dir_)
         return (pos, dir_z / np.linalg.norm(dir_z))
 
     def maxangle_z(self):
-        u1 = self._K.dot([self._imgshape[0], 0, 1])
-        u1 /= np.linalg.norm(u1)
+        u1 = self._K.dot([self._imgshape[1], 0, 1])
+        u1 = u1 / np.linalg.norm(u1)
         u2 = self._K.dot([0, 0, 1])
-        u2 /= np.linalg.norm(u2)
+        u2 = u2 / np.linalg.norm(u2)
         return np.arccos(u2.T.dot(u1))
 
     def projected(self, points3D):
@@ -155,10 +159,11 @@ class RobotView(object):
         img = np.ones((self._imgshape[0], self._imgshape[1], 3),
                       dtype=np.uint8) * 255
         radius = 2
-        projected = self.projected(points3D)
+        projected = self.projected_in_view(points3D)
         pt2 = projected + radius
         for i in range(pt2.shape[1]):
-            cv2.rectangle(img, tuple(np.int64(projected[:, i])),
+            cv2.rectangle(img, 
+                          tuple(np.int64(projected[:, i])),
                           tuple(np.int64(pt2[:, i])),
                           (0, 0, 255), thickness=-1)
         return img
@@ -167,10 +172,19 @@ class RobotView(object):
         cv2.imshow(self._win_name, img)
         cv2.waitKey(self._wait_period)
 
+    def projected_in_view(self, points3D):
+        projected = self.projected(points3D)
+        in_view = ((projected[0, :] >= 0) 
+                   & (projected[0, :] < self._imgshape[1]) 
+                   & (projected[1, :] >= 0) 
+                   & (projected[1, :] < self._imgshape[0]))
+        return projected[:, in_view]
+
+
     def in_view(self, points3D):
         """ Returns true for points that are within view """
-        #projected = self.projected(points3D)
-        #points3D_cam = homo2euc(self.T_w2c.dot(euc2homo(points3D)))
+        projected = self.projected(points3D)
+        points3D_cam = homo2euc(self.T_w2c.dot(euc2homo(points3D)))
         # within image and closer than maxZ
         #in_view = ((projected[0, :] >= 0) 
         #           & (projected[0, :] < self._imgshape[1]) 

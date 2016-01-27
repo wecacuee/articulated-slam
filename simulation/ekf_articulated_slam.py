@@ -184,7 +184,7 @@ def articulated_slam(debug_inp=True):
     # Writing to file variables
     f_gt = open('gt.txt','w')
     f_slam = open('slam.txt','w')    
-    img_shape = (960, 320)
+    img_shape = (240, 320)
     f = 300
     K = np.array([[f, 0, img_shape[1]/2], [0, f, img_shape[0]/2], [0, 0, 1]])
 
