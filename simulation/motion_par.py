@@ -16,6 +16,7 @@ from scipy import ndimage
 import scipy.stats as sp
 import pdb
 import warnings
+import xlrd
 
 ##
 # @brief Main class for motion parameter of an articulated model
@@ -192,9 +193,9 @@ class Motion_Par:
 
 if __name__=="__main__":
     # Order of the motion that we are expecting
-    motion_order = 3 # 1 is static, 2 is constant velocity model
+    motion_order = 1 # 1 is static, 2 is constant velocity model
     dt = 1.0 # Time steps of dt sec
-    const_vel = motion_par(motion_order,dt)
+    const_vel = Motion_Par(motion_order,dt)
     # Reading the data from the excel file
     wb = xlrd.open_workbook('../temp/output_angles_ground_truth.xls')
     sh = wb.sheet_by_index(0)

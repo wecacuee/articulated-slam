@@ -74,7 +74,7 @@ def robot_to_world(robot_state,gen_obv):
                 [0,0,1]])
     # v2.0 
     # State is (x,y,0) since we assume robot is on the ground
-    return R.dot(gen_obv[0] - np.array([x,y,0]))
+    return R.T.dot(gen_obv)+ np.array([x,y,0])
 
 
 # x,y in cartesian to robot bearing and range
@@ -135,27 +135,34 @@ def Rtoquat(R):
 def threeptmap3d():
     nframes = 100
     map_conf=   [#static
-                dict(ldmks=np.array([[0,0,0,]]).T,
+                dict(ldmks=np.array([[0,10,0,]]).T,
                 initthetas=[0,0,0],
-                initpos=[x,y,z],
-                delthetas=[0,0,0],
-                delpos=[0,0,0])
-                for x,y,z in zip([10]*10 + range(10,191,20)+[190]*10+range(10,191,20),
-                                 range(10,191,20)+[190]*10+range(10,191,20)+[10]*10,
-                                 [5]*10 + range(1,11,1)+[1]*10+range(1,11,1))
-                ]+[#Prismatic
-                dict(ldmks=np.array([[0,0,0]]).T,
-                initthetas=[0,0,0],
-                initpos=[-1,0,0],
-                delthetas=[0,0,0],
-                delpos=[0,-0.5,0])]
+                initpos=[0,0,0],
+                delthetas=[0,0,np.pi/10],
+                delpos=[0,0,0])]    
+    #map_conf=  [#static
+    #            dict(ldmks=np.array([[0,0,0,]]).T,
+    #            initthetas=[0,0,0],
+    #            initpos=[x,y,z],
+    #            delthetas=[0,0,0],
+    #            delpos=[0,0,0])
+    #            for x,y,z in zip([10]*10 + range(10,191,20)+[190]*10+range(10,191,20),
+    #                             range(10,191,20)+[190]*10+range(10,191,20)+[10]*10,
+    #                             [5]*10 + range(1,11,1)+[1]*10+range(1,11,1))
+    #            ]+[#Prismatic
+    #           dict(ldmks=np.array([[0,0,0]]).T,
+    #           initthetas=[0,0,0],
+    #           initpos=[-1,0,0],
+    #           delthetas=[0,0,0],
+    #           delpos=[0,0.5,0])]
 
  
     lmmap = landmarkmap.map_from_conf(map_conf,nframes)
     # For now static robot 
-    robtraj = landmarkmap.robot_trajectory(np.array([[60,140,0],[0,175,0],[-60,140,0],[-60,-140,0],[60,-140,0]]),2,np.pi/10)
+    robtraj = landmarkmap.robot_trajectory(np.array([[0,0,0],[20,20,0]]),0.01,np.pi/10)
+    #robtraj = landmarkmap.robot_trajectory(np.array([[60,140,0],[0,175,0],[-60,140,0],[-60,-140,0],[60,-140,0]]),0.2,np.pi/10)
     maxangle = 45*np.pi/180
-    maxdist = 120
+    maxdist = 120 
     return nframes,lmmap,robtraj,maxangle,maxdist
 
 
@@ -176,7 +183,8 @@ def visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state_2D,
 
 '''
 Propagates robot motion with two different models, one for linear velocity
-and other one for a combination of linear and rotational velocity
+and other one for a combination of linear.dot(gen_obv - np.array([x,y,0]))
+
 Inputs are: 
 Previous robot state,
 covarinace in previous state,
@@ -292,7 +300,7 @@ def slam(debug_inp=True):
         # Collecting all the predictions made by the landmark
         ids_list = []
         # Processing all the observations
-        for id,ldmk_rob_obv in zip(ids,np.dstack(ldmk_robot_obs)):
+        for id,ldmk_rob_obv in zip(ids,np.dstack(ldmk_robot_obs)[0]):
             # Observation corresponding to current landmark is
             #obs = np.array([r, theta])
             '''
@@ -309,7 +317,7 @@ def slam(debug_inp=True):
                 ldmk_am[id] = 2
                 ld_ids.append(id)
                 # Getting the current state to be added to the SLAM state (x,y) position of landmark
-                curr_ld_state = robot_to_world(rob_state,ldmk_rob_obv)
+                curr_ld_state = robot_to_world(slam_state,ldmk_rob_obv)
                 curr_ld_cov = initial_cov 
                 index_set.append(index_set[-1]+curr_ld_state.shape[0])
                 # Extend Robot state by adding the motion parameter of the landmark
@@ -327,13 +335,11 @@ def slam(debug_inp=True):
                 # Following steps from Table 10.2 from book Probabilistic Robotics
                 lk_pred = robot_to_world(slam_state[0:3],ldmk_rob_obv)
                 
-                R_temp = np.array([[np.cos(-slam_state[2]), -np.sin(-slam_state[2]),0],
-                         [np.sin(-slam_state[2]), np.cos(-slam_state[2]),0],
+                R_temp = np.array([[np.cos(slam_state[2]), -np.sin(slam_state[2]),0],
+                         [np.sin(slam_state[2]), np.cos(slam_state[2]),0],
                          [0,0,1]])
 
-                pos_list = np.ndarray.tolist(slam_state[0:2])
-                pos_list.append(0.0)
-                z_pred = R_temp.T.dot(lk_pred)+np.array(pos_list)
+                z_pred = R_temp.dot(slam_state[index_set[curr_ind]:index_set[curr_ind+1]] - np.append(slam_state[0:2],[0]))
 
                 #diff_vec = lk_pred-slam_state[0:2]
                 #q_val = np.dot(diff_vec,diff_vec)
@@ -341,12 +347,12 @@ def slam(debug_inp=True):
                 # Getting the jacobian matrix 
                 H_mat = np.zeros((3,index_set[-1]))
                 # w.r.t robot state
-                curr_obs = ldmk_rob_obv[0]
+                curr_obs = ldmk_rob_obv
                 theta = slam_state[2]
-                H_mat[0,0:3] = np.array([1,0,-np.sin(theta)*curr_obs[0] - np.cos(theta)*curr_obs[1]])
-                H_mat[1,0:3] = np.array([0,1,(np.cos(theta)-np.sin(theta))*curr_obs[0] - (np.cos(theta)+np.sin(theta))*curr_obs[1]])
-                H_mat[2,0:3] = np.array([0,0,(np.sin(theta)+np.cos(theta))*curr_obs[0] + (np.cos(theta)+np.sin(theta))*curr_obs[1]])
-                H_mat[:,index_set[curr_ind]:index_set[curr_ind+1]] = np.dot(np.diag(np.ones(3)),np.array([[1],[1],[1]]))
+                H_mat[0,0:3] = np.array([-np.cos(theta),-np.sin(theta),-np.sin(theta)*curr_obs[0] + np.cos(theta)*curr_obs[1]])
+                H_mat[1,0:3] = np.array([np.sin(theta),-np.cos(theta),(-np.cos(theta)*curr_obs[0]) - (np.sin(theta)*curr_obs[1])])
+                H_mat[2,0:3] = np.array([0,0,0])
+                H_mat[:,index_set[curr_ind]:index_set[curr_ind+1]] = np.dot(R_temp,np.array([[1],[1],[1]]))
 
 
                 # w.r.t landmark associated states
@@ -360,7 +366,7 @@ def slam(debug_inp=True):
                 # Kalman Gain
                 K_mat = np.dot(np.dot(slam_cov,H_mat.T),np.linalg.inv(inno_cov))
                 # Updating SLAM state
-                slam_state = slam_state+np.hstack((np.dot(K_mat,np.vstack((ldmk_rob_obv-z_pred)[0]))))
+                slam_state = slam_state+np.hstack((np.dot(K_mat,np.vstack((ldmk_rob_obv-z_pred)))))
                 # Updating SLAM covariance
                 slam_cov = np.dot(np.identity(slam_cov.shape[0])-np.dot(K_mat,H_mat),slam_cov)
             # end of if else ldmk_am[id]
@@ -381,11 +387,11 @@ def slam(debug_inp=True):
         #up.slam_cov_plot(slam_state,slam_cov,obs_num,rob_state,ld_preds,ld_ids_preds)
         #visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state[:2],
         #                          slam_cov[:2, :2], colors)
-        R_temp_true = np.array([[np.cos(-rob_state[2]), -np.sin(-rob_state[2]),0],
-                      [np.sin(-rob_state[2]), np.cos(-rob_state[2]),0],
+        R_temp_true = np.array([[np.cos(rob_state[2]), -np.sin(rob_state[2]),0],
+                      [np.sin(rob_state[2]), np.cos(rob_state[2]),0],
                       [0,0,1]])
-        R_temp = np.array([[np.cos(-slam_state[2]), -np.sin(-slam_state[2]),0],
-                      [np.sin(-slam_state[2]), np.cos(-slam_state[2]),0],
+        R_temp = np.array([[np.cos(slam_state[2]), -np.sin(slam_state[2]),0],
+                      [np.sin(slam_state[2]), np.cos(slam_state[2]),0],
                       [0,0,1]])
  
         quat_true = Rtoquat(R_temp_true)

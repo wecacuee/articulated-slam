@@ -422,7 +422,6 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, imgshape, K, lmvis
         in_view_ldmks = robview.in_view(ldmks)
         selected_ldmks = ldmks[:, in_view_ldmks]
         pos = posdir[0].reshape(3,1)
-        
         # v1.0 Need to update after new model has been implemented
         #dists = np.sqrt(np.sum((selected_ldmks - pos)**2, 0))
         dir = posdir[1]
@@ -439,7 +438,7 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, imgshape, K, lmvis
         yield (ldmks_idx[0], [float(pos[0]), float(pos[1]),
                                              rob_theta,
                                              float(robot_inputs[0]),
-                                             float(robot_inputs[1])], ldmks,ldmk_robot_obs)
+                                             float(robot_inputs[1])],ldmks,ldmk_robot_obs)
 
 def map_from_conf(map_conf, nframes):
     """ Generate LandmarkMap from configuration """
