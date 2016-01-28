@@ -6,7 +6,8 @@ from collections import deque, namedtuple
 import rospy
 import rosbag
 
-from extracttrajectories import TimeSeriesSerializer
+from dataio import (TimeSeriesSerializer, FeaturesOdomGTSerializer,
+                    FeaturesOdomGT)
 
 class ClosestTimeSeriesPoint(object):
     def __init__(self):
@@ -46,9 +47,6 @@ def odom_msg_to_pose_twist(odom_msg):
             (tuplexyz(odom_msg.twist.twist.linear),
              tuplexyz(odom_msg.twist.twist.angular),))
 
-FeaturesOdomGT = namedtuple('FeaturesOdomGT', ['tracked_points', 'odom',
-                                               'gt_pose'])
-
 def sync_features_odom_gt(feature_time_series, bag_file, robot_gt):
     bag = rosbag.Bag(bag_file)
 
@@ -77,59 +75,6 @@ def sync_features_odom_gt(feature_time_series, bag_file, robot_gt):
             raise StopIteration()
 
         yield FeaturesOdomGT(tracked_points, pose_twist_odom, gt_msg)
-
-class FeaturesOdomGTSerializer(object):
-    def dump(self, file, feat_odom_gt_iter, timestamps):
-        file.write("\t".join(map(str, timestamps)))
-        file.write("\n")
-        feat_serializer = TimeSeriesSerializer()
-        for feat, odom, gt_pos in feat_odom_gt_iter:
-            cols = list() 
-            (pos, quat), (linvel, angvel) = odom
-            cols.extend(pos)
-            cols.extend(quat)
-            cols.extend(linvel)
-            cols.extend(angvel)
-
-            xyz, abg = gt_pos
-            cols.extend(xyz)
-            cols.extend(abg)
-
-            feature_str = feat_serializer.serialize_tracked_pts(feat)
-            cols.append(feature_str)
-            file.write("\t".join(map(str, cols)))
-            file.write("\n")
-
-    def load(self, file):
-        timestamps = self.init_load(file)
-
-        timeseries = dict()
-        for ts_idx,tracked_points in enumerate(self.load_iter(file)):
-            timeseries[ts_idx] = tracked_points
-
-        return timeseries, timestamps
-
-    def init_load(self, file):
-        line = file.readline().strip()
-        timestamps = map(int, line.split("\t"))
-        return timestamps
-
-    def load_iter(self, file):
-        feat_serializer = TimeSeriesSerializer()
-        for line in file:
-            cols = line.strip().split("\t")
-            pos = cols[:3]
-            quat = cols[3:7]
-            linvel = cols[7:10]
-            angvel = cols[10:13]
-            odom = (pos, quat), (linvel, angvel)
-
-            xyz = cols[13:16]
-            abg = cols[16:19]
-            gt_pose = (xyz, abg)
-
-            features = feat_serializer.unpack_tracked_pts(cols[19:])
-            yield FeaturesOdomGT(features, odom, gt_pose)
 
 def main(feature_time_series, bag_file, robot_gt, feat_odom_gt_out):
     time_series_reader = TimeSeriesSerializer()

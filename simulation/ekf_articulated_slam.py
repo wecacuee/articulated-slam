@@ -142,7 +142,8 @@ covarinace in previous state,
 actual robot input (translational and rotational component),
 and time interval
 '''
-def robot_motion_prop(prev_state,prev_state_cov,robot_input,delta_t=1):
+def robot_motion_prop(prev_state,prev_state_cov,robot_input,delta_t=1, 
+                     motion_model='nonholonomic'):
     # Robot input is [v,w]^T where v is the linear velocity and w is the rotational component
     v = robot_input[0];w=robot_input[1];
     # Robot state is [x,y,\theta]^T, where x,y is the position and \theta is the orientation
@@ -150,35 +151,59 @@ def robot_motion_prop(prev_state,prev_state_cov,robot_input,delta_t=1):
     robot_state = np.zeros(3)
     # Setting noise parameters, following Page 210 Chapter 7, Mobile Robot Localization of 
     alpha_1 = 0.1; alpha_2=0.05; alpha_3 = 0.05; alpha_4 = 0.1
-    # M for transferring noise from input space to state-space
-    M = np.array([[(alpha_1*(v**2))+(alpha_2*(w**2)),0],[0,(alpha_3*(v**2))+(alpha_4*(w**2))]])
     
-    # Check if rotational velocity is close to 0
-    if (abs(w)<1e-4):
-        robot_state[0] = x+(v*delta_t*np.cos(theta))        
-        robot_state[1] = y+(v*delta_t*np.sin(theta))        
-        robot_state[2] = theta
-        # Derivative of forward dynamics model w.r.t previous robot state
-        G = np.array([[1,0,-v*delta_t*np.sin(theta)],\
-                [0,1,v*delta_t*np.cos(theta)],\
-                [0,0,1]])
-        # Derivative of forward dynamics model w.r.t robot input
-        V = np.array([[delta_t*np.cos(theta),0],[delta_t*np.sin(theta),0],[0,0]])
+    if motion_model == 'holonomic':
+        vx, vy = v
+        robot_state = np.array([
+            x+(vx*np.cos(theta) - vy*np.sin(theta)) * delta_t,
+            y+(vx*np.sin(theta) + vy*np.cos(theta)) * delta_t,
+            theta + w * delta_t
+        ])
+        M = np.array([[(alpha_1*(vx**2))+(alpha_1*(vy**2))+(alpha_2*(w**2)),0, 0],
+                      [0, (alpha_1*(vx**2))+(alpha_1*(vy**2))+(alpha_2*(w**2)), 0],
+                      [0, 0, (alpha_3*(vx**2))+(alpha_3*(vy**2))+(alpha_4*(w**2))]])
+        # G = \del robot_state / \del [x,y,theta]
+        G = np.array(
+            [[1, 0, (-vx * np.sin(theta) - vy * np.cos(theta)) * delta_t],
+             [0, 1, (vx * np.cos(theta) - vy * np.sin(theta) ) * delta_t],
+             [0, 0,                                                    1]])
+
+        # V = \del robot_state / \del [vx, vy, w]
+        V = np.array(
+            [[np.cos(theta) * delta_t, -np.sin(theta) * delta_t, 0],
+             [np.sin(theta) * delta_t,  np.cos(theta) * delta_t, 0],
+             [                      0,                        0, 1]])
+    elif motion_model == 'nonholonomic':
+        # M for transferring noise from input space to state-space
+        M = np.array([[(alpha_1*(v**2))+(alpha_2*(w**2)),0],[0,(alpha_3*(v**2))+(alpha_4*(w**2))]])
+        # Check if rotational velocity is close to 0
+        if (abs(w)<1e-4):
+            robot_state[0] = x+(v*delta_t*np.cos(theta))        
+            robot_state[1] = y+(v*delta_t*np.sin(theta))        
+            robot_state[2] = theta
+            # Derivative of forward dynamics model w.r.t previous robot state
+            G = np.array([[1,0,-v*delta_t*np.sin(theta)],\
+                    [0,1,v*delta_t*np.cos(theta)],\
+                    [0,0,1]])
+            # Derivative of forward dynamics model w.r.t robot input
+            V = np.array([[delta_t*np.cos(theta),0],[delta_t*np.sin(theta),0],[0,0]])
+        else:
+            # We have a non-zero rotation component
+            robot_state[0] = x+(((-v/w)*np.sin(theta))+((v/w)*np.sin(theta+w*delta_t)))
+            robot_state[1] = y+(((v/w)*np.cos(theta))-((v/w)*np.cos(theta+w*delta_t)))
+            robot_state[2] = theta+(w*delta_t)
+            G = np.array([[1,0,(v/w)*(-np.cos(theta)+np.cos(theta+w*delta_t))],\
+                    [0,1,(v/w)*(-np.sin(theta)+np.sin(theta+w*delta_t))],\
+                    [0,0,1]])
+            # Derivative of forward dynamics model w.r.t robot input
+            # Page 206, Eq 7.11
+            V = np.array([[(-np.sin(theta)+np.sin(theta+w*delta_t))/w,\
+                    (v*(np.sin(theta)-np.sin(theta+w*delta_t)))/(w**2)+((v*np.cos(theta+w*delta_t)*delta_t)/w)],\
+                    [(np.cos(theta)-np.cos(theta+w*delta_t))/w,\
+                    (-v*(np.cos(theta)-np.cos(theta+w*delta_t)))/(w**2)+((v*np.sin(theta+w*delta_t)*delta_t)/w)],\
+                    [0,delta_t]])
     else:
-        # We have a non-zero rotation component
-        robot_state[0] = x+(((-v/w)*np.sin(theta))+((v/w)*np.sin(theta+w*delta_t)))
-        robot_state[1] = y+(((v/w)*np.cos(theta))-((v/w)*np.cos(theta+w*delta_t)))
-        robot_state[2] = theta+(w*delta_t)
-        G = np.array([[1,0,(v/w)*(-np.cos(theta)+np.cos(theta+w*delta_t))],\
-                [0,1,(v/w)*(-np.sin(theta)+np.sin(theta+w*delta_t))],\
-                [0,0,1]])
-        # Derivative of forward dynamics model w.r.t robot input
-        # Page 206, Eq 7.11
-        V = np.array([[(-np.sin(theta)+np.sin(theta+w*delta_t))/w,\
-                (v*(np.sin(theta)-np.sin(theta+w*delta_t)))/(w**2)+((v*np.cos(theta+w*delta_t)*delta_t)/w)],\
-                [(np.cos(theta)-np.cos(theta+w*delta_t))/w,\
-                (-v*(np.cos(theta)-np.cos(theta+w*delta_t)))/(w**2)+((v*np.sin(theta+w*delta_t)*delta_t)/w)],\
-                [0,delta_t]])
+        raise ValueError('Unknown motion model %s' % motion_model)
     # Covariance in propagated state
     state_cov = np.dot(np.dot(G,prev_state_cov),np.transpose(G))+np.dot(np.dot(V,M),np.transpose(V))
     return robot_state,state_cov
@@ -238,12 +263,14 @@ def articulated_slam(debug_inp=True):
                                                   # Do not pass visualizer to
                                                   # disable visualization
                                                   lmvis=None)
+        motion_model = 'nonholonomic'
     else:
         serializer = dataio.FeaturesOdomGTSerializer()
         datafile = open("/home/vikasdhi/mid/articulatedslam/2016-01-22/rev_2016-01-22-13-56-28/extracttrajectories_GFTT_SIFT_odom_gt_timeseries.txt")
         timestamps = serializer.init_load(datafile)
         rob_obs_iter = imap(raw_features_to_get_robot_observations,
                             serializer.load_iter(datafile))
+        motion_model = 'holonomic'
 
     lmvis = landmarkmap.LandmarksVisualizer([0,0], [7, 7], frame_period=-1,
                                             imgshape=(700, 700))
@@ -297,7 +324,10 @@ def articulated_slam(debug_inp=True):
         # Following EKF steps now
 
         # First step is propagate : both robot state and motion parameter of any active landmark
-        slam_state[0:3],slam_cov[0:3,0:3]=robot_motion_prop(slam_state[0:3],slam_cov[0:3,0:3],robot_input)
+        slam_state[0:3],slam_cov[0:3,0:3]=robot_motion_prop(slam_state[0:3],
+                                                            slam_cov[0:3,0:3],
+                                                            robot_input,
+                                                           motion_model=motion_model)
         # Active here means the landmark for which an articulation model has been associated
         if len(ld_ids)>0:
             '''
