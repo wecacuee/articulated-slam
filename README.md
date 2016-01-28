@@ -1,9 +1,7 @@
 TO DO
  - Massaging real data and GT association - Vikas (1)
-    - Fix init_pt issue (1.1)
-    - Check coordinate frame equivalence for odom and vicon ground truth poses
-    (1.2)
- - 3D visualization (both robot trajectory and simulation map) - Robot POV and bird's eye view - Vikas (2)
+    - Fix coordinates of input landmarkpoint to be in xyz
+    - 3D visualization (both robot trajectory and simulation map) - Robot POV and bird's eye view - Vikas (2)
     - Current vis is not 3Dish enough (2.1)
     - Robot POV is prob buggy  (2.2)
     - Robot POV need image underlay from real data (2.3)
