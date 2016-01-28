@@ -20,7 +20,11 @@ import pdb
 import utils_plot as up
 import scipy.linalg
 import matplotlib.pyplot as plt
+import dataio
 
+from itertools import imap
+
+SIMULATEDDATA = True
 #def threeptmap():
 #    nframes = 100
 #    map_conf = [# static
@@ -179,6 +183,25 @@ def robot_motion_prop(prev_state,prev_state_cov,robot_input,delta_t=1):
     state_cov = np.dot(np.dot(G,prev_state_cov),np.transpose(G))+np.dot(np.dot(V,M),np.transpose(V))
     return robot_state,state_cov
 
+def raw_features_to_get_robot_observations(features_odom_gt):
+    tracked_pts, odom, gt_pose = features_odom_gt
+    track_ids, points, depths  = zip(*tracked_pts)
+    (pos, quat), (linvel, angvel) = odom
+    (xyz, abg) = gt_pose
+    points_a = np.array(points).T
+    depths_a = np.array(depths)
+    real_K = np.array([[275, 0, 160], 
+                       [0, 275, 120],
+                       [0,   0,   1]])
+    Kinv = np.linalg.inv(real_K)
+    points3D = Kinv.dot(landmarkmap.euc2homo(points_a)) * depths_a
+    ldmk_robot_obs = points3D
+    ldmks = ldmk_robot_obs
+    return track_ids, [xyz[0], xyz[1], abg[2], 
+                       np.asarray(linvel[:2]),
+                       angvel[2]], \
+            ldmks, ldmk_robot_obs
+
 '''
 Performing Articulated SLAM
 Pass in optional parameter for collecting debug output for all the landmarks
@@ -208,27 +231,33 @@ def articulated_slam(debug_inp=True):
     
     # to get the landmarks with ids that are being seen by robot (Need to modify to match 3D viewing cone)
     # Handle viewable observations based on new code
-    rob_obs_iter = landmarkmap.get_robot_observations(lmmap, robtraj,
-                                                      maxangle, maxdist,
-                                                      img_shape, K,
-                                              # Do not pass visualizer to
-                                              # disable visualization
-                                              lmvis=None)
+    if SIMULATEDDATA:
+        rob_obs_iter = landmarkmap.get_robot_observations(lmmap, robtraj,
+                                                          maxangle, maxdist,
+                                                          img_shape, K,
+                                                  # Do not pass visualizer to
+                                                  # disable visualization
+                                                  lmvis=None)
+    else:
+        serializer = dataio.FeaturesOdomGTSerializer()
+        datafile = open("/home/vikasdhi/mid/articulatedslam/2016-01-22/rev_2016-01-22-13-56-28/extracttrajectories_GFTT_SIFT_odom_gt_timeseries.txt")
+        timestamps = serializer.init_load(datafile)
+        rob_obs_iter = imap(raw_features_to_get_robot_observations,
+                            serializer.load_iter(datafile))
 
     lmvis = landmarkmap.LandmarksVisualizer([0,0], [7, 7], frame_period=-1,
                                             imgshape=(700, 700))
     
-    rob_obs_iter = list(rob_obs_iter)
+    #rob_obs_iter = list(rob_obs_iter)
     #frame_period = lmvis.frame_period
     
 
     # EKF parameters for filtering
 
     # Initially we only have the robot state
-    (_, rob_state_and_input, init_pt,_) = rob_obs_iter[0]
+    (_, rob_state_and_input, init_pt,_) = rob_obs_iter.next()
     init_pt = np.dstack(init_pt)[0] 
     model = np.zeros(init_pt.shape[0])
-    import pdb; pdb.set_trace()
     slam_state =  np.array(rob_state_and_input[:3]) # \mu_{t} state at current time step
     
     # Covariance following discussion on page 317
@@ -247,8 +276,7 @@ def articulated_slam(debug_inp=True):
     # Processing all the observations
     # v1.0 Need to update to v2.0 with no rs and thetas
     # v2.0 Expected format
-    import pdb; pdb.set_trace()
-    for fidx,(ids,rob_state_and_input, ldmks, ldmk_robot_obs) in enumerate(rob_obs_iter[1:]):    
+    for fidx,(ids,rob_state_and_input, ldmks, ldmk_robot_obs) in enumerate(rob_obs_iter):    
         rob_state = rob_state_and_input[:3]
         robot_input = rob_state_and_input[3:]
         print '+++++++++++++ fidx = %d +++++++++++' % fidx
@@ -314,9 +342,7 @@ def articulated_slam(debug_inp=True):
             if ldmk_am[id] is None:
                 motion_class.process_inp_data([0,0], rob_state,ldmk_rob_obv,init_pt[id])
                 # Still need to estimate the motion class
-                #import pdb; pdb.set_trace()
                 # Check if the model is estimated
-                #import pdb;pdb.set_trace()
                 if sum(motion_class.prior>m_thresh)>0:
                     model[id] = np.where(motion_class.prior>m_thresh)[0]	
                     ldmk_am[id] = motion_class.am[int(model[id])]
