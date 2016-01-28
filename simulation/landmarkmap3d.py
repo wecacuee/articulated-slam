@@ -219,46 +219,61 @@ def rotmat_z(theta):
                      [ np.sin(theta),   np.cos(theta),0],
                      [0,0,1]])
 
-def robot_trajectory(positions, lin_vel, angular_vel):
+)ef robot_trajectory(positions, lin_vel, angular_vel, circle_flag=False,r=20,center=np.array([0,0]),nframes=30):
     '''
     Returns (position_t, direction_t, linear_velocity_{t+1},
     angular_velocity_{t+1})
     '''
-    prev_dir = None
-    from_pos = positions[:-1]
-    to_pos = positions[1:]
-    for fp, tp in zip(from_pos, to_pos):
-        fp = np.array(fp)
-        tp = np.array(tp)
-        dir = (tp - fp) / vnorm(tp-fp)
+    if not circle_flag:
+        prev_dir = None
+        from_pos = positions[:-1]
+        to_pos = positions[1:]
+        for fp, tp in zip(from_pos, to_pos):
+            fp = np.array(fp)
+            tp = np.array(tp)
+            dir = (tp - fp) / vnorm(tp-fp)
 
-        if prev_dir is not None:
-            to_dir = dir
-            dir = prev_dir
-            # Try rotation, if it increases the projection then we are good.
-            after_rot = rotmat_z(angular_vel).dot(prev_dir)
-            after_rot_proj = to_dir.dot(after_rot)
-            before_rot_proj = to_dir.dot(prev_dir)
-            angular_vel = np.sign(after_rot_proj - before_rot_proj) * angular_vel
-            # Checks if dir is still on the same side of to_dir as prev_dir
-            # Uses the fact that cross product is a measure of sine of
-            # differences in orientation. As long as sine of the two
-            # differences is same, the product is +ve and the robot must
-            # keep rotating otherwise we have rotated too far and we must
-            # stop.
-            while np.dot(np.cross(dir, to_dir), np.cross(prev_dir, to_dir)) > 0:
-                yield (pos, dir, 0, angular_vel)
-                dir = rotmat_z(angular_vel).dot(dir)
-            dir = to_dir
+            if prev_dir is not None:
+                to_dir = dir
+                dir = prev_dir
+                # Try rotation, if it increases the projection then we are good.
+                after_rot = rotmat_z(angular_vel).dot(prev_dir)
+                after_rot_proj = to_dir.dot(after_rot)
+                before_rot_proj = to_dir.dot(prev_dir)
+                angular_vel = np.sign(after_rot_proj - before_rot_proj) * angular_vel
+                # Checks if dir is still on the same side of to_dir as prev_dir
+                # Uses the fact that cross product is a measure of sine of
+                # differences in orientation. As long as sine of the two
+                # differences is same, the product is +ve and the robot must
+                # keep rotating otherwise we have rotated too far and we must
+                # stop.
+                while np.dot(np.cross(dir, to_dir), np.cross(prev_dir, to_dir)) > 0:
+                    yield (pos, dir, 0, angular_vel)
+                    dir = rotmat_z(angular_vel).dot(dir)
+                dir = to_dir
 
-        #for i in range(nf+1):
-        pos = fp
-        vel = (tp - fp) * lin_vel / vnorm(tp - fp)
-        # continue till pos is on the same side of tp as fp
-        while np.dot((pos - tp), (fp - tp)) > 0:
-            yield (pos, dir, lin_vel, 0)
-            pos = pos + vel
-        prev_dir = dir
+            #for i in range(nf+1):
+            pos = fp
+            vel = (tp - fp) * lin_vel / vnorm(tp - fp)
+            # continue till pos is on the same side of tp as fp
+            while np.dot((pos - tp), (fp - tp)) > 0:
+                yield (pos, dir, lin_vel, 0)
+                pos = pos + vel
+            prev_dir = dir
+    else:
+        w_v = angular_vel
+        theta = 0
+        cur = None
+        for it in range(nframes):
+            to_dir = np.array([center[0]+r*np.cos(theta+it*w_v),center[1]+r*np.sin(theta+it*w_v),0])
+            if cur is not None:
+                # Assumption of moving in counter clockwise direction
+                dir = (to_dir - cur)/vnorm(to_dir-cur)
+                    yield(to_dir,np.pi/2+ theta+it*w_v,r*w_v,w_v)
+            else:
+                yield(to_dir,np.pi/2,0,0)
+            cur = to_dir 
+        
 
 
 def crossmat(e):
@@ -432,11 +447,11 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, imgshape, K, lmvis
                                        robtraj):
         posdir = posdir_and_inputs[:2]
         robot_inputs = posdir_and_inputs[2:]
-        dir = posdir[1]
-        assert(dir[2] == 0)
-        theta = np.arctan2(dir[1], dir[0])
+        rob_theta = posdir[1]
+        #assert(dir[2] == 0)
+        #theta = np.arctan2(dir[1], dir[0])
         # Handle in new visualizer
-        robview = RobotView(posdir[0], maxangle,maxdist,theta, 
+        robview = RobotView(posdir[0], maxangle,maxdist,rob_theta, 
                             imgshape, K, maxdist)
         if lmvis is not None:
             img = lmvis.genframe(ldmks, robview)
@@ -448,10 +463,10 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, imgshape, K, lmvis
         pos = posdir[0].reshape(3,1)
         # v1.0 Need to update after new model has been implemented
         #dists = np.sqrt(np.sum((selected_ldmks - pos)**2, 0))
-        dir = posdir[1]
+        #dir = posdir[1]
         #angles = np.arccos(dir.dot((selected_ldmks - pos))/dists)
         #obsvecs = selected_ldmks - pos
-        rob_theta = np.arctan2(dir[1], dir[0])
+        #rob_theta = np.arctan2(dir[1], dir[0])
         # Wrap around for theta (to make it continuous)
         #if prev_theta is not None and dis:
         #    if abs(prev_theta - rob_theta) > np.pi/4:
