@@ -16,3 +16,4 @@
 # Adding ignore commands for some of the cpp code
 *.swo
 *.swp
+*.png

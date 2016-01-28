@@ -12,6 +12,8 @@ inside SLAM, by first
                 #slam_state = slam_state+np.dot(K_mat,(np.array([r,theta])-z_pred))
                 #slam_state = slam_state+np.dot(K_mat,(np.array([r,theta])-z_pred))
 '''
+import sys
+
 import numpy as np
 import cv2
 import landmarkmap3d as landmarkmap
@@ -24,7 +26,7 @@ import dataio
 
 from itertools import imap
 
-SIMULATEDDATA = True
+SIMULATEDDATA = False
 #def threeptmap():
 #    nframes = 100
 #    map_conf = [# static
@@ -222,10 +224,10 @@ def raw_features_to_get_robot_observations(features_odom_gt):
     points3D = Kinv.dot(landmarkmap.euc2homo(points_a)) * depths_a
     ldmk_robot_obs = points3D
     ldmks = ldmk_robot_obs
-    return track_ids, [xyz[0], xyz[1], abg[2], 
+    return (track_ids, [xyz[0], xyz[1], abg[2], 
                        np.asarray(linvel[:2]),
-                       angvel[2]], \
-            ldmks, ldmk_robot_obs
+                       angvel[2]],
+            ldmks, ldmk_robot_obs)
 
 '''
 Performing Articulated SLAM
@@ -268,8 +270,38 @@ def articulated_slam(debug_inp=True):
         serializer = dataio.FeaturesOdomGTSerializer()
         datafile = open("/home/vikasdhi/mid/articulatedslam/2016-01-22/rev_2016-01-22-13-56-28/extracttrajectories_GFTT_SIFT_odom_gt_timeseries.txt")
         timestamps = serializer.init_load(datafile)
-        rob_obs_iter = imap(raw_features_to_get_robot_observations,
-                            serializer.load_iter(datafile))
+        data_iter = serializer.load_iter(datafile)
+        VISDEBUG = 0
+        if VISDEBUG:
+            plotables = dict()
+            for i, (features, odom, gt_pose) in enumerate(data_iter):
+                if i % 100 != 0:
+                    continue
+                (pos, quat), (linvel, angvel) = odom
+                xyz, abg = gt_pose
+                plotables.setdefault('linvel[0]', []).append(linvel[0])
+                plotables.setdefault('linvel[1]', []).append(linvel[1])
+                plotables.setdefault('linvel[2]', []).append(linvel[2])
+                plotables.setdefault('angvel[0]', []).append(angvel[0])
+                plotables.setdefault('angvel[1]', []).append(angvel[1])
+                plotables.setdefault('angvel[2]', []).append(angvel[2])
+                plotables.setdefault('xyz[0]', []).append(xyz[0])
+                plotables.setdefault('xyz[1]', []).append(xyz[1])
+                plotables.setdefault('xyz[2]', []).append(xyz[2])
+                plotables.setdefault('abg[0]', []).append(abg[0])
+                plotables.setdefault('abg[1]', []).append(abg[1])
+                plotables.setdefault('abg[2]', []).append(abg[2])
+
+            for (k, v), m in zip(plotables.items(), ',.1234_x|^vo'):
+                plt.plot(v, label=k, marker=m)
+            plt.legend(loc='best')
+            plt.show()
+            sys.exit(0)
+
+
+        rob_obs_iter = imap(raw_features_to_get_robot_observations, data_iter)
+
+
         motion_model = 'holonomic'
 
     lmvis = landmarkmap.LandmarksVisualizer([0,0], [7, 7], frame_period=-1,
@@ -281,10 +313,10 @@ def articulated_slam(debug_inp=True):
 
     # EKF parameters for filtering
 
+    first_traj_pt = dict()
     # Initially we only have the robot state
-    (_, rob_state_and_input, init_pt,_) = rob_obs_iter.next()
-    init_pt = np.dstack(init_pt)[0] 
-    model = np.zeros(init_pt.shape[0])
+    (_, rob_state_and_input, _, _) = rob_obs_iter.next()
+    model = dict()
     slam_state =  np.array(rob_state_and_input[:3]) # \mu_{t} state at current time step
     
     # Covariance following discussion on page 317
@@ -358,6 +390,8 @@ def articulated_slam(debug_inp=True):
         # Processing all the observations
         # v2.0
         for id, ldmk_rob_obv in zip(ids,np.dstack(ldmk_robot_obs)[0]):
+            if id not in first_traj_pt:
+                first_traj_pt[id] = ldmk_rob_obv
            
             motion_class = ldmk_estimater.setdefault(id, mm.Estimate_Mm())
             # For storing the chosen articulated model
@@ -370,7 +404,7 @@ def articulated_slam(debug_inp=True):
             '''
             # For each landmark id, we want to check if the motion model has been estimated
             if ldmk_am[id] is None:
-                motion_class.process_inp_data([0,0], rob_state,ldmk_rob_obv,init_pt[id])
+                motion_class.process_inp_data([0,0], rob_state,ldmk_rob_obv,first_traj_pt[id])
                 # Still need to estimate the motion class
                 # Check if the model is estimated
                 if sum(motion_class.prior>m_thresh)>0:
@@ -418,7 +452,7 @@ def articulated_slam(debug_inp=True):
                 #H_mat[0,0:3] = np.array([1,0,-np.sin(theta)*curr_obs[0] - np.cos(theta)*curr_obs[1]])
                 #H_mat[1,0:3] = np.array([0,1,(np.cos(theta)-np.sin(theta))*curr_obs[0] - (np.cos(theta)+np.sin(theta))*curr_obs[1]])
                 #H_mat[2,0:3] = np.array([0,0,(np.sin(theta)+np.cos(theta))*curr_obs[0] + (np.cos(theta)+np.sin(theta))*curr_obs[1]])
-                H_mat[:,index_set[curr_ind]:index_set[curr_ind+1]] = np.dot(R_temp,ldmk_am[id].observation_jac(slam_state[index_set[curr_ind]:index_set[curr_ind+1]],init_pt[id]))
+                H_mat[:,index_set[curr_ind]:index_set[curr_ind+1]] = np.dot(R_temp,ldmk_am[id].observation_jac(slam_state[index_set[curr_ind]:index_set[curr_ind+1]],first_traj_pt[id]))
 
 
                 # Innovation covariance
