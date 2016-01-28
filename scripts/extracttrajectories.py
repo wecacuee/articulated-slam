@@ -4,7 +4,7 @@ import cPickle
 from itertools import izip
 import subprocess
 import glob
-from collections import deque
+from collections import deque, namedtuple
 
 import cv2
 import rospy
@@ -204,6 +204,7 @@ class TrackCollection(object):
     def tracks(self):
         return self._tracks
 
+
 class TrackCollectionSerializer(object):
     def dump(self, file, trackcollection):
         timestamps = sorted(set(trackcollection.timestamps))
@@ -225,9 +226,9 @@ class TrackCollectionSerializer(object):
     def load(self, file):
         trackcollection = list()
         line = file.readline()
-        timestamps = line.split("\t")
+        timestamps = map(int, line.strip().split("\t"))
         for line in file:
-            cols = line.split("\t")
+            cols = line.strip().split("\t")
             tracklen, trackstartidx, trackendidx = map(int, cols[:3])
             points = map(float, cols[3:3+2*tracklen])
             pointpairs = zip(points[:2*tracklen:2], points[1:2*tracklen:2])
@@ -236,9 +237,66 @@ class TrackCollectionSerializer(object):
             track = zip(pointpairs, depths, timelist)
             trackcollection.append(track)
 
-        return trackcollection
+        return trackcollection, timestamps
+
+TrackedPoint = namedtuple('TrackedPoint', ['track_id', 'pt', 'depth'])
+
+def reindex_as_timeseries(trackcollection, timestamps):
+    time_series = dict()
+    for tid, track in enumerate(trackcollection):
+        for pt, depth, ts in track:
+            ts_idx = timestamps.index(ts)
+            time_series.setdefault(ts_idx, []).append(
+                TrackedPoint(tid, pt, depth))
+
+    return time_series, timestamps
+
+class TimeSeriesSerializer(object):
+
+    def serialize_tracked_pts(self, tracked_pts):
+        cols = list()
+        npoints = len(tracked_pts)
+        cols.append(npoints)
+        for (tid, pt, depth) in tracked_pts:
+            cols.extend((tid, pt[0], pt[1], depth))
+
+        return "\t".join(map(str, cols))
+
+    def dump(self, file, time_series, timestamps):
+        file.write("\t".join(map(str, timestamps)) + "\n")
+        for ts_idx, tracked_pts in time_series.iteritems():
+            file.write(self.serialize_tracked_pts(tracked_pts))
+            file.write("\n")
+
+    def unpack_tracked_pts(self, tracked_pts_str_cols):
+        cols = tracked_pts_str_cols
+        npoints = int(cols[0])
+        tracked_points = list()
+        for i in range(npoints):
+            tid = int(cols[1+4*i])
+            x, y, depth = map(float, cols[4*i+2:4*i+5])
+            pt = (x, y)
+            tracked_points.append(TrackedPoint(tid, pt, depth))
+        return tracked_points
 
 
+    def load_iter(self, file_but_first_line):
+        for ts_idx, line in enumerate(file_but_first_line):
+            yield self.unpack_tracked_pts(line.strip().split("\t"))
+
+    def init_load(self, file):
+        line = file.readline().strip()
+        timestamps = map(int, line.strip().split("\t"))
+        return timestamps
+
+    def load(self, file):
+        timestamps = self.init_load(file)
+
+        timeseries = dict()
+        for tracked_points in self.load_iter(file):
+            timeseries[ts_idx] = tracked_points
+
+        return timeseries, timestamps
 
 def cv2_drawMatches(img1, kp1_pt, img2, kp2_pt, matches, outimg,
                     matchColor=(0,255, 0),
