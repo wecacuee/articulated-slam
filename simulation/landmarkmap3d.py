@@ -219,7 +219,7 @@ def rotmat_z(theta):
                      [ np.sin(theta),   np.cos(theta),0],
                      [0,0,1]])
 
-)ef robot_trajectory(positions, lin_vel, angular_vel, circle_flag=False,r=20,center=np.array([0,0]),nframes=30):
+def robot_trajectory(positions, lin_vel, angular_vel, circle_flag=False,r=20,center=np.array([0,0]),nframes=30):
     '''
     Returns (position_t, direction_t, linear_velocity_{t+1},
     angular_velocity_{t+1})
@@ -269,7 +269,7 @@ def rotmat_z(theta):
             if cur is not None:
                 # Assumption of moving in counter clockwise direction
                 dir = (to_dir - cur)/vnorm(to_dir-cur)
-                    yield(to_dir,np.pi/2+ theta+it*w_v,r*w_v,w_v)
+                yield(to_dir,np.pi/2+ theta+it*w_v,r*w_v,w_v)
             else:
                 yield(to_dir,np.pi/2,0,0)
             cur = to_dir 

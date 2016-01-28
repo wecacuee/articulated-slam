@@ -97,7 +97,9 @@ def threeptmap3d():
     lmmap = landmarkmap.map_from_conf(map_conf,nframes)
     # For now static robot 
     #robtraj = landmarkmap.robot_trajectory(np.array([[0,0,0],[20,20,0]]),0.01,np.pi/10)
-    robtraj = landmarkmap.robot_trajectory(np.array([[110,90,0],[140,60,0],[120,50,0],[110,90,0],[140,60,0]]) / scale,0.2,np.pi/10,True,20,np.array([20,20])/scale,nframes)
+    robtraj = landmarkmap.robot_trajectory(
+        np.array([[110,90,0],[140,60,0],[120,50,0],[110,90,0],[140,60,0]]) / scale,
+        0.2, np.pi/10, True, 20/scale, np.array([20, 20])/scale, nframes)
     #robtraj = landmarkmap.robot_trajectory(np.array([[110,90,0],[40,175,0]]) / scale,0.1,np.pi/10)
     maxangle = 45*np.pi/180
     maxdist = 120 / scale
