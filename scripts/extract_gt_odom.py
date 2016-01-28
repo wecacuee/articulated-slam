@@ -104,12 +104,12 @@ class FeaturesOdomGTSerializer(object):
         timestamps = self.init_load(file)
 
         timeseries = dict()
-        for tracked_points in self.load_iter(file):
+        for ts_idx,tracked_points in enumerate(self.load_iter(file)):
             timeseries[ts_idx] = tracked_points
 
         return timeseries, timestamps
 
-    def load_init(self, file):
+    def init_load(self, file):
         line = file.readline().strip()
         timestamps = map(int, line.split("\t"))
         return timestamps
