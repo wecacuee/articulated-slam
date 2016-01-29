@@ -91,15 +91,16 @@ class LandmarkMap(object):
 
 class RobotView(object):
     """ Describes the cone in view by robot """
-    def __init__(self, pos, theta, img_shape, K, maxX):
-        """
-        pos   : 3D position in robot plane
-        theta : angle of rotation relative to x-axis with axis of rotation 
-        """
-        assert pos[2] == 0, "Robot is on Z-axis"
-        pos = pos[:2]
+    def __init__(self, img_shape, K, maxX, 
+                image_file_format=None, 
+                timestamps_file=None):
         self._imgshape = img_shape
         self.maxX = maxX
+        if timestamps_file is not None:
+            self._timestamps = dict([(int(line.strip()), i) for i, line in
+                                enumerate(open(timestamps_file))])
+        else:
+            self._timestamps = dict()
 
         # n_h = [n, -h] notation
         # n_h^\top x_h = 0 is the equation of plane
@@ -107,18 +108,28 @@ class RobotView(object):
         # Default equation is for z = 0
         self._robot_plane_w = np.array([[0, 0, 1, 0]]).T
         self._robot_heading_c = np.array([[1, 0, 0]]).T
-        self.T_w2c = np.eye(4)
+        self.T_w2c = None
         R_x_view_2_z_view = rodrigues([0, 1, 0], -np.pi/2).dot(
             rodrigues([1, 0, 0], np.pi/2))
         self._K_x_view = K.dot(R_x_view_2_z_view)
+
+        self._image_file_fmt = image_file_format
+        self._win_name = "d"
+        self._wait_period = 30
+
+    def set_robot_pos_theta(self, pos, theta):
+        """
+        pos   : 3D position in robot plane
+        theta : angle of rotation relative to x-axis with axis of rotation 
+        """
+        assert pos[2] == 0, "Robot is on Z-axis"
+        pos = pos[:2]
         R_c2w = rodrigues([0, 0, 1], theta)
+        self.T_w2c = np.eye(4)
         self.T_w2c[:3, :3] = R_c2w.T
         t_c2w = self.robot_plane_basis().dot(pos)
         # t_w2c = - R_c2w.T.dot(t_c2w)
         self.T_w2c[:3, 3] = - R_c2w.T.dot(t_c2w)
-
-        self._win_name = "d"
-        self._wait_period = 30
 
     def robot_plane_basis(self):
         b1 = self._robot_heading_c
@@ -159,17 +170,28 @@ class RobotView(object):
         return self.projected(
             homo2euc(T.dot(euc2homo(points3D))))
 
-    def drawlandmarks(self, points3D_cam, colors=None):
-        img = np.ones((self._imgshape[0], self._imgshape[1], 3),
-                      dtype=np.uint8) * 255
+    def imgidx_by_timestamp(self, timestamp):
+        return self._timestamps.get(timestamp, -1)
+
+    def drawlandmarks(self, points3D_cam, imgidx=-1, colors=None):
+        if self._image_file_fmt is None or imgidx ==  -1:
+            img = np.ones((self._imgshape[0], self._imgshape[1], 3),
+                          dtype=np.uint8) * 255
+        else:
+            img = cv2.imread(self._image_file_fmt % imgidx)
 
         if colors is None:
             colors = [(blue if points3D_cam[0, i] < self.maxX else black)
                       for i in range(points3D_cam.shape[1])]
 
-        radius = 0.10
-        projected = self.projected_in_view(points3D_cam)
-        pt2 = self.projected_in_view(points3D_cam + radius)
+        radius = 0.05
+        projected = self.projected(points3D_cam)
+        in_view = self.in_view_no_depth(projected) & (
+            points3D_cam[0, :] > 0.1)
+        projected = projected[:, in_view]
+        pt2 = self.projected(points3D_cam + radius)[:, in_view]
+        colors = [c for i, c in enumerate(colors) if in_view[i]]
+
         for i in range(pt2.shape[1]):
             cv2.rectangle(img, 
                           tuple(np.int64(projected[:, i])),
@@ -181,25 +203,19 @@ class RobotView(object):
         cv2.imshow(self._win_name, img)
         cv2.waitKey(self._wait_period)
 
-    def projected_in_view(self, points3D_cam):
-        projected = self.projected(points3D_cam)
+    def in_view_no_depth(self, projected):
         in_view = ((projected[0, :] >= 0) 
                    & (projected[0, :] < self._imgshape[1]) 
                    & (projected[1, :] >= 0) 
-                   & (projected[1, :] < self._imgshape[0])
-                   & (points3D_cam[0, :] > 0.1))
-        return projected[:, in_view]
-
+                   & (projected[1, :] < self._imgshape[0]))
+        return in_view
 
     def in_view(self, points3D_world):
         """ Returns true for points that are within view """
         projected = self.projected_world(points3D_world)
         points3D_cam = homo2euc(self.T_w2c.dot(euc2homo(points3D_world)))
         # within image and closer than maxX
-        in_view = ((projected[0, :] >= 0) 
-                   & (projected[0, :] < self._imgshape[1]) 
-                   & (projected[1, :] >= 0) 
-                   & (projected[1, :] < self._imgshape[0]) 
+        in_view = (self.in_view_no_depth(projected) 
                    & (points3D_cam[0, :] >= 0.5) 
                    & (points3D_cam[0, :] < self.maxX))
         return in_view
@@ -409,7 +425,8 @@ class LandmarksVisualizer(object):
         frame_period = self.frame_period
         for lmks, posdir in itertools.izip(map.get_landmarks(), 
                                            robottraj_iter):
-            robview = RobotView(posdir[0], posdir[1], 45*np.pi/180, 40)
+            robview = RobotView(img_shape, K, maxX)
+            robview.set_robot_pos_theta(posdir[0], posdir[1])
             img = self.genframe(lmks, robview)
             img = self.drawrobot(robview, img)
             cv2.imshow(self._name, img)
@@ -433,6 +450,7 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, imgshape, K, lmvis
     """ Return a tuple of r, theta and ids for each frame"""
     """ v2.0 Return a ituple of lndmks in robot frame and ids for each frame"""
     prev_theta =  None
+    robview = RobotView(imgshape, K, maxdist)
     for ldmks, posdir_and_inputs in itertools.izip(lmmap.get_landmarks(), 
                                        robtraj):
         posdir = posdir_and_inputs[:2]
@@ -441,8 +459,7 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, imgshape, K, lmvis
         #assert(dir[2] == 0)
         #theta = np.arctan2(dir[1], dir[0])
         # Handle in new visualizer
-        robview = RobotView(posdir[0], rob_theta, 
-                            imgshape, K, maxdist)
+        robview.set_robot_pos_theta(posdir[0], rob_theta)
         if lmvis is not None:
             img = lmvis.genframe(ldmks, robview)
             img = lmvis.drawrobot(robview, img)
@@ -480,7 +497,7 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, imgshape, K, lmvis
         R_w2c = R_c2w.T
         ldmk_robot_obs = R_w2c.dot(selected_ldmks-pos)
         # Ignoring robot's Z component
-        yield (ldmks_idx[0], [float(pos[0]), float(pos[1]),
+        yield (0, ldmks_idx[0], [float(pos[0]), float(pos[1]),
                                              rob_theta,
                                              float(robot_inputs[0]),
                                              float(robot_inputs[1])], ldmks,

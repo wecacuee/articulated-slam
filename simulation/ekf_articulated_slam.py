@@ -13,10 +13,13 @@ inside SLAM, by first
                 #slam_state = slam_state+np.dot(K_mat,(np.array([r,theta])-z_pred))
 '''
 import sys
+import os
+import copy
 
 import numpy as np
 import cv2
 import landmarkmap3d as landmarkmap
+from landmarkmap3d import rodrigues
 import estimate_mm as mm # To figure out the right motion model
 import pdb
 import utils_plot as up
@@ -24,7 +27,7 @@ import scipy.linalg
 import matplotlib.pyplot as plt
 import dataio
 
-from itertools import imap
+from itertools import imap, izip
 
 SIMULATEDDATA = False
 #def threeptmap():
@@ -210,24 +213,72 @@ def robot_motion_prop(prev_state,prev_state_cov,robot_input,delta_t=1,
     state_cov = np.dot(np.dot(G,prev_state_cov),np.transpose(G))+np.dot(np.dot(V,M),np.transpose(V))
     return robot_state,state_cov
 
-def raw_features_to_get_robot_observations(features_odom_gt):
-    tracked_pts, odom, gt_pose = features_odom_gt
-    track_ids, points, depths  = zip(*tracked_pts)
-    (pos, quat), (linvel, angvel) = odom
-    (xyz, abg) = gt_pose
-    points_a = np.array(points).T
-    depths_a = np.array(depths)
-    real_K = np.array([[275, 0, 160], 
-                       [0, 275, 120],
-                       [0,   0,   1]])
-    Kinv = np.linalg.inv(real_K)
-    points3D = Kinv.dot(landmarkmap.euc2homo(points_a)) * depths_a
-    ldmk_robot_obs = points3D
-    ldmks = ldmk_robot_obs
-    return (track_ids, [xyz[0], xyz[1], abg[2], 
-                       np.asarray(linvel[:2]),
-                       angvel[2]],
-            ldmks, ldmk_robot_obs)
+class RealDataToSimulatedFormat(object):
+    def __init__(self, K):
+        # (z_view) real_k assumes Z in viewing direction, Y-axis downwards
+        # (x_viwe) Simulated data format assumes X in viewing direction, Z -axis upwards
+        R_x_view_2_z_view = rodrigues([0, 1, 0], -np.pi/2).dot(
+            rodrigues([1, 0, 0], np.pi/2))
+        K_x_view = K.dot(R_x_view_2_z_view)
+        self.camera_K_x_view = K_x_view
+        self._first_gt_pose = None
+        self._all_ldmks = np.array([])
+
+    def first_gt_pose(self):
+        return self._first_gt_pose
+
+    def compute_ldmks_robot_pose(self, points, depths):
+        points_a = np.array(points).T
+        depths_a = np.array(depths)
+        Kinv = np.linalg.inv(self.camera_K_x_view)
+        ldmk_robot_obs = Kinv.dot(landmarkmap.euc2homo(points_a)) * depths_a
+        return ldmk_robot_obs
+
+    def prepare_ldmks_all_world(self, theta, ldmk_robot_obs, xy, track_ids):
+        # prepare ldmks
+        R_c2w = rodrigues([0, 0, 1], theta)
+        ldmks_world = R_c2w.dot(ldmk_robot_obs) \
+                + np.asarray([xy[0], xy[1], 0]).reshape(-1, 1)
+        max_track_id = np.maximum(np.max(track_ids), len(self._all_ldmks))
+        all_ldmks = np.zeros((ldmks_world.shape[0], max_track_id + 1))
+        if (len(self._all_ldmks)):
+            all_ldmks[:, :self._all_ldmks.shape[1]] = self._all_ldmks
+        all_ldmks[:, track_ids] = ldmks_world
+        self._all_ldmks = all_ldmks
+        return self._all_ldmks
+
+    def unpack_odom(self, odom):
+        (pos, quat), (linvel, angvel) = odom
+        assert(abs(linvel[2]) < 0.1)
+        assert(abs(angvel[0]) < 0.1)
+        assert(abs(angvel[1]) < 0.1)
+        return linvel[:2], angvel[2]
+
+    def unpack_gt_pose(self, gt_pose):
+        (xyz, abg) = gt_pose
+        if self._first_gt_pose is None:
+            self._first_gt_pose = copy.deepcopy(gt_pose)
+
+        (_, _, z0), _ = self._first_gt_pose
+        xyz[2] = xyz[2] - z0
+        assert abs(xyz[2]) < 0.05, 'xyz[2] - z0 = %f; z0 = %f' % (xyz[2], z0)
+        assert abs(abg[0]) < 0.05, 'abg[0] = %f' % abg[0]
+        assert abs(abg[1]) < 0.05, 'abg[1] = %f' % abg[1]
+        return (xyz[:2], abg[2])
+
+    def real_data_to_required_format(self, ts_features_odom_gt):
+        ts, features_odom_gt = ts_features_odom_gt
+        tracked_pts, odom, gt_pose = features_odom_gt
+        track_ids, points, depths  = zip(*tracked_pts)
+        (linvel2D, angvel2D) = self.unpack_odom(odom)
+        (xy, theta) = self.unpack_gt_pose(gt_pose)
+        ldmk_robot_obs = self.compute_ldmks_robot_pose(points, depths)
+        all_ldmks = self.prepare_ldmks_all_world(theta, ldmk_robot_obs,
+                                     xy, track_ids)
+
+        return (ts, track_ids, [xy[0], xy[1], theta,
+                            np.asarray(linvel2D), angvel2D],
+                all_ldmks, ldmk_robot_obs)
 
 '''
 Performing Articulated SLAM
@@ -238,14 +289,23 @@ def articulated_slam(debug_inp=True):
     f_gt = open('gt.txt','w')
     f_slam = open('slam.txt','w')    
     img_shape = (240, 320)
-    f = 300
-    K = np.array([[f, 0, img_shape[1]/2], [0, f, img_shape[0]/2], [0, 0, 1]])
+    f = 275
+    camera_K_z_view = np.array([[f, 0, img_shape[1]/2.], 
+                       [0, f, img_shape[0]/2.],
+                       [0,   0,   1]])
+    timeseries_data_file = "/home/vikasdhi/mid/articulatedslam/2016-01-22/rev_2016-01-22-13-56-28/extracttrajectories_GFTT_SIFT_odom_gt_timeseries.txt"
+    timeseries_dir = os.path.dirname(timeseries_data_file)
+    image_file_fmt = os.path.join(timeseries_dir, "img/frame%04d.png")
+    timestamps_file = os.path.join(timeseries_dir, 'img/timestamps.txt')
 
     # Motion probability threshold
     m_thresh = 0.60 # Choose the articulation model with greater than this threhsold's probability
     
     # Getting the map
     nframes,lmmap,robtraj,maxangle,maxdist = threeptmap3d()
+    robview = landmarkmap.RobotView(img_shape, camera_K_z_view, maxdist,
+                                   image_file_format=image_file_fmt,
+                                   timestamps_file=timestamps_file)
     #nframes, lmmap, lmvis, robtraj, maxangle, maxdist = threeptmap()
 
     ldmk_estimater = dict(); # id -> mm.Estimate_Mm()
@@ -261,14 +321,15 @@ def articulated_slam(debug_inp=True):
     if SIMULATEDDATA:
         rob_obs_iter = landmarkmap.get_robot_observations(lmmap, robtraj,
                                                           maxangle, maxdist,
-                                                          img_shape, K,
+                                                          img_shape,
+                                                          camera_K_z_view,
                                                   # Do not pass visualizer to
                                                   # disable visualization
                                                   lmvis=None)
         motion_model = 'nonholonomic'
     else:
         serializer = dataio.FeaturesOdomGTSerializer()
-        datafile = open("/home/vikasdhi/mid/articulatedslam/2016-01-22/rev_2016-01-22-13-56-28/extracttrajectories_GFTT_SIFT_odom_gt_timeseries.txt")
+        datafile = open(timeseries_data_file)
         timestamps = serializer.init_load(datafile)
         data_iter = serializer.load_iter(datafile)
         VISDEBUG = 0
@@ -298,24 +359,21 @@ def articulated_slam(debug_inp=True):
             plt.show()
             sys.exit(0)
 
-
-        rob_obs_iter = imap(raw_features_to_get_robot_observations, data_iter)
-
+        formatter = RealDataToSimulatedFormat(camera_K_z_view)
+        rob_obs_iter = imap(
+            formatter.real_data_to_required_format,
+            izip(timestamps, data_iter))
 
         motion_model = 'holonomic'
 
-    lmvis = landmarkmap.LandmarksVisualizer([0,0], [7, 7], frame_period=-1,
+    lmvis = landmarkmap.LandmarksVisualizer([0,0], [7, 7], frame_period=10,
                                             imgshape=(700, 700))
     
-    #rob_obs_iter = list(rob_obs_iter)
-    #frame_period = lmvis.frame_period
-    
-
     # EKF parameters for filtering
 
     first_traj_pt = dict()
     # Initially we only have the robot state
-    (_, rob_state_and_input, _, _) = rob_obs_iter.next()
+    (_, _, rob_state_and_input, _, _) = rob_obs_iter.next()
     model = dict()
     slam_state =  np.array(rob_state_and_input[:3]) # \mu_{t} state at current time step
     
@@ -335,7 +393,7 @@ def articulated_slam(debug_inp=True):
     # Processing all the observations
     # v1.0 Need to update to v2.0 with no rs and thetas
     # v2.0 Expected format
-    for fidx,(ids,rob_state_and_input, ldmks, ldmk_robot_obs) in enumerate(rob_obs_iter):    
+    for fidx,(timestamp, ids,rob_state_and_input, ldmks, ldmk_robot_obs) in enumerate(rob_obs_iter):    
         rob_state = rob_state_and_input[:3]
         robot_input = rob_state_and_input[3:]
         print '+++++++++++++ fidx = %d +++++++++++' % fidx
@@ -346,12 +404,14 @@ def articulated_slam(debug_inp=True):
         print 'Observations:',ldmk_robot_obs
         
         # Handle new robot view code appropriately
-        robview = landmarkmap.RobotView((rob_state[0], rob_state[1], 0), maxangle,maxdist,
-               rob_state[2], img_shape, K, maxdist)
+        robview.set_robot_pos_theta((rob_state[0], rob_state[1], 0),
+                                    rob_state[2]) 
         img = lmvis.genframe(ldmks, robview)
         imgr = lmvis.drawrobot(robview, img)
+        imgrv = robview.drawlandmarks(ldmk_robot_obs,
+                                      imgidx=robview.imgidx_by_timestamp(timestamp))
+        robview.visualize(imgrv)
         lmvis.imshow_and_wait(imgr)
-        robview.visualize(robview.drawlandmarks(ldmks))
         
         # Following EKF steps now
 
@@ -404,10 +464,11 @@ def articulated_slam(debug_inp=True):
             '''
             # For each landmark id, we want to check if the motion model has been estimated
             if ldmk_am[id] is None:
-                motion_class.process_inp_data([0,0], rob_state,ldmk_rob_obv,first_traj_pt[id])
+                motion_class.process_inp_data([0,0], slam_state,ldmk_rob_obv,first_traj_pt[id])
                 # Still need to estimate the motion class
                 # Check if the model is estimated
                 if sum(motion_class.prior>m_thresh)>0:
+                    print("INFO: Model estimated\n")
                     model[id] = np.where(motion_class.prior>m_thresh)[0]	
                     ldmk_am[id] = motion_class.am[int(model[id])]
                     ld_ids.append(id)
