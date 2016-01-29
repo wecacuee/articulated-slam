@@ -11,6 +11,8 @@ bags:=all_static_2016-01-22-13-49-34 planar_2016-01-22-14-43-28 prism_2016-01-22
 targets:=$(foreach b,$(bags),$(PROJMIDDIR)/$(b)/extracttrajectories_GFTT_SIFT.avi) $(foreach b,$(bags),$(PROJMIDDIR)/$(b)/extracttrajectories_GFTT_SIFT_odom_gt_timeseries.txt)#$(foreach b,$(bags),$(PROJMIDDIR)/$(b)/densetraj.gz) $(foreach b,$(bags),$(PROJMIDDIR)/$(b)/densetraj.avi)
 all: $(targets) 
 
+extractimgs: $(foreach b,$(bags),$(PROJMIDDIR)/$(b)/img/frame0000.png)
+
 # Data dir to MID DIR
 $(PROJMIDDIR)/%.bag: $(PROJDATADIR)/%.bag
 	if [ -e $@ ] ; then true; else ln -sT $< $@; fi
@@ -18,6 +20,10 @@ $(PROJMIDDIR)/%.bag: $(PROJDATADIR)/%.bag
 # Data dir to MID DIR
 $(PROJMIDDIR)/%/robot.txt: $(PROJDATADIR)/%/robot.txt
 	if [ -e $@ ] ; then true; else ln -sT $(dir $<) $(patsubst %/,%,$(dir $@)); fi
+
+%/depth/frame0000.np %/img/frame0000.png: %.bag scripts/bag2depthimg.py
+	source /opt/ros/indigo/setup.bash && \
+		python scripts/bag2depthimg.py $< $*/
 
 %/extracttrajectories_GFTT_SIFT_odom_gt_timeseries.txt: %/extracttrajectories_GFTT_SIFT_timeseries.pickle %.bag %_optitrack/robot.txt scripts/extract_gt_odom.py
 	source /opt/ros/indigo/setup.bash && \
