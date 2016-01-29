@@ -61,18 +61,22 @@ def sync_features_odom_gt(feature_time_series, bag_file, robot_gt):
     time_series_reader = TimeSeriesSerializer()
     feature_ts_file = open(feature_time_series)
     timestamps = time_series_reader.init_load(feature_ts_file)
+    last_odom_msg = None
+    last_gt_msg = None
     for ts, tracked_points in izip(timestamps,
                                    time_series_reader.load_iter(feature_ts_file)):
         ts = rospy.Time(ts * 1e-9)
         odom_ts, odom_msg = closest_odom.closest_msg(ts)
         if odom_msg is None:
-            raise StopIteration()
+            odom_msg = last_odom_msg
+        last_odom_msg = odom_msg
 
         pose_twist_odom = odom_msg_to_pose_twist(odom_msg)
 
         gt_ts, gt_msg = closest_gt.closest_msg(ts)
         if gt_msg is None:
-            raise StopIteration()
+            gt_msg = last_gt_msg
+        last_gt_msg = gt_msg
 
         yield FeaturesOdomGT(tracked_points, pose_twist_odom, gt_msg)
 

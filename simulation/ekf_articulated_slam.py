@@ -293,7 +293,7 @@ def articulated_slam(debug_inp=True):
     camera_K_z_view = np.array([[f, 0, img_shape[1]/2.], 
                        [0, f, img_shape[0]/2.],
                        [0,   0,   1]])
-    timeseries_data_file = "/home/vikasdhi/mid/articulatedslam/2016-01-22/rev_2016-01-22-13-56-28/extracttrajectories_GFTT_SIFT_odom_gt_timeseries.txt"
+    timeseries_data_file = "/home/vikasdhi/mid/articulatedslam/2016-01-22/all_static_2016-01-22-13-49-34/extracttrajectories_GFTT_SIFT_odom_gt_timeseries.txt"
     timeseries_dir = os.path.dirname(timeseries_data_file)
     image_file_fmt = os.path.join(timeseries_dir, "img/frame%04d.png")
     timestamps_file = os.path.join(timeseries_dir, 'img/timestamps.txt')

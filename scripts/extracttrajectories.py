@@ -5,6 +5,7 @@ from itertools import izip
 import subprocess
 import glob
 from collections import deque, namedtuple
+from os.path import join as pjoin
 
 import cv2
 import rospy
@@ -62,7 +63,7 @@ class SyncSortedTimedMessages(object):
             return synced[0], synced[1]
         else:
             thisbuffer.appendleft((msg, t))
-            return
+            return None
 
 def rosbag_topic(bagfile, imgtopic, depthtopic):
     """ Extract opencv image from bagfile """
@@ -76,10 +77,11 @@ def rosbag_topic(bagfile, imgtopic, depthtopic):
                                           ):
         # print('Got msgid=%d' % messageid[topic])
         syncedmsg = sync.add_timed_messages(messageid[topic], msg, t)
-        if not syncedmsg:
+        if syncedmsg is None:
             continue
 
         (imgmsg, img_ts), (depthmsg, d_ts) = syncedmsg
+        chosen_ts = (img_ts, d_ts)[messageid[topic]]
 
         cvimage = bridge.imgmsg_to_cv2(imgmsg, "bgr8")
         cvdepth = bridge.imgmsg_to_cv2(depthmsg, "passthrough")
@@ -88,7 +90,7 @@ def rosbag_topic(bagfile, imgtopic, depthtopic):
         assert(~np.any(np.isnan(cvdepth)))
         cvimage = cv2.resize(cvimage, dsize=cvdepth.shape[1::-1])
 
-        yield img_ts, cvimage, cvdepth
+        yield chosen_ts, cvimage, cvdepth
 
 def list_bool_indexing(list_, bool_indices):
     """ numpy like list indexing with list of bools """
@@ -209,10 +211,9 @@ class TrackCollection(object):
 
 
 class TrackCollectionSerializer(object):
-    def dump(self, file, trackcollection):
-        timestamps = sorted(set(trackcollection.timestamps))
+    def dump(self, file, trackcollection, timestamps):
         file.write("\t".join(map(str, timestamps)) + "\n")
-        for track in trackcollection.tracks():
+        for track in trackcollection:
             tracklen = len(track.kp_pt)
             if tracklen < 2:
                 continue # do not need single point tracks
@@ -426,9 +427,9 @@ class TrajectoryExtractor(object):
         imgdraw = cv2_drawTracks(img, self.tracks,
                                  latestpointcolor = green,
                                  oldpointcolor = red)
-        cv2.imshow("c", imgdraw)
+        #cv2.imshow("c", imgdraw)
         cv2.imwrite(os_handledirs(self.framesout % framecount), imgdraw)
-        cv2.waitKey(10)
+        #cv2.waitKey(10)
 
 def main():
     ##
@@ -436,8 +437,14 @@ def main():
     ## 
     bagfile = list_get(sys.argv, 1,
                        "/home/vikasdhi/data/articulatedslam/2016-01-15/all_dynamic_2016-01-15-16-07-26.bag")
-    videoout_temp = list_get(sys.argv, 2, "/tmp/%s_%s_out.avi")
-    pickleout_temp = list_get(sys.argv, 3, "/tmp/%s_%s_out.pickle")
+    outdir = list_get(sys.argv,2, os.path.splitext(bagfile)[0])
+    videoout_temp = pjoin(outdir, "%s_%s_out.avi")
+    os_handledirs(videoout_temp)
+    pickleout_temp = pjoin(outdir, "%s_%s.pickle")
+    timeseries_out_tmp = pjoin(outdir, "%s_%s_timeseries.pickle")
+    imgframe_fmt = pjoin(outdir, 'img', 'frame%04d.png')
+    depthframe_fmt = pjoin(outdir, 'depth', 'frame%04d.np')
+    timestampindex_filepath = pjoin(outdir, 'img', 'timestamps.txt')
     imgtopic = '/camera/rgb/image_rect_color'
     depthtopic = '/camera/depth_registered/image_raw'
     framesout = "/tmp/aae_extracttrajectories/frames%04d.png"
@@ -473,6 +480,7 @@ def main():
     feature2d_descriptor = "SIFT"
     videoout = videoout_temp % (feature2d_detector, feature2d_descriptor)
     pickleout = pickleout_temp % (feature2d_detector, feature2d_descriptor)
+    timeseriesout = timeseries_out_tmp % (feature2d_detector, feature2d_descriptor)
 
 
 
@@ -483,8 +491,11 @@ def main():
     traj_extract.init(img.shape, feature2d_detector, detector_config,
                       feature2d_descriptor, framesout,
                       max_dist_as_img_fraction)
-    framecount = 0
-    for timestamp, img, depth in rosbag_topic(bagfile, imgtopic, depthtopic):
+
+    ts_file = open(timestampindex_filepath, "w")
+    for framecount, (timestamp, img, depth) in enumerate(
+        rosbag_topic(bagfile, imgtopic, depthtopic)):
+
         kp_pt, desc_list = traj_extract.detectAndCompute(img)
         depth_pt = [depth[y,x] for x,y in kp_pt]
         if traj_extract.isempty():
@@ -497,15 +508,27 @@ def main():
                                                 prev_desc)
             traj_extract.updateTracks(timestamp, kp_pt, depth_pt, desc_list,
                                       prev_match_indices, match_indices)
-            traj_extract.visualize(img, framecount)
-            framecount += 1
+
+        cv2.imwrite(os_handledirs(imgframe_fmt % framecount), img)
+        traj_extract.visualize(img, framecount)
+        np.save(open(os_handledirs(depthframe_fmt % framecount), "w"), depth)
+        ts_file.write(str(timestamp))
+        ts_file.write("\n")
 
 
     # Saving tracks
-    TrackCollectionSerializer().dump(open(pickleout, 'w'), traj_extract.tracks)
+    timestamps = sorted(set(traj_extract.tracks.timestamps))
+    track_collection = [zip(track.kp_pt, track.depth, track.ts)
+                        for track in traj_extract.tracks.tracks()]
+
+    TrackCollectionSerializer().dump(open(pickleout, 'w'),
+                                     traj_extract.tracks.tracks(), timestamps)
+    [time_series, time_stamps] = reindex_as_timeseries(track_collection,
+                                                       timestamps)
+    TimeSeriesSerializer().dump(open(timeseriesout,'w'), time_series, time_stamps)
     # Video from frames
     subprocess.call(("""avconv -framerate 12 -i %s -r
-                    30 -vb 2M %s""" % (framesout, videoout)).split())
+                    12 -vb 2M %s""" % (framesout, videoout)).split())
     
 if __name__ == '__main__':
     main()
