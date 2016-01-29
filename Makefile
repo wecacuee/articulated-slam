@@ -20,10 +20,10 @@ $(PROJMIDDIR)/%/robot.txt: $(PROJDATADIR)/%/robot.txt
 	if [ -e $@ ] ; then true; else ln -sT $(dir $<) $(patsubst %/,%,$(dir $@)); fi
 
 # Recipe to convert bag to 2D SIFT trajectories
-%/extracttrajectories_GFTT_SIFT_odom_gt_timeseries.txt %/depth/frame0000.np %/img/frame0000.png %/extracttrajectories_GFTT_SIFT_timeseries.pickle %/extracttrajectories_GFTT_SIFT.avi %/extracttrajectories_GFTT_SIFT.pickle: %.bag scripts/extracttrajectories.py
+%/extracttrajectories_GFTT_SIFT_odom_gt_timeseries.txt %/depth/frame0000.np %/img/frame0000.png %/extracttrajectories_GFTT_SIFT_timeseries.pickle %/extracttrajectories_GFTT_SIFT.avi %/extracttrajectories_GFTT_SIFT.pickle: %.bag simulation/extracttrajectories.py
 	mkdir -p $(dir $@) && \
 	    source /opt/ros/indigo/setup.bash && \
-	    python scripts/extracttrajectories.py $<
+	    python simulation/extracttrajectories.py $<
 
 # video -> dense trajectories
 %/densetraj.gz %/densetraj0000.png: %.bag build/densetraj/src/densetraj/build/devel/lib/dense-trajectories/DenseTrackStab

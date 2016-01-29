@@ -181,8 +181,7 @@ class RobotView(object):
         else:
             img = cv2.imread(self._image_file_fmt % imgidx)
             if img is None:
-                img = np.ones((self._imgshape[0], self._imgshape[1], 3),
-                              dtype=np.uint8) * 255
+                raise ValueError("file not found %s" % self._image_file_fmt)
 
         return img
 
@@ -213,13 +212,13 @@ class RobotView(object):
 
         if colors is None:
             colors = [(blue if track[-1].pt3D[0, 0] < self.maxX else black)
-                      for track in ldmktracks_cam.values()]
+                      for track in ldmktracks_cam]
 
         filter_in_view = lambda proj, pt3D: proj[:, self.in_view_no_depth(proj)
                                     & (pt3D[0, :] > 0.1)]
         proj_tracks = [[filter_in_view(self.projected(pt3D_cam), pt3D_cam)
                        for ts, pt3D_cam in track]
-                       for track in ldmktracks_cam.values()]
+                       for track in ldmktracks_cam]
         filtered_proj_tracks = [[pt2D for pt2D in track if pt2D.shape[1] >= 1]
                                 for track in proj_tracks]
         filtered_proj_tracks = [track for track in filtered_proj_tracks
@@ -228,6 +227,17 @@ class RobotView(object):
                                        filtered_proj_tracks,
                                        latestpointcolor=np.asarray(colors),
                                        oldpointcolor=np.asarray(colors)*0.4)
+
+    def drawrevaxis(self, img, center, axis_vec, radius, color, size=1):
+        norm = np.linalg.norm 
+        pt13D = center + axis_vec * size/ norm(axis_vec)
+        pt23D = center - axis_vec * size/ norm(axis_vec)
+        pt1 = self.projected_world(pt13D.reshape(-1, 1))
+        pt2 = self.projected_world(pt23D.reshape(-1, 1))
+        cv2.line(img, tuple(np.int64(pt1)),
+                      tuple(np.int64(pt2)), 
+                      tuple(color))
+        return img
 
     def visualize(self, img):
         cv2.imshow(self._win_name, img)
@@ -346,8 +356,6 @@ class LandmarksVisualizer(object):
         self.camera_K = np.array([[f[0], 0, imgshape[1]/2.],
                                   [0, f[1], imgshape[0]/2.],
                                   [0, 0, 1]])
-        cv2.namedWindow(self._name, flags=cv2.WINDOW_NORMAL)
-        cv2.waitKey(-1)
 
     def set_camera_pos(self, axis_angle, pos):
         self.camera_R_w2c = rodrigues(np.asarray(axis_angle[:3]), axis_angle[3]).T
@@ -358,7 +366,7 @@ class LandmarksVisualizer(object):
         K, R, t = (self.camera_K, self.camera_R_w2c, self.camera_t_w2c)
         return homo2euc(K.dot(R.dot(points3D) + t))
 
-    def genframe(self, landmarks, robview=None, colors=None):
+    def genframe(self, landmarks, ldmk_robot_obs=[], robview=None, colors=None):
         img = np.ones(self._imgdims) * 255
         if landmarks.shape[1] > 10:
             radius_euc = 0.05
@@ -366,18 +374,18 @@ class LandmarksVisualizer(object):
             radius_euc = 0.4
         K, t = self.camera_K, self.camera_t_w2c
         radius = np.int64(np.maximum(K[0,0], K[1,1])*radius_euc/t[2])
-        if robview is not None:
-            in_view_ldmks = robview.in_view(landmarks)
-        else:
-            in_view_ldmks = np.zeros(landmarks.shape[1])
-
         if colors is not None and len(colors) > 0:
-            assert len(colors) == np.sum(in_view_ldmks), '%d <=> %d' % (len(colors), np.sum(in_view_ldmks))
-            extcolors = np.empty((landmarks.shape[1], 3))
-            extcolors[in_view_ldmks, :] = np.array(colors)
-            extcolors[~in_view_ldmks, :] = black
+            all_ldmks = np.hstack((landmarks, ldmk_robot_obs))
+            extcolors = np.empty((all_ldmks.shape[1], 3))
+            extcolors[:landmarks.shape[1], :] = black
+            extcolors[landmarks.shape[1]:, :] = np.array(colors)
             colors = [tuple(a) for a in list(extcolors)]
         else:
+            if robview is not None:
+                in_view_ldmks = robview.in_view(landmarks)
+            else:
+                in_view_ldmks = np.zeros(landmarks.shape[1])
+
             colors = [(blue if in_view_ldmks[i] else black) for i in
                       range(landmarks.shape[1])]
         proj_ldmks = self.projectToImage(landmarks)
@@ -439,6 +447,17 @@ class LandmarksVisualizer(object):
                       black)
         cv2.line(img, tuple(np.int64(pt2)),
                  tuple(np.int64(pt3)), black)
+        return img
+
+    def drawrevaxis(self, img, center, axis_vec, radius, color, size=1):
+        norm = np.linalg.norm 
+        pt13D = center + axis_vec * size/ norm(axis_vec)
+        pt23D = center - axis_vec * size/ norm(axis_vec)
+        pt1 = self.projectToImage(pt13D.reshape(-1, 1))
+        pt2 = self.projectToImage(pt23D.reshape(-1, 1))
+        cv2.line(img, tuple(np.int64(pt1)),
+                      tuple(np.int64(pt2)), 
+                      tuple(color))
         return img
 
     def imshow_and_wait(self, img):

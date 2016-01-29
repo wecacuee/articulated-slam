@@ -587,12 +587,13 @@ def main():
     feat_odom_gt_serializer = FeaturesOdomGTSerializer()
     feat_odom_gt_file = open(feat_odom_gt_out, "w")
 
-
+    framesout = "/tmp/aae_extracttrajectories/frames%04d.png"
     for ts_feat_odom_gt in feature_odom_gt_pose_iter_from_bag(bagfile,
-                                                           feature2d_detector,
-                                                           feature2d_descriptor,
-                                                           imgframe_fmt=imgframe_fmt,
-                                                           depthframe_fmt=depthframe_fmt):
+                                                              feature2d_detector,
+                                                              feature2d_descriptor,
+                                                              framesout = framesout,
+                                                              imgframe_fmt=imgframe_fmt,
+                                                              depthframe_fmt=depthframe_fmt):
         timestamp, feat_odom_gt = ts_feat_odom_gt
         trackedpts, odom, gt_pose = feat_odom_gt
         ts_file.write(str(timestamp))

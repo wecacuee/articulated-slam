@@ -28,10 +28,11 @@ import matplotlib.pyplot as plt
 import dataio
 from extracttrajectories import feature_odom_gt_pose_iter_from_bag
 
-from itertools import imap, izip
-from collections import namedtuple
+from itertools import imap, izip, tee as itr_tee, islice
+from collections import namedtuple, deque
 
 TrackedLdmk = namedtuple('TrackedLdmk', ['ts', 'pt3D'])
+models_names = ['Revolute','Prismatic','Static']
 
 SIMULATEDDATA = False
 #def threeptmap():
@@ -217,8 +218,31 @@ def robot_motion_prop(prev_state,prev_state_cov,robot_input,delta_t=1,
     state_cov = np.dot(np.dot(G,prev_state_cov),np.transpose(G))+np.dot(np.dot(V,M),np.transpose(V))
     return robot_state,state_cov
 
+class FilterTrackByLength(object):
+    def __init__(self):
+        self._track_lengths = dict()
+        self._min_track_length = 200
+
+    def count(self, rob_obs_iter):
+        for timestamp, ids,rob_state_and_input, ldmks, ldmk_robot_obs in rob_obs_iter:
+            for id in ids:
+                self._track_lengths[id] = self._track_lengths.get(id, 0) + 1
+
+    def isvalid(self, id):
+        return self._track_lengths.get(id, 0) > self._min_track_length
+
+    def filter(self, rob_obs_iter):
+        for timestamp, ids,rob_state_and_input, ldmks, ldmk_robot_obs in rob_obs_iter:
+            f_ids = [id for id in ids if self.isvalid(id)]
+            bool_valid = np.array([(True if self.isvalid(id) else False)
+                                   for id in ids])
+
+            f_ldmk_robot_obs = ldmk_robot_obs[:, bool_valid]
+            yield (timestamp, f_ids, rob_state_and_input,
+                   ldmks, f_ldmk_robot_obs)
+
 class RealDataToSimulatedFormat(object):
-    def __init__(self, K, max_depth=6):
+    def __init__(self, K, max_depth=4):
         # (z_view) real_k assumes Z in viewing direction, Y-axis downwards
         # (x_viwe) Simulated data format assumes X in viewing direction, Z -axis upwards
         R_x_view_2_z_view = rodrigues([0, 1, 0], -np.pi/2).dot(
@@ -226,7 +250,7 @@ class RealDataToSimulatedFormat(object):
         K_x_view = K.dot(R_x_view_2_z_view)
         self.camera_K_x_view = K_x_view
         self._first_gt_pose = None
-        self._all_ldmks = np.array([])
+        self._all_ldmks = np.zeros((2,0))
         self._max_depth = max_depth
 
     def first_gt_pose(self):
@@ -244,9 +268,9 @@ class RealDataToSimulatedFormat(object):
         R_c2w = rodrigues([0, 0, 1], theta)
         ldmks_world = R_c2w.dot(ldmk_robot_obs) \
                 + np.asarray([xy[0], xy[1], 0]).reshape(-1, 1)
-        max_track_id = np.maximum(np.max(track_ids), len(self._all_ldmks))
+        max_track_id = np.maximum(np.max(track_ids), self._all_ldmks.shape[1])
         all_ldmks = np.zeros((ldmks_world.shape[0], max_track_id + 1))
-        if (len(self._all_ldmks)):
+        if (self._all_ldmks.shape[1]):
             all_ldmks[:, :self._all_ldmks.shape[1]] = self._all_ldmks
         all_ldmks[:, track_ids] = ldmks_world
         self._all_ldmks = all_ldmks
@@ -266,7 +290,7 @@ class RealDataToSimulatedFormat(object):
 
         (_, _, z0), _ = self._first_gt_pose
         xyz[2] = xyz[2] - z0
-        assert abs(xyz[2]) < 0.05, 'xyz[2] - z0 = %f; z0 = %f' % (xyz[2], z0)
+        assert abs(xyz[2]) < 0.15, 'xyz[2] - z0 = %f; z0 = %f' % (xyz[2], z0)
         assert abs(abg[0]) < 0.05, 'abg[0] = %f' % abg[0]
         assert abs(abg[1]) < 0.05, 'abg[1] = %f' % abg[1]
         return (xyz[:2], abg[2])
@@ -275,7 +299,7 @@ class RealDataToSimulatedFormat(object):
         ts, features_odom_gt = ts_features_odom_gt
         tracked_pts, odom, gt_pose = features_odom_gt
         filtered_tracked_pts = [(id, pt, d) for id, pt, d in tracked_pts 
-                                if d > self._max_depth]
+                                if d < self._max_depth]
         track_ids, points, depths  = zip(*filtered_tracked_pts)
         (linvel2D, angvel2D) = self.unpack_odom(odom)
         (xy, theta) = self.unpack_gt_pose(gt_pose)
@@ -286,6 +310,13 @@ class RealDataToSimulatedFormat(object):
         return (ts, track_ids, [xy[0], xy[1], theta,
                             np.asarray(linvel2D), angvel2D],
                 all_ldmks, ldmk_robot_obs)
+
+def get_timeseries_data_iter(timeseries_data_file):
+    serializer = dataio.FeaturesOdomGTSerializer()
+    datafile = open(timeseries_data_file)
+    timestamps = serializer.init_load(datafile)
+    data_iter = izip(timestamps, serializer.load_iter(datafile))
+    return data_iter
 
 '''
 Performing Articulated SLAM
@@ -300,7 +331,7 @@ def articulated_slam(debug_inp=True):
     camera_K_z_view = np.array([[f, 0, img_shape[1]/2.], 
                        [0, f, img_shape[0]/2.],
                        [0,   0,   1]])
-    timeseries_data_file = "/home/vikasdhi/mid/articulatedslam/2016-01-22/rev2_2016-01-22-14-32-13/extracttrajectories_GFTT_SIFT_odom_gt_timeseries.txt"
+    timeseries_data_file = "/home/vikasdhi/mid/articulatedslam/2016-01-22/rev_2016-01-22-13-56-28/extracttrajectories_GFTT_SIFT_odom_gt_timeseries.txt"
     bag_file = "/home/vikasdhi/mid/articulatedslam/2016-01-22/rev2_2016-01-22-14-32-13.bag"
     timeseries_dir = os.path.dirname(timeseries_data_file)
     image_file_fmt = os.path.join(timeseries_dir, "img/frame%04d.png")
@@ -320,9 +351,8 @@ def articulated_slam(debug_inp=True):
     ldmk_am = dict(); # id->am Id here maps to the chosen Articulated model for the landmark
     ekf_map_id = dict(); # Formulating consistent EKF mean and covariance vectors
     
-    # Commenting old visualization code component	
-    #rev_color, pris_color, stat_color = [np.array(l) for l in (
-    #    [255, 0, 0], [0, 255, 0], [0, 0, 255])]
+    rev_color, pris_color, stat_color = [np.array(l) for l in (
+        [255, 0, 0], [0, 255, 0], [0, 0, 255])]
     
     # to get the landmarks with ids that are being seen by robot (Need to modify to match 3D viewing cone)
     # Handle viewable observations based on new code
@@ -336,9 +366,14 @@ def articulated_slam(debug_inp=True):
                                                   lmvis=None)
         motion_model = 'nonholonomic'
     else:
-        data_iter = feature_odom_gt_pose_iter_from_bag(bag_file, "GFTT",
+        use_bag = False
+        if use_bag:
+            data_iter = feature_odom_gt_pose_iter_from_bag(bag_file, "GFTT",
                                                        "SIFT")
-        VISDEBUG = 1
+        else:
+            data_iter = get_timeseries_data_iter(timeseries_data_file)
+
+        VISDEBUG = 0
         if VISDEBUG:
             plotables = dict()
             for i, (ts, (features, odom, gt_pose)) in enumerate(data_iter):
@@ -366,9 +401,23 @@ def articulated_slam(debug_inp=True):
             sys.exit(0)
 
         formatter = RealDataToSimulatedFormat(camera_K_z_view)
-        rob_obs_iter = imap(
+        rob_obs_iter_all = imap(
             formatter.real_data_to_required_format,
             data_iter)
+        filter_by_length = FilterTrackByLength()
+        filter_by_length.count(islice(rob_obs_iter_all, 500))
+
+        if use_bag:
+            data_iter = feature_odom_gt_pose_iter_from_bag(bag_file, "GFTT",
+                                                       "SIFT")
+        else:
+            data_iter = get_timeseries_data_iter(timeseries_data_file)
+
+        formatter = RealDataToSimulatedFormat(camera_K_z_view)
+        rob_obs_iter_all = imap(
+            formatter.real_data_to_required_format,
+            data_iter)
+        rob_obs_iter = filter_by_length.filter(islice(rob_obs_iter_all, 500))
 
         motion_model = 'holonomic'
 
@@ -390,7 +439,6 @@ def articulated_slam(debug_inp=True):
     index_set = [slam_state.shape[0]] # To update only the appropriate indices of state and covariance 
     # Observation noise
     Q_obs = np.array([[5.0,0,0],[0,5.0,0],[0,0,5.0]])
-    # Commenting old visualization code compoenents 
     #For plotting
     obs_num = 0
     # For error estimation in robot localization
@@ -401,6 +449,8 @@ def articulated_slam(debug_inp=True):
     # v1.0 Need to update to v2.0 with no rs and thetas
     # v2.0 Expected format
     for fidx,(timestamp, ids,rob_state_and_input, ldmks, ldmk_robot_obs) in enumerate(rob_obs_iter):    
+        if fidx % 7 != 0 or fidx < 200:
+            continue
         rob_state = rob_state_and_input[:3]
         robot_input = rob_state_and_input[3:]
         print '+++++++++++++ fidx = %d +++++++++++' % fidx
@@ -409,20 +459,6 @@ def articulated_slam(debug_inp=True):
         #print 'Observations:', zip(rs, thetas, ids)
         # v2.0 
         print 'Observations size:',ldmk_robot_obs.shape
-        
-        for i, id in enumerate(ids):
-            ldmktracks.setdefault(id, []).append(
-                TrackedLdmk(timestamp, ldmk_robot_obs[:, i:i+1]))
-
-        # Handle new robot view code appropriately
-        robview.set_robot_pos_theta((rob_state[0], rob_state[1], 0),
-                                    rob_state[2]) 
-        img = lmvis.genframe(ldmks, robview)
-        imgr = lmvis.drawrobot(robview, img)
-        imgrv = robview.drawtracks(ldmktracks,
-                                   imgidx=robview.imgidx_by_timestamp(timestamp))
-        robview.visualize(imgrv)
-        lmvis.imshow_and_wait(imgr)
         
         # Following EKF steps now
 
@@ -479,8 +515,8 @@ def articulated_slam(debug_inp=True):
                 # Still need to estimate the motion class
                 # Check if the model is estimated
                 if sum(motion_class.prior>m_thresh)>0:
-                    print("INFO: Model estimated\n")
                     model[id] = np.where(motion_class.prior>m_thresh)[0]	
+                    print("INFO: Model estimated %s " % models_names[int(model[id])])
                     ldmk_am[id] = motion_class.am[int(model[id])]
                     ld_ids.append(id)
                     curr_ld_state = ldmk_am[id].current_state()
@@ -540,14 +576,13 @@ def articulated_slam(debug_inp=True):
             # end of if else ldmk_am[id]
             mm_probs.append(motion_class.prior)
 
-            # commenting out old visualization code
-            #motion_class = ldmk_estimater[id]
-            #p1, p2, p3 = motion_class.prior[:3]
-            #color = np.int64((p1*rev_color
-            #         + p2*pris_color
-            #         + p3*stat_color))
-            #color = color - np.min(color)
-            #colors.append(color)
+            motion_class = ldmk_estimater[id]
+            p1, p2, p3 = motion_class.prior[:3]
+            color = np.int64((p1*rev_color
+                     + p2*pris_color
+                     + p3*stat_color))
+            color = color - np.min(color)
+            colors.append(color)
             ids_list.append(id)
 
         # end of loop over observations in single frame
@@ -561,6 +596,38 @@ def articulated_slam(debug_inp=True):
         ##up.slam_cov_plot(slam_state,slam_cov,obs_num,rob_state,ld_preds,ld_ids_preds)
         #visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state[:2],
         #                          slam_cov[:2, :2], colors,obs_num)
+
+        for i, id in enumerate(ids):
+            ldmktracks.setdefault(id, []).append(
+                TrackedLdmk(timestamp, ldmk_robot_obs[:, i:i+1]))
+
+        # Handle new robot view code appropriately
+        robview.set_robot_pos_theta((rob_state[0], rob_state[1], 0),
+                                    rob_state[2]) 
+        assert ldmk_robot_obs.shape[1] == len(colors), '%d <=> %d' % (
+            ldmk_robot_obs.shape[1], len(colors))
+        img = lmvis.genframe(ldmks, ldmk_robot_obs=ldmk_robot_obs, colors=colors)
+        imgr = lmvis.drawrobot(robview, img)
+        imgrv = robview.drawtracks([ldmktracks[id] for id in ids],
+                                   imgidx=robview.imgidx_by_timestamp(timestamp),
+                                   colors=colors)
+
+        for id in ld_ids:
+            if model[id] == 0:
+                config_pars = ldmk_am[id].config_pars
+                vec1 = config_pars['vec1']
+                vec2 = config_pars['vec2']
+                center = config_pars['center']
+                center3D = center[0]*vec1 + center[1]*vec2 + ldmk_am[id].plane_point
+                axis_vec = np.cross(vec1, vec2)
+                radius = config_pars['radius']
+                imgrv = robview.drawrevaxis(imgrv, center3D, axis_vec, radius, rev_color)
+                imgr = lmvis.drawrevaxis(imgr, center3D, axis_vec, radius,
+                                         rev_color)
+
+        robview.visualize(imgrv)
+        lmvis.imshow_and_wait(imgr)
+        
         R_temp_true = np.array([[np.cos(-rob_state[2]), -np.sin(-rob_state[2]),0],
                       [np.sin(-rob_state[2]), np.cos(-rob_state[2]),0],
                       [0,0,1]]) 
