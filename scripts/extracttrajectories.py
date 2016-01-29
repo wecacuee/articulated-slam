@@ -25,7 +25,8 @@ except AttributeError:
 def os_handledirs(filename):
     """ Creates directory for filename """
     dirname = os.path.dirname(filename)
-    if not os.path.exists(dirname): os.makedirs(dirname)
+    if not os.path.exists(dirname): 
+        os.makedirs(dirname)
     return filename
 
 class SyncSortedTimedMessages(object):
