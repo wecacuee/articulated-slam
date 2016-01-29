@@ -7,6 +7,7 @@ import numpy as np
 import numpy.random as nprnd
 from numpy.linalg import norm as vnorm
 import cv2
+import visutils
 
 red = (0, 0, 255)
 blue = (255, 0, 0)
@@ -173,12 +174,20 @@ class RobotView(object):
     def imgidx_by_timestamp(self, timestamp):
         return self._timestamps.get(timestamp, -1)
 
-    def drawlandmarks(self, points3D_cam, imgidx=-1, colors=None):
+    def get_img(self, imgidx=-1):
         if self._image_file_fmt is None or imgidx ==  -1:
             img = np.ones((self._imgshape[0], self._imgshape[1], 3),
                           dtype=np.uint8) * 255
         else:
             img = cv2.imread(self._image_file_fmt % imgidx)
+            if img is None:
+                img = np.ones((self._imgshape[0], self._imgshape[1], 3),
+                              dtype=np.uint8) * 255
+
+        return img
+
+    def drawlandmarks(self, points3D_cam, imgidx=-1, colors=None):
+        img = self.get_img(imgidx)
 
         if colors is None:
             colors = [(blue if points3D_cam[0, i] < self.maxX else black)
@@ -198,6 +207,27 @@ class RobotView(object):
                           tuple(np.int64(pt2[:, i])),
                           colors[i], thickness=-1)
         return img
+
+    def drawtracks(self, ldmktracks_cam, imgidx=-1, colors=None):
+        img = self.get_img(imgidx)
+
+        if colors is None:
+            colors = [(blue if track[-1].pt3D[0, 0] < self.maxX else black)
+                      for track in ldmktracks_cam.values()]
+
+        filter_in_view = lambda proj, pt3D: proj[:, self.in_view_no_depth(proj)
+                                    & (pt3D[0, :] > 0.1)]
+        proj_tracks = [[filter_in_view(self.projected(pt3D_cam), pt3D_cam)
+                       for ts, pt3D_cam in track]
+                       for track in ldmktracks_cam.values()]
+        filtered_proj_tracks = [[pt2D for pt2D in track if pt2D.shape[1] >= 1]
+                                for track in proj_tracks]
+        filtered_proj_tracks = [track for track in filtered_proj_tracks
+                                if len(track)]
+        return visutils.cv2_drawTracks(img,
+                                       filtered_proj_tracks,
+                                       latestpointcolor=np.asarray(colors),
+                                       oldpointcolor=np.asarray(colors)*0.4)
 
     def visualize(self, img):
         cv2.imshow(self._win_name, img)

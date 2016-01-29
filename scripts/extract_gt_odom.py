@@ -49,6 +49,12 @@ def odom_msg_to_pose_twist(odom_msg):
 
 def sync_features_odom_gt(feature_time_series, bag_file, robot_gt):
     bag = rosbag.Bag(bag_file)
+    time_series_reader = TimeSeriesSerializer()
+    timestamps = time_series_reader.init_load(feature_ts_file)
+    tracked_pts_iter = time_series_reader.load_iter(feature_ts_file))
+    return sync_features_odom_gt_bag(tracked_pts_iter, bag, robot_gt)
+
+def sync_features_odom_gt_bag(feature_time_series, bag, robot_gt):
 
     closest_odom = ClosestTimeSeriesPoint()
     func = lambda topic_msg_t: (topic_msg_t[2], topic_msg_t[1])
@@ -58,13 +64,10 @@ def sync_features_odom_gt(feature_time_series, bag_file, robot_gt):
     closest_gt = ClosestTimeSeriesPoint()
     closest_gt.set_time_series_iter(gt_pose_file(open(robot_gt)))
 
-    time_series_reader = TimeSeriesSerializer()
     feature_ts_file = open(feature_time_series)
-    timestamps = time_series_reader.init_load(feature_ts_file)
     last_odom_msg = None
     last_gt_msg = None
-    for ts, tracked_points in izip(timestamps,
-                                   time_series_reader.load_iter(feature_ts_file)):
+    for ts, tracked_points in izip(timestamps, tracked_pts_iter):
         ts = rospy.Time(ts * 1e-9)
         odom_ts, odom_msg = closest_odom.closest_msg(ts)
         if odom_msg is None:
