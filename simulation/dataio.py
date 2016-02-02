@@ -15,7 +15,10 @@ class TimeSeriesSerializer(object):
 
     def dump(self, file, time_series, timestamps):
         file.write("\t".join(map(str, timestamps)) + "\n")
-        for ts_idx, tracked_pts in time_series.iteritems():
+        self.dump_iter(file, timestamps.itervalues())
+
+    def dump_iter(self, file, time_series_iter):
+        for tracked_pts in time_series_iter:
             file.write(self.serialize_tracked_pts(tracked_pts))
             file.write("\n")
 
@@ -53,25 +56,29 @@ FeaturesOdomGT = namedtuple('FeaturesOdomGT', ['tracked_points', 'odom',
                                                'gt_pose'])
 
 class FeaturesOdomGTSerializer(object):
+    def serialize_feat_odom_gt(self, feat_odom_gt_pos):
+        feat_serializer = TimeSeriesSerializer()
+        feat, odom, gt_pos = feat_odom_gt_pos
+        cols = list() 
+        (pos, quat), (linvel, angvel) = odom
+        cols.extend(pos)
+        cols.extend(quat)
+        cols.extend(linvel)
+        cols.extend(angvel)
+
+        xyz, abg = gt_pos
+        cols.extend(xyz)
+        cols.extend(abg)
+
+        feature_str = feat_serializer.serialize_tracked_pts(feat)
+        cols.append(feature_str)
+        return "\t".join(map(str, cols))
+
     def dump(self, file, feat_odom_gt_iter, timestamps):
         file.write("\t".join(map(str, timestamps)))
         file.write("\n")
-        feat_serializer = TimeSeriesSerializer()
-        for feat, odom, gt_pos in feat_odom_gt_iter:
-            cols = list() 
-            (pos, quat), (linvel, angvel) = odom
-            cols.extend(pos)
-            cols.extend(quat)
-            cols.extend(linvel)
-            cols.extend(angvel)
-
-            xyz, abg = gt_pos
-            cols.extend(xyz)
-            cols.extend(abg)
-
-            feature_str = feat_serializer.serialize_tracked_pts(feat)
-            cols.append(feature_str)
-            file.write("\t".join(map(str, cols)))
+        for feat_odom_gt_pos in feat_odom_gt_iter:
+            file.write(self.serialize_tracked_pts(feat_odom_gt_iter))
             file.write("\n")
 
     def load(self, file):

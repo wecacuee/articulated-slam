@@ -7,7 +7,11 @@ import numpy as np
 import numpy.random as nprnd
 from numpy.linalg import norm as vnorm
 import cv2
+import visutils
 
+red = (0, 0, 255)
+blue = (255, 0, 0)
+black = (0., 0., 0.)
 
 def landmarks_from_rectangle(n, maxs):
     """Generate n landmarks within rectangle"""
@@ -88,128 +92,173 @@ class LandmarkMap(object):
 
 class RobotView(object):
     """ Describes the cone in view by robot """
-    def __init__(self, pos,maxangle,maxdist, theta, img_shape, K, maxZ):
-        """
-        pos   : 3D position in robot plane
-        theta : angle of rotation relative to x-axis with axis of rotation 
-        """
-        #self._pos = pos.reshape((3,1))
-        #self._dir = theta 
-        #self._maxangle = maxangle
-        #self._maxdist = maxdist
-
-
-        assert pos[2] == 0, "Robot is on Z-axis"
-        pos = pos[:2]
+    def __init__(self, img_shape, K, maxX, 
+                image_file_format=None, 
+                timestamps_file=None):
         self._imgshape = img_shape
-        self._K = K
-        self.maxZ = maxZ
+        self.maxX = maxX
+        if timestamps_file is not None:
+            self._timestamps = dict([(int(line.strip()), i) for i, line in
+                                enumerate(open(timestamps_file))])
+        else:
+            self._timestamps = dict()
 
         # n_h = [n, -h] notation
         # n_h^\top x_h = 0 is the equation of plane
         # where x_h is in homogeneous coordinates
         # Default equation is for z = 0
-        self._robot_plane = np.array([[0, 0, 1, 0]]).T
-        self.T_w2c = np.eye(4)
-        R_w2c = rodrigues([0, 1, 0], theta).dot(
-            rodrigues([0, 1, 0], -np.pi/2)).dot(
-                rodrigues([1, 0, 0], np.pi/2))
-        self.T_w2c[:3, :3] = R_w2c
-        t_c2w = self.robot_plane_basis().dot(pos)
-        # t_w2c = - R_c2w.T.dot(t_c2w)
-        self.T_w2c[:3, 3] = - R_w2c.dot(t_c2w)
+        self._robot_plane_w = np.array([[0, 0, 1, 0]]).T
+        self._robot_heading_c = np.array([[1, 0, 0]]).T
+        self.T_w2c = None
+        R_x_view_2_z_view = rodrigues([0, 1, 0], -np.pi/2).dot(
+            rodrigues([1, 0, 0], np.pi/2))
+        self._K_x_view = K.dot(R_x_view_2_z_view)
 
+        self._image_file_fmt = image_file_format
         self._win_name = "d"
         self._wait_period = 30
 
+    def set_robot_pos_theta(self, pos, theta):
+        """
+        pos   : 3D position in robot plane
+        theta : angle of rotation relative to x-axis with axis of rotation 
+        """
+        assert pos[2] == 0, "Robot is on Z-axis"
+        pos = pos[:2]
+        R_c2w = rodrigues([0, 0, 1], theta)
+        self.T_w2c = np.eye(4)
+        self.T_w2c[:3, :3] = R_c2w.T
+        t_c2w = self.robot_plane_basis().dot(pos)
+        # t_w2c = - R_c2w.T.dot(t_c2w)
+        self.T_w2c[:3, 3] = - R_c2w.T.dot(t_c2w)
+
     def robot_plane_basis(self):
-        xaxis = np.array([[1, 0, 0]]).T
-        yaxis = np.array([[0, 1, 0]]).T
-        plane_normal = self._robot_plane[:3, :]
+        b1 = self._robot_heading_c
+        plane_normal = self._robot_plane_w[:3, :]
+        b2 = np.cross(plane_normal.ravel(),
+                      self._robot_heading_c.ravel()).reshape(-1,1)
         plane_normal = plane_normal / np.linalg.norm(plane_normal)
-        return np.hstack((xaxis - xaxis.T.dot(plane_normal), 
-                          yaxis - yaxis.T.dot(plane_normal)))
+        return np.hstack((b1 - b1.T.dot(plane_normal), 
+                          b2 - b2.T.dot(plane_normal)))
 
     def pos_dir_z(self):
-        zaxis = self._robot_plane[:3]
-        # 0 = R_w2c * pos + t_w2c
-        # 0 = pos + R_w2c.T * t_w2c
-        pos = - self.T_w2c[:3, :3].T.dot(self.T_w2c[:3, 3:])
-        pos_z = pos - zaxis.T.dot(pos)
-        zaxis = np.array([[0, 0, 1]]).T
-        dir_ = self.T_w2c[:3, :3].T.dot(zaxis)
-        dir_z = dir_ - zaxis.T.dot(dir_)
+        plane_normal = self._robot_plane_w[:3]
+        T_c2w = np.linalg.inv(self.T_w2c)
+        origin = np.zeros((3,1))
+        pos = homo2euc(T_c2w.dot(euc2homo(origin)))
+        pos_z = pos - pos.T.dot(plane_normal)
+        dir_ = self.T_w2c[:3, :3].T.dot(self._robot_heading_c)
+        dir_z = dir_ - dir_.T.dot(plane_normal)
         return (pos, dir_z / np.linalg.norm(dir_z))
 
     def maxangle_z(self):
-        u1 = self._K.dot([self._imgshape[1], 0, 1])
+        Kinv = np.linalg.inv(self._K_x_view)
+        u1 = Kinv.dot([self._imgshape[1], 0, 1])
         u1 = u1 / np.linalg.norm(u1)
-        u2 = self._K.dot([0, 0, 1])
+        u2 = Kinv.dot([0, 0, 1])
         u2 = u2 / np.linalg.norm(u2)
         return np.arccos(u2.T.dot(u1))
 
-    def projected(self, points3D):
-        points3D = np.asarray(points3D)
-        K, T = self._K, self.T_w2c
-        P = K.dot(T[:3, :])
-        projected = homo2euc(P.dot(euc2homo(points3D)))
+    def projected(self, points3D_cam):
+        points3D = np.asarray(points3D_cam)
+        K = self._K_x_view
+        projected = homo2euc(K.dot(points3D))
         return projected
 
-    def drawlandmarks(self, points3D):
-        img = np.ones((self._imgshape[0], self._imgshape[1], 3),
-                      dtype=np.uint8) * 255
-        radius = 2
-        projected = self.projected_in_view(points3D)
-        pt2 = projected + radius
+    def projected_world(self, points3D_world):
+        points3D = np.asarray(points3D_world)
+        T = self.T_w2c
+        return self.projected(
+            homo2euc(T.dot(euc2homo(points3D))))
+
+    def imgidx_by_timestamp(self, timestamp):
+        return self._timestamps.get(timestamp, -1)
+
+    def get_img(self, imgidx=-1):
+        if self._image_file_fmt is None or imgidx ==  -1:
+            img = np.ones((self._imgshape[0], self._imgshape[1], 3),
+                          dtype=np.uint8) * 255
+        else:
+            img = cv2.imread(self._image_file_fmt % imgidx)
+            if img is None:
+                raise ValueError("file not found %s" % self._image_file_fmt)
+
+        return img
+
+    def drawlandmarks(self, points3D_cam, imgidx=-1, colors=None):
+        img = self.get_img(imgidx)
+
+        if colors is None:
+            colors = [(blue if points3D_cam[0, i] < self.maxX else black)
+                      for i in range(points3D_cam.shape[1])]
+
+        radius = 0.05
+        projected = self.projected(points3D_cam)
+        in_view = self.in_view_no_depth(projected) & (
+            points3D_cam[0, :] > 0.1)
+        projected = projected[:, in_view]
+        pt2 = self.projected(points3D_cam + radius)[:, in_view]
+        colors = [c for i, c in enumerate(colors) if in_view[i]]
+
         for i in range(pt2.shape[1]):
             cv2.rectangle(img, 
                           tuple(np.int64(projected[:, i])),
                           tuple(np.int64(pt2[:, i])),
-                          (0, 0, 255), thickness=-1)
+                          colors[i], thickness=-1)
+        return img
+
+    def drawtracks(self, ldmktracks_cam, imgidx=-1, colors=None):
+        img = self.get_img(imgidx)
+
+        if colors is None:
+            colors = [(blue if track[-1].pt3D[0, 0] < self.maxX else black)
+                      for track in ldmktracks_cam]
+
+        filter_in_view = lambda proj, pt3D: proj[:, self.in_view_no_depth(proj)
+                                    & (pt3D[0, :] > 0.1)]
+        proj_tracks = [[filter_in_view(self.projected(pt3D_cam), pt3D_cam)
+                       for ts, pt3D_cam in track]
+                       for track in ldmktracks_cam]
+        filtered_proj_tracks = [[pt2D for pt2D in track if pt2D.shape[1] >= 1]
+                                for track in proj_tracks]
+        filtered_proj_tracks = [track for track in filtered_proj_tracks
+                                if len(track)]
+        return visutils.cv2_drawTracks(img,
+                                       filtered_proj_tracks,
+                                       latestpointcolor=np.asarray(colors),
+                                       oldpointcolor=np.asarray(colors)*0.4)
+
+    def drawrevaxis(self, img, center, axis_vec, radius, color, size=1):
+        norm = np.linalg.norm 
+        pt13D = center + axis_vec * size/ norm(axis_vec)
+        pt23D = center - axis_vec * size/ norm(axis_vec)
+        pt1 = self.projected_world(pt13D.reshape(-1, 1))
+        pt2 = self.projected_world(pt23D.reshape(-1, 1))
+        cv2.line(img, tuple(np.int64(pt1)),
+                      tuple(np.int64(pt2)), 
+                      tuple(color))
         return img
 
     def visualize(self, img):
         cv2.imshow(self._win_name, img)
         cv2.waitKey(self._wait_period)
 
-    def projected_in_view(self, points3D):
-        projected = self.projected(points3D)
+    def in_view_no_depth(self, projected):
         in_view = ((projected[0, :] >= 0) 
                    & (projected[0, :] < self._imgshape[1]) 
                    & (projected[1, :] >= 0) 
                    & (projected[1, :] < self._imgshape[0]))
-        return projected[:, in_view]
-
-
-    def in_view(self, points3D):
-        """ Returns true for points that are within view """
-        projected = self.projected(points3D)
-        points3D_cam = homo2euc(self.T_w2c.dot(euc2homo(points3D)))
-        # within image and closer than maxZ
-        in_view = ((projected[0, :] >= 0) 
-                   & (projected[0, :] < self._imgshape[1]) 
-                   & (projected[1, :] >= 0) 
-                   & (projected[1, :] < self._imgshape[0]) 
-                   & (points3D_cam[2, :] >= 0.5) 
-                   & (points3D_cam[2, :] < self.maxZ))
         return in_view
-        #points = points3D
-        #apex = np.hstack(self._pos)
-        #theta = self._dir        
-        #phi = 90*np.pi/180
-        #base = np.array([[self._maxdist*np.cos(theta)*np.sin(phi)],
-        #                [self._maxdist*np.sin(theta)*np.sin(phi)],
-        #                [self._maxdist*np.cos(phi)]])
-        #base = np.hstack(base) + np.array(apex)
-        #in_view_pts = np.zeros(points.shape[1],dtype=bool) 
-        #for it in range(points.shape[1]):
-        #    in_view_pts[it] = False 
-        #    ap2vec = apex - points[:,it]
-        #    axisvec = apex - base
-        #    policy1 = np.around(ap2vec.dot(axisvec)/np.linalg.norm(axisvec)/np.linalg.norm(ap2vec),3) >= np.around(np.cos(self._maxangle),3)
-        #    policy2 = np.around(ap2vec.dot(axisvec)/np.linalg.norm(axisvec),3) <= np.around(np.linalg.norm(axisvec),3)
-        #    in_view_pts[it] = policy1 & policy2
-        #return in_view_pts
+
+    def in_view(self, points3D_world):
+        """ Returns true for points that are within view """
+        projected = self.projected_world(points3D_world)
+        points3D_cam = homo2euc(self.T_w2c.dot(euc2homo(points3D_world)))
+        # within image and closer than maxX
+        in_view = (self.in_view_no_depth(projected) 
+                   & (points3D_cam[0, :] >= 0.5) 
+                   & (points3D_cam[0, :] < self.maxX))
+        return in_view
 
 def rotmat_z(theta):
     '''
@@ -265,13 +314,14 @@ def robot_trajectory(positions, lin_vel, angular_vel, circle_flag=False,r=20,cen
         theta = 0
         cur = None
         for it in range(nframes):
-            to_dir = np.array([center[0]+r*np.cos(theta+it*w_v),center[1]+r*np.sin(theta+it*w_v),0])
+            to_dir = np.array([center[0]+r*np.cos(theta+it*w_v),
+                               center[1]+r*np.sin(theta+it*w_v),0])
             if cur is not None:
                 # Assumption of moving in counter clockwise direction
                 dir = (to_dir - cur)/vnorm(to_dir-cur)
-                yield(to_dir,np.pi/2+ theta+it*w_v,r*w_v,w_v)
+                yield(to_dir, np.pi/2+ theta+it*w_v, r*w_v, w_v)
             else:
-                yield(to_dir,np.pi/2,0,0)
+                yield(to_dir, np.pi/2, 0, 0)
             cur = to_dir 
         
 
@@ -306,41 +356,36 @@ class LandmarksVisualizer(object):
         self.camera_K = np.array([[f[0], 0, imgshape[1]/2.],
                                   [0, f[1], imgshape[0]/2.],
                                   [0, 0, 1]])
-        cv2.namedWindow(self._name, flags=cv2.WINDOW_NORMAL)
-        cv2.waitKey(-1)
 
     def set_camera_pos(self, axis_angle, pos):
-        self.camera_R = rodrigues(np.asarray(axis_angle[:3]), axis_angle[3]).T
-        self.camera_t = - self.camera_R.dot(pos)
+        self.camera_R_w2c = rodrigues(np.asarray(axis_angle[:3]), axis_angle[3]).T
+        self.camera_t_w2c = - self.camera_R_w2c.dot(pos)
 
     def projectToImage(self, points3D):
         points3D = np.asarray(points3D).reshape(3, -1)
-        K, R, t = (self.camera_K, self.camera_R, self.camera_t)
+        K, R, t = (self.camera_K, self.camera_R_w2c, self.camera_t_w2c)
         return homo2euc(K.dot(R.dot(points3D) + t))
 
-    def genframe(self, landmarks, robview=None, colors=None):
+    def genframe(self, landmarks, ldmk_robot_obs=[], robview=None, colors=None):
         img = np.ones(self._imgdims) * 255
         if landmarks.shape[1] > 10:
             radius_euc = 0.05
         else:
             radius_euc = 0.4
-        K, t = self.camera_K, self.camera_t
+        K, t = self.camera_K, self.camera_t_w2c
         radius = np.int64(np.maximum(K[0,0], K[1,1])*radius_euc/t[2])
-        red = (0, 0, 255)
-        blue = (255, 0, 0)
-        black = (0., 0., 0.)
-        if robview is not None:
-            in_view_ldmks = robview.in_view(landmarks)
-        else:
-            in_view_ldmks = np.zeros(landmarks.shape[1])
-
         if colors is not None and len(colors) > 0:
-            assert len(colors) == np.sum(in_view_ldmks), '%d <=> %d' % (len(colors), np.sum(in_view_ldmks))
-            extcolors = np.empty((landmarks.shape[1], 3))
-            extcolors[in_view_ldmks, :] = np.array(colors)
-            extcolors[~in_view_ldmks, :] = black
+            all_ldmks = np.hstack((landmarks, ldmk_robot_obs))
+            extcolors = np.empty((all_ldmks.shape[1], 3))
+            extcolors[:landmarks.shape[1], :] = black
+            extcolors[landmarks.shape[1]:, :] = np.array(colors)
             colors = [tuple(a) for a in list(extcolors)]
         else:
+            if robview is not None:
+                in_view_ldmks = robview.in_view(landmarks)
+            else:
+                in_view_ldmks = np.zeros(landmarks.shape[1])
+
             colors = [(blue if in_view_ldmks[i] else black) for i in
                       range(landmarks.shape[1])]
         proj_ldmks = self.projectToImage(landmarks)
@@ -382,7 +427,7 @@ class LandmarksVisualizer(object):
     def drawrobot(self, robview, img):
         pos, dir = robview.pos_dir_z()
         maxangle = robview.maxangle_z()
-        maxdist = robview.maxZ
+        maxdist = robview.maxX
 
         pt1 = self.projectToImage(pos).ravel()
         pt2 = self.project_direction_shift(pos,
@@ -391,7 +436,6 @@ class LandmarksVisualizer(object):
         pt3 = self.project_direction_shift(pos,
                                            rotmat_z(maxangle/2).dot(dir),
                                            maxdist).ravel()
-
         black = (0,0,0)
         red = (0, 0, 255)
         #cv2.fillConvexPoly(img, np.int64([[pt1, pt2, pt3]]), color=red)
@@ -403,6 +447,17 @@ class LandmarksVisualizer(object):
                       black)
         cv2.line(img, tuple(np.int64(pt2)),
                  tuple(np.int64(pt3)), black)
+        return img
+
+    def drawrevaxis(self, img, center, axis_vec, radius, color, size=1):
+        norm = np.linalg.norm 
+        pt13D = center + axis_vec * size/ norm(axis_vec)
+        pt23D = center - axis_vec * size/ norm(axis_vec)
+        pt1 = self.projectToImage(pt13D.reshape(-1, 1))
+        pt2 = self.projectToImage(pt23D.reshape(-1, 1))
+        cv2.line(img, tuple(np.int64(pt1)),
+                      tuple(np.int64(pt2)), 
+                      tuple(color))
         return img
 
     def imshow_and_wait(self, img):
@@ -419,7 +474,8 @@ class LandmarksVisualizer(object):
         frame_period = self.frame_period
         for lmks, posdir in itertools.izip(map.get_landmarks(), 
                                            robottraj_iter):
-            robview = RobotView(posdir[0], posdir[1], 45*np.pi/180, 40)
+            robview = RobotView(img_shape, K, maxX)
+            robview.set_robot_pos_theta(posdir[0], posdir[1])
             img = self.genframe(lmks, robview)
             img = self.drawrobot(robview, img)
             cv2.imshow(self._name, img)
@@ -443,6 +499,7 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, imgshape, K, lmvis
     """ Return a tuple of r, theta and ids for each frame"""
     """ v2.0 Return a ituple of lndmks in robot frame and ids for each frame"""
     prev_theta =  None
+    robview = RobotView(imgshape, K, maxdist)
     for ldmks, posdir_and_inputs in itertools.izip(lmmap.get_landmarks(), 
                                        robtraj):
         posdir = posdir_and_inputs[:2]
@@ -451,8 +508,7 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, imgshape, K, lmvis
         #assert(dir[2] == 0)
         #theta = np.arctan2(dir[1], dir[0])
         # Handle in new visualizer
-        robview = RobotView(posdir[0], maxangle,maxdist,rob_theta, 
-                            imgshape, K, maxdist)
+        robview.set_robot_pos_theta(posdir[0], rob_theta)
         if lmvis is not None:
             img = lmvis.genframe(ldmks, robview)
             img = lmvis.drawrobot(robview, img)
@@ -486,12 +542,15 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, imgshape, K, lmvis
         
         # Changed selected_ldmks to robot coordinate frame -> looks like we need to directly send           obsvecs with rotation according to heading
         # v2.0 Rename gen_obs
-        ldmk_robot_obs = rotmat_z(rob_theta).dot(selected_ldmks-pos)
+        R_c2w = rodrigues([0, 0, 1], rob_theta)
+        R_w2c = R_c2w.T
+        ldmk_robot_obs = R_w2c.dot(selected_ldmks-pos)
         # Ignoring robot's Z component
-        yield (ldmks_idx[0], [float(pos[0]), float(pos[1]),
+        yield (0, ldmks_idx[0], [float(pos[0]), float(pos[1]),
                                              rob_theta,
                                              float(robot_inputs[0]),
-                                             float(robot_inputs[1])], ldmks,ldmk_robot_obs)
+                                             float(robot_inputs[1])], ldmks,
+               ldmk_robot_obs)
 
 def map_from_conf(map_conf, nframes):
     """ Generate LandmarkMap from configuration """

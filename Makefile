@@ -19,19 +19,11 @@ $(PROJMIDDIR)/%.bag: $(PROJDATADIR)/%.bag
 $(PROJMIDDIR)/%/robot.txt: $(PROJDATADIR)/%/robot.txt
 	if [ -e $@ ] ; then true; else ln -sT $(dir $<) $(patsubst %/,%,$(dir $@)); fi
 
-%/extracttrajectories_GFTT_SIFT_odom_gt_timeseries.txt: %/extracttrajectories_GFTT_SIFT_timeseries.pickle %.bag %_optitrack/robot.txt scripts/extract_gt_odom.py
-	source /opt/ros/indigo/setup.bash && \
-		python scripts/extract_gt_odom.py $< $(word 2,$^) $(word 3,$^) > $@
-
-%/extracttrajectories_GFTT_SIFT_timeseries.pickle: %/extracttrajectories_GFTT_SIFT.pickle scripts/track_collection_to_time_series.py
-	source /opt/ros/indigo/setup.bash && \
-	    python scripts/track_collection_to_time_series.py < $< > $@
-
 # Recipe to convert bag to 2D SIFT trajectories
-%/extracttrajectories_GFTT_SIFT.avi %/extracttrajectories_GFTT_SIFT.pickle: %.bag
+%/extracttrajectories_GFTT_SIFT_odom_gt_timeseries.txt %/depth/frame0000.np %/img/frame0000.png %/extracttrajectories_GFTT_SIFT_timeseries.pickle %/extracttrajectories_GFTT_SIFT.avi %/extracttrajectories_GFTT_SIFT.pickle: %.bag simulation/extracttrajectories.py
 	mkdir -p $(dir $@) && \
 	    source /opt/ros/indigo/setup.bash && \
-	    python scripts/extracttrajectories.py $< $*/extracttrajectories_%s_%s.avi $*/extracttrajectories_%s_%s.pickle
+	    python simulation/extracttrajectories.py $<
 
 # video -> dense trajectories
 %/densetraj.gz %/densetraj0000.png: %.bag build/densetraj/src/densetraj/build/devel/lib/dense-trajectories/DenseTrackStab
