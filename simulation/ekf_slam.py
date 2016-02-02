@@ -9,7 +9,7 @@ import pdb
 import utils_plot as up
 import scipy.linalg
 import matplotlib.pyplot as plt
-
+import matplotlib.font_manager as fm
 
 
 '''
@@ -126,49 +126,79 @@ def cartesian_to_bearing(obs,robot_state):
 #
 #    return nframes, lmmap, lmvis, robtraj, maxangle, maxdist
 def Rtoquat(R):
-    qw = np.sqrt(1+R[0,0,]+R[1,1]+R[2,2])/2.0
-    qx = (R[2,1] - R[1,2])/4/qw
-    qy = (R[0,2] - R[2,0])/4/qw
-    qz = (R[1,0] - R[0,1])/4/qw
+
+    tr = R[0,0] + R[1,1] + R[2,2]
+    if tr>0:
+        S = np.sqrt(tr+1.0)*2
+        qw = 0.25*S
+        qx = (R[2,1] - R[1,2])/S
+        qy = (R[0,2] - R[2,0])/S
+        qz = (R[1,0] - R[0,1])/S
+    
+    elif R[0,0]>R[1,1] and R[0,0]>R[2,2]:
+        S = np.sqrt(1.0+R[0,0]-R[1,1]-R[2,2])*2
+        qw = (R[2,1] - R[1,2])/S
+        qx = 0.25*S
+        qy = (R[0,1]+R[1,0])/S
+        qz = (R[0,2]+R[2,0])/S
+    
+    elif R[1,1]>R[2,2]:
+        S = np.sqrt(1.0+R[1,1]-R[0,0]-R[2,2])*2
+        qw = (R[0,2]-R[2,0])/S
+        qx = (R[0,1]+R[1,0])/S
+        qy = 0.25*S
+        qz = (R[1,2]+R[2,1])/S
+    else:
+        S = np.sqrt(1.0+R[2,2]-R[0,0]-R[1,1])*2
+        qw = (R[1,0]-R[0,1])/S
+        qx = (R[0,2]+R[2,0])/S
+        qy = (R[1,2]+R[2,1])/S
+        qz = 0.25*S
     return (qx,qy,qz,qw)
 
+
 def threeptmap3d():
-    nframes = 100
+    nframes = 105
+    scale = 30. 
     #map_conf=   [#static
     #            dict(ldmks=np.array([[0,10,0,]]).T,
     #            initthetas=[0,0,0],
     #            initpos=[0,0,0],
     #            delthetas=[0,0,np.pi/10],
     #            delpos=[0,0,0])]    
-    map_conf=  [#static
-               # dict(ldmks=np.array([[0,0,0,]]).T,
-               # initthetas=[0,0,0],
-               # initpos=[x,y,z],
-               # delthetas=[0,0,0],
-               # delpos=[0,0,0])
-               # for x,y,z in zip([10]*10 + range(10,191,20)+[190]*10+range(10,191,20),
-               #                  range(10,191,20)+[190]*10+range(10,191,20)+[10]*10,
-               #                  [5]*10 + range(1,11,1)+[1]*10+range(1,11,1))
-               #]+[#Prismatic
-               # dict(ldmks=np.array([[0,40,0]]).T,
-               # initthetas=[0,0,0],
-               # initpos=[0,0,0],
-               # delthetas=[0,0,0],
-               # delpos=[1,0,0])]
-               #]+[#Revolute
-                dict(ldmks=np.array([[40,40,0]]).T,
+    map_conf=   [#static
+                dict(ldmks=np.array([[0,0,0,]]).T/scale,
                 initthetas=[0,0,0],
-                initpos=[0,0,0],
+                initpos=np.array([x,y,z])/scale,
+                delthetas=[0,0,0],
+                delpos=np.array([0,0,0])/scale)
+                for x,y,z in zip([10]*10 + range(10,191,20)+[190]*10+range(10,191,20),
+                                 range(10,191,20)+[190]*10+range(10,191,20)+[10]*10,
+                                 [5]*10 + range(1,11,1)+[1]*10+range(1,11,1))
+                ]+[#Prismatic
+                dict(ldmks=np.array([[0,160,0]]).T/scale,
+                initthetas=[0,0,0],
+                initpos=np.array([0,0,0])/scale,
+                delthetas=[0,0,0],
+                delpos=np.array([1,0,0])/scale)
+                ]+[#Revolute
+                dict(ldmks=np.array([[10,10,0]]).T/scale,
+                initthetas=[0,0,0],
+                initpos=np.array([130,130,0])/scale,
                 delthetas=[0,0,np.pi/10],
-                delpos=[0,0,0])]
+                delpos=np.array([0,0,0])/scale)]
 
- 
     lmmap = landmarkmap.map_from_conf(map_conf,nframes)
+    robtraj = landmarkmap.robot_trajectory(
+            np.array([[110,90,0],[140,60,0],[120,50,0],[110,90,0],[140,60,0]]) / scale,
+            0.2, np.pi/50, True, 100/scale, np.array([40, 40])/scale, nframes)
+
     # For now static robot 
     #robtraj = landmarkmap.robot_trajectory(np.array([[0,0,0],[20,20,0]]),0.01,np.pi/10)
-    robtraj = landmarkmap.robot_trajectory(np.array([[60,140,0],[0,175,0],[-60,140,0],[-60,-140,0],[60,-140,0]]),0.2,np.pi/10)
+    #robtraj = landmarkmap.robot_trajectory(np.array([[60,140,0],[0,175,0],[-60,140,0],[-60,-140,0],[60,-140,0]]),0.2,np.pi/10)
+    #robtraj = landmarkmap.robot_trajectory(np.array([[110,90,0],[40,175,0]]) / scale,0.1,np.pi/10)
     maxangle = 45*np.pi/180
-    maxdist = 120 
+    maxdist = 120/scale 
     return nframes,lmmap,robtraj,maxangle,maxdist
 
 
@@ -278,13 +308,22 @@ def slam(debug_inp=True):
     # For plotting
     obs_num = 0
     # Initial covariance for landmarks (x,y) position
-    initial_cov = np.array([[5.0,0,0],[0,5.0,0],[0,0,5.0]])
+    initial_cov = np.array([[1.0,0,0],[0,1.0,0],[0,0,1.0]])
     # For error estimation in robot localization
     true_robot_states = []
     slam_robot_states = []
-
-    # Processing all the observations
-    # We need to skip the first observation because it was used to initialize SLAM State
+    prob_plot1 = []
+    prob_plot2 = []
+    prob_plot3 = []
+    # Noise settings
+    mu = 0.0
+    sigma = 0.1
+ 
+    csv = np.genfromtxt('expt_noise.csv',delimiter=',')
+    count = 0 
+    pdb.set_trace()
+        # Processing all the observations
+        # We need to skip the first observation because it was used to initialize SLAM State
     for fidx, (ids, rob_state_and_input, ldmks,ldmk_robot_obs) in enumerate(rob_obs_iter[1:]): 
         rob_state = rob_state_and_input[:3]
         robot_input = rob_state_and_input[3:]
@@ -309,6 +348,10 @@ def slam(debug_inp=True):
         for id,ldmk_rob_obv in zip(ids,np.dstack(ldmk_robot_obs)[0]):
             # Observation corresponding to current landmark is
             #obs = np.array([r, theta])
+            # Adding noise to observations
+            ldmk_rob_obv = ldmk_rob_obv + csv[count,:]
+            count = count + 1
+                
             '''
             Step 1: Process Observations to first determine the motion model of each landmark
             During this step we will use robot's internal odometry to get the best position of 
@@ -324,6 +367,12 @@ def slam(debug_inp=True):
                 ld_ids.append(id)
                 # Getting the current state to be added to the SLAM state (x,y) position of landmark
                 curr_ld_state = robot_to_world(slam_state,ldmk_rob_obv)
+                if id==40:
+                    prob_plot1 = curr_ld_state
+                if id==41:
+                    prob_plot2 = curr_ld_state
+                if id==13:
+                    prob_plot3 = curr_ld_state
                 curr_ld_cov = initial_cov 
                 index_set.append(index_set[-1]+curr_ld_state.shape[0])
                 # Extend Robot state by adding the motion parameter of the landmark
@@ -340,7 +389,7 @@ def slam(debug_inp=True):
                 curr_ind = ld_ids.index(id)
                 # Following steps from Table 10.2 from book Probabilistic Robotics
                 lk_pred = robot_to_world(slam_state[0:3],ldmk_rob_obv)
-                
+            
                 R_temp = np.array([[np.cos(slam_state[2]), -np.sin(slam_state[2]),0],
                          [np.sin(slam_state[2]), np.cos(slam_state[2]),0],
                          [0,0,1]])
@@ -402,14 +451,35 @@ def slam(debug_inp=True):
  
         quat_true = Rtoquat(R_temp_true)
         quat_slam = Rtoquat(R_temp)
-        f_gt.write(str(fidx+1)+" "+str(rob_state[0])+" "+str(rob_state[1])+" "+str(0)+" "+str(quat_true[0])+" "+str(quat_true[1])+" "+str(quat_true[2])+" "+str(quat_true[3])+" "+"\n")
-        f_slam.write(str(fidx+1)+" "+str(slam_state[0])+" "+str(slam_state[1])+" "+str(0)+" "+str(quat_slam[0])+" "+str(quat_slam[1])+" "+str(quat_slam[2])+" "+str(quat_slam[3])+" "+"\n")
+        if fidx<100:
+            f_gt.write(str(fidx+1)+" "+str(rob_state[0])+" "+str(rob_state[1])+" "+str(0)+" "+str(quat_true[0])+" "+str(quat_true[1])+" "+str(quat_true[2])+" "+str(quat_true[3])+" "+"\n")
+            f_slam.write(str(fidx+1)+" "+str(slam_state[0])+" "+str(slam_state[1])+" "+str(0)+" "+str(quat_slam[0])+" "+str(quat_slam[1])+" "+str(quat_slam[2])+" "+str(quat_slam[3])+" "+"\n")
  
 
 
-        true_robot_states.append(rob_state)
-        slam_robot_states.append(slam_state[0:3].tolist())
+            true_robot_states.append(rob_state)
+            slam_robot_states.append(slam_state[0:3].tolist())
     # end of loop over frames
+
+    print count 
+    # Generating plots for paper
+
+    plt.figure('Trajectories')
+    pdb.set_trace()
+    true_robot_states = np.dstack(true_robot_states)[0]
+    slam_robot_states = np.dstack(slam_robot_states)[0]
+    plt.plot(true_robot_states[0],true_robot_states[1],'-k',linestyle='dashed',label='True Robot trajectory',markersize=15.0)
+    plt.plot(slam_robot_states[0],slam_robot_states[1],'^g',label='EKF SLAM trajectory',markersize=15.0)
+    plt.plot(prob_plot1[0],prob_plot1[1],'*g',label='Prismatic',markersize=15.0)
+    plt.plot(prob_plot2[0],prob_plot2[1],'ob',label='Revolute',markersize=15.0)
+    plt.plot(prob_plot3[0],prob_plot3[1],'^r',label='Static',markersize=15.0)
+    plt.yticks([-2,0,2,4,6],fontsize = 24)
+    plt.xticks([-2,0,2,4,6],fontsize = 24)
+    plt.legend(loc=4,fontsize=24)
+    plt.show()
+
+
+
     f_gt.close()
     f_slam.close()
     return (true_robot_states,slam_robot_states)

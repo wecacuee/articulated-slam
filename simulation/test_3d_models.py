@@ -61,7 +61,7 @@ def gen_simple_data(model='rev'):
     elif model=='static':
         x_0 = 2#*np.random.random_sample() 
         y_0 = 2#*np.random.random_sample() 
-        z_0 = 1.0#2*np.random.random_sample() 
+        z_0 = 0#2*np.random.random_sample() 
         for i in range(30):
             yield np.array([x_0,y_0,z_0])
 
@@ -108,7 +108,7 @@ def gen_id():
     for i in range(30):
         yield np.array([0,1,2])    
                     
-def gen_cmplx_data(model1='rev',model2='rev',model3='rev'):
+def gen_cmplx_data(model1='static',model2='rev',model3='rev'):
     data = gen_simple_data(model1)
     data2 = gen_simple_data(model2) 
     data3 = gen_simple_data(model3)
@@ -225,7 +225,7 @@ def test():
     # Generate map using a single function
     # 
     # Need to modify data generation
-    data = gen_cmplx_data('pris','rev','static')
+    data = gen_cmplx_data('static','rev','static')
     #data_init_pt = gen_init('pris')
     #data2_init_pt = gen_init('rev')   
     #data3_init_pt = gen_init('static')
@@ -344,8 +344,6 @@ def test():
                     pos_list = np.ndarray.tolist(slam_state[0:2]) 
                     pos_list.append(0.0)
                     z_pred = R_temp.T.dot(lk_pred)+np.array(pos_list)
-
-
                     H_mat = np.zeros((3,index_set[-1]))
                     theta = slam_state[2]
                     H_mat[0,0:3] = np.array([1,0,-np.sin(theta)*curr_obs[0] - np.cos(theta)*curr_obs[1]])
