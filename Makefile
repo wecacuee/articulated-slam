@@ -3,6 +3,7 @@ DATADIR:=/home/vikasdhi/data
 MIDDIR:=/home/vikasdhi/mid
 PROJDATADIR:=$(DATADIR)/articulatedslam/2016-01-22
 PROJMIDDIR:=$(MIDDIR)/articulatedslam/2016-01-22
+PYTHONPATH:=simulation/:$(PYTHONPATH)
 
 .SECONDARY:
 

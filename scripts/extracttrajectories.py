@@ -14,6 +14,8 @@ from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
 import cv2
 
+from dataio import TimeSeriesSerializer, TrackedPoint
+
 # http://stackoverflow.com/questions/15584608/python-opencv2-cv2-cv-fourcc-not-working-with-videowriterb
 try:
     cv2_VideoWriter_fourcc = cv2.VideoWriter_fourc
@@ -239,8 +241,6 @@ class TrackCollectionSerializer(object):
 
         return trackcollection, timestamps
 
-TrackedPoint = namedtuple('TrackedPoint', ['track_id', 'pt', 'depth'])
-
 def reindex_as_timeseries(trackcollection, timestamps):
     time_series = dict()
     for tid, track in enumerate(trackcollection):
@@ -250,53 +250,6 @@ def reindex_as_timeseries(trackcollection, timestamps):
                 TrackedPoint(tid, pt, depth))
 
     return time_series, timestamps
-
-class TimeSeriesSerializer(object):
-
-    def serialize_tracked_pts(self, tracked_pts):
-        cols = list()
-        npoints = len(tracked_pts)
-        cols.append(npoints)
-        for (tid, pt, depth) in tracked_pts:
-            cols.extend((tid, pt[0], pt[1], depth))
-
-        return "\t".join(map(str, cols))
-
-    def dump(self, file, time_series, timestamps):
-        file.write("\t".join(map(str, timestamps)) + "\n")
-        for ts_idx, tracked_pts in time_series.iteritems():
-            file.write(self.serialize_tracked_pts(tracked_pts))
-            file.write("\n")
-
-    def unpack_tracked_pts(self, tracked_pts_str_cols):
-        cols = tracked_pts_str_cols
-        npoints = int(cols[0])
-        tracked_points = list()
-        for i in range(npoints):
-            tid = int(cols[1+4*i])
-            x, y, depth = map(float, cols[4*i+2:4*i+5])
-            pt = (x, y)
-            tracked_points.append(TrackedPoint(tid, pt, depth))
-        return tracked_points
-
-
-    def load_iter(self, file_but_first_line):
-        for ts_idx, line in enumerate(file_but_first_line):
-            yield self.unpack_tracked_pts(line.strip().split("\t"))
-
-    def init_load(self, file):
-        line = file.readline().strip()
-        timestamps = map(int, line.strip().split("\t"))
-        return timestamps
-
-    def load(self, file):
-        timestamps = self.init_load(file)
-
-        timeseries = dict()
-        for tracked_points in self.load_iter(file):
-            timeseries[ts_idx] = tracked_points
-
-        return timeseries, timestamps
 
 def cv2_drawMatches(img1, kp1_pt, img2, kp2_pt, matches, outimg,
                     matchColor=(0,255, 0),
