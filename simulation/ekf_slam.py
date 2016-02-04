@@ -1,7 +1,7 @@
 '''
 Perform the actual SLAM on the landmarks and robot positions
 '''
-import landmarkmap3d as landmarkmap
+import landmarkmap3d_sim as landmarkmap
 import cv2
 import numpy as np
 import scipy.stats as sp
@@ -158,7 +158,7 @@ def Rtoquat(R):
 
 
 def threeptmap3d():
-    nframes = 105
+    nframes = 110
     scale = 30. 
     #map_conf=   [#static
     #            dict(ldmks=np.array([[0,10,0,]]).T,
@@ -176,7 +176,7 @@ def threeptmap3d():
                                  range(10,191,20)+[190]*10+range(10,191,20)+[10]*10,
                                  [5]*10 + range(1,11,1)+[1]*10+range(1,11,1))
                 ]+[#Prismatic
-                dict(ldmks=np.array([[0,160,0]]).T/scale,
+                dict(ldmks=np.array([[40,160,0]]).T/scale,
                 initthetas=[0,0,0],
                 initpos=np.array([0,0,0])/scale,
                 delthetas=[0,0,0],
@@ -185,7 +185,7 @@ def threeptmap3d():
                 dict(ldmks=np.array([[10,10,0]]).T/scale,
                 initthetas=[0,0,0],
                 initpos=np.array([130,130,0])/scale,
-                delthetas=[0,0,np.pi/10],
+                delthetas=[0,0,np.pi/5],
                 delpos=np.array([0,0,0])/scale)]
 
     lmmap = landmarkmap.map_from_conf(map_conf,nframes)
@@ -278,7 +278,7 @@ def slam(debug_inp=True):
     f_gt = open('gt_orig.txt','w')
     f_slam = open('slam_orig.txt','w')
     f= 300
-    img_shape = (960, 320)
+    img_shape = (240, 320)
     K = np.array([[f, 0, img_shape[1]/2], [0, f, img_shape[0]/2], [0, 0, 1]])
     # Getting the map
     #nframes, lmmap, lmvis, robtraj, maxangle, maxdist = threeptmap3d()
@@ -327,10 +327,12 @@ def slam(debug_inp=True):
     for fidx, (ids, rob_state_and_input, ldmks,ldmk_robot_obs) in enumerate(rob_obs_iter[1:]): 
         rob_state = rob_state_and_input[:3]
         robot_input = rob_state_and_input[3:]
-        print '+++++++++++++ fidx = %d +++++++++++' % fidx
-        print 'Robot true state:', rob_state
-        #print 'Observations:', zip(rs, thetas, ids)
-        print 'Observations:', ldmk_robot_obs
+        #print '+++++++++++++ fidx = %d +++++++++++' % fidx
+        #print 'Robot true state:', rob_state
+        ##print 'Observations:', zip(rs, thetas, ids)
+        #print 'Observations:', ldmk_robot_obs
+        if fidx == 91:
+            pdb.set_trace()
         posdir = map(np.array, ([rob_state[0], rob_state[1]],
                                 [np.cos(rob_state[2]), np.sin(rob_state[2])]))
         #robview = landmarkmap.RobotView(posdir[0], posdir[1], maxangle, maxdist)
@@ -435,9 +437,9 @@ def slam(debug_inp=True):
             ids_list.append(id)
 
         # end of loop over observations in single frame
-                
+        print fidx,count 
         # Follow all the steps on
-        print "SLAM State for robot and landmarks is",slam_state
+        #print "SLAM State for robot and landmarks is",slam_state
         obs_num = obs_num+1
         #up.slam_cov_plot(slam_state,slam_cov,obs_num,rob_state,ld_preds,ld_ids_preds)
         #visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state[:2],
