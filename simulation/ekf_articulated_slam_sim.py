@@ -14,7 +14,7 @@ inside SLAM, by first
 '''
 import numpy as np
 import cv2
-import landmarkmap3d as landmarkmap
+import landmarkmap3d_sim as landmarkmap
 import estimate_mm as mm # To figure out the right motion model
 import pdb
 import utils_plot as up
@@ -241,10 +241,10 @@ def articulated_slam(debug_inp=True):
                                               lmvis=None)
 
     lmvis = landmarkmap.LandmarksVisualizer([0,0], [7, 7], frame_period=-1,
-                                            imgshape=(700, 700))
+            imgshape=(700, 700))
     
     rob_obs_iter = list(rob_obs_iter)
-    frame_period = lmvis.frame_period
+    #frame_period = lmvis.frame_period
     
 
     # EKF parameters for filtering
@@ -273,6 +273,7 @@ def articulated_slam(debug_inp=True):
     mu = 0.0
     sigma = 0.04
 
+    colors = []
     prob_plot1 = []
     prob_plot2 = []
     prob_plot3 = []
@@ -298,13 +299,6 @@ def articulated_slam(debug_inp=True):
         #print 'Observations:',ldmk_robot_obs
         
         # Handle new robot view code appropriately
-        robview = landmarkmap.RobotView((rob_state[0], rob_state[1], 0), maxangle,maxdist,
-               rob_state[2], img_shape, K, maxdist)
-        img = lmvis.genframe(ldmks, robview)
-        imgr = lmvis.drawrobot(robview, img)
-        lmvis.imshow_and_wait(imgr)
-        robview.visualize(robview.drawlandmarks(ldmks))
-        
         # Following EKF steps now
     
         # First step is propagate : both robot state and motion parameter of any active landmark
@@ -404,9 +398,6 @@ def articulated_slam(debug_inp=True):
                 H_mat[1,0:3] = np.array([np.sin(theta),-np.cos(theta),(-np.cos(theta)*curr_obs[0])-(np.sin(theta)*curr_obs[1])])
                 H_mat[2,0:3] = np.array([0,0,0])
     
-                #H_mat[0,0:3] = np.array([1,0,-np.sin(theta)*curr_obs[0] - np.cos(theta)*curr_obs[1]])
-                #H_mat[1,0:3] = np.array([0,1,(np.cos(theta)-np.sin(theta))*curr_obs[0] - (np.cos(theta)+np.sin(theta))*curr_obs[1]])
-                #H_mat[2,0:3] = np.array([0,0,(np.sin(theta)+np.cos(theta))*curr_obs[0] + (np.cos(theta)+np.sin(theta))*curr_obs[1]])
                 H_mat[:,index_set[curr_ind]:index_set[curr_ind+1]] = np.dot(R_temp,ldmk_am[id].observation_jac(slam_state[index_set[curr_ind]:index_set[curr_ind+1]],init_pt[id]))
     
     
@@ -430,7 +421,6 @@ def articulated_slam(debug_inp=True):
             if id == 13:
                 tmp = motion_class.prior.copy()
                 prob_plot3.append(tmp)
-    
     
             mm_probs.append(motion_class.prior)
     
@@ -466,6 +456,13 @@ def articulated_slam(debug_inp=True):
         ##up.slam_cov_plot(slam_state,slam_cov,obs_num,rob_state,ld_preds,ld_ids_preds)
         #visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state[:2],
         #                          slam_cov[:2, :2], colors,obs_num)
+        robview = landmarkmap.RobotView((rob_state[0], rob_state[1], 0), maxangle,maxdist,
+               rob_state[2], img_shape, K, maxdist)
+        img = lmvis.genframe(ldmks, robview,colors)
+        imgr = lmvis.drawrobot(robview, img.copy())
+        lmvis.imshow_and_wait(imgr)
+        #robview.visualize(robview.drawlandmarks(ldmks))
+        
         R_temp_true = np.array([[np.cos(rob_state[2]), -np.sin(rob_state[2]),0],
                       [np.sin(rob_state[2]), np.cos(rob_state[2]),0],
                       [0,0,1]]) 
@@ -481,9 +478,9 @@ def articulated_slam(debug_inp=True):
             slam_robot_states.append(slam_state[0:3].copy().tolist())
         obs_num = obs_num + 1
         #print 'SLAM state:',slam_state
+        print fidx,count
     # end of loop over frames
 
-    print count
     # Generating plots for paper
     prob_plot1_dup = prob_plot1
     prob_plot2_dup = prob_plot2

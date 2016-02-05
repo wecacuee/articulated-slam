@@ -337,10 +337,6 @@ class LandmarksVisualizer(object):
         red = (0, 0, 255)
         blue = (255, 0, 0)
         black = (0., 0., 0.)
-        if robview is not None:
-            in_view_ldmks = robview.in_view(landmarks)
-        else:
-            in_view_ldmks = np.zeros(landmarks.shape[1])
 
         if colors is not None and len(colors) > 0:
             assert len(colors) == np.sum(in_view_ldmks), '%d <=> %d' % (len(colors), np.sum(in_view_ldmks))
@@ -349,6 +345,10 @@ class LandmarksVisualizer(object):
             extcolors[~in_view_ldmks, :] = black
             colors = [tuple(a) for a in list(extcolors)]
         else:
+            if robview is not None:
+                in_view_ldmks = robview.in_view(landmarks)
+            else:
+                in_view_ldmks = np.zeros(landmarks.shape[1])
             colors = [(blue if in_view_ldmks[i] else black) for i in
                       range(landmarks.shape[1])]
         proj_ldmks = self.projectToImage(landmarks)
@@ -414,7 +414,7 @@ class LandmarksVisualizer(object):
         return img
 
     def imshow_and_wait(self, img):
-        cv2.imshow(self._name, img)
+        cv2.imshow(self._name, img/255.)
         keyCode = cv2.waitKey(self.frame_period)
         if keyCode in [1048608, 32]: # space
             # toggle visualization b/w continuity and paused state

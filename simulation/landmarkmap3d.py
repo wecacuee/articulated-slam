@@ -57,6 +57,12 @@ def static_trajectory(Tinit, n):
 def prismatic_trajectory(*args):
     """ Prismatic trajectory for n frames """
     return dyn_trajectory(*args)
+def rev_trajectory(Tinit, delT, n):
+    """ Revolute trajectory for n frames """
+    Titer = Tinit
+    for i in xrange(n):
+        Titer[:2, :2] = delT[:2, :2].dot(Titer[:2, :2])
+        yield Titer
 
 def dyn_trajectory(Tinit, delT, n):
     """ Revolute trajectory for n frames """
@@ -306,7 +312,7 @@ def robot_trajectory(positions, lin_vel, angular_vel, circle_flag=False,r=20,cen
             vel = (tp - fp) * lin_vel / vnorm(tp - fp)
             # continue till pos is on the same side of tp as fp
             while np.dot((pos - tp), (fp - tp)) > 0:
-                yield (pos, dir, lin_vel, 0)
+                yield (pos, np.arctan2(dir[1],dir[0]), lin_vel, 0)
                 pos = pos + vel
             prev_dir = dir
     else:
@@ -374,17 +380,23 @@ class LandmarksVisualizer(object):
             radius_euc = 0.4
         K, t = self.camera_K, self.camera_t_w2c
         radius = np.int64(np.maximum(K[0,0], K[1,1])*radius_euc/t[2])
+        red = (0, 0, 255)
+        blue = (255, 0, 0)
+        black = (0., 0., 0.)
+        
+        if robview is not None:
+            in_view_ldmks = robview.in_view(landmarks)
+        else:
+            in_view_ldmks = np.zeros(landmarks.shape[1])
+        in_view_ldmks = np.asarray(in_view_ldmks,dtype='bool')
+
         if colors is not None and len(colors) > 0:
             all_ldmks = np.hstack((landmarks, ldmk_robot_obs))
             extcolors = np.empty((all_ldmks.shape[1], 3))
-            extcolors[:landmarks.shape[1], :] = black
-            extcolors[landmarks.shape[1]:, :] = np.array(colors)
+            extcolors[in_view_ldmks, :] = np.array(colors)
+            extcolors[~in_view_ldmks, :] = black
             colors = [tuple(a) for a in list(extcolors)]
         else:
-            if robview is not None:
-                in_view_ldmks = robview.in_view(landmarks)
-            else:
-                in_view_ldmks = np.zeros(landmarks.shape[1])
 
             colors = [(blue if in_view_ldmks[i] else black) for i in
                       range(landmarks.shape[1])]
@@ -461,7 +473,7 @@ class LandmarksVisualizer(object):
         return img
 
     def imshow_and_wait(self, img):
-        cv2.imshow(self._name, img)
+        cv2.imshow(self._name, img/255.)
         keyCode = cv2.waitKey(self.frame_period)
         if keyCode in [1048608, 32]: # space
             # toggle visualization b/w continuity and paused state
@@ -544,7 +556,7 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, imgshape, K, lmvis
         # v2.0 Rename gen_obs
         R_c2w = rodrigues([0, 0, 1], rob_theta)
         R_w2c = R_c2w.T
-        ldmk_robot_obs = R_w2c.dot(selected_ldmks-pos)
+        ldmk_robot_obs = R_c2w.dot(selected_ldmks-pos)
         # Ignoring robot's Z component
         yield (0, ldmks_idx[0], [float(pos[0]), float(pos[1]),
                                              rob_theta,
@@ -562,13 +574,20 @@ def map_from_conf(map_conf, nframes):
             ldmks = rmconf['ldmks']
         else:
             raise RuntimeException('No way to compute ldmks')
+        if rmconf['delthetas'] > 0 and np.all(np.asarray(rmconf['delpos']) == 0):
+            traj = rev_trajectory(T_from_angle_pos(rmconf['initthetas'],
+                        rmconf['initpos']),
+                    T_from_angle_pos(rmconf['delthetas'],
+                        rmconf['delpos']),
+                    nframes)
+        else:
+            traj = dyn_trajectory(T_from_angle_pos(rmconf['initthetas'],
+                        rmconf['initpos']),
+                    T_from_angle_pos(rmconf['delthetas'],
+                        rmconf['delpos']),
+                    nframes)
 
 
-        traj = dyn_trajectory(T_from_angle_pos(rmconf['initthetas'],
-                                               rmconf['initpos']),
-                              T_from_angle_pos(rmconf['delthetas'],
-                                               rmconf['delpos']),
-                              nframes)
         rm = RigidMotions(RigidBody2D(ldmks), traj)
         rmlist.append(rm)
 

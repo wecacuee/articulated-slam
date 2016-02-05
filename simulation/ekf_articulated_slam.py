@@ -108,7 +108,7 @@ def threeptmap3d():
     # For now static robot 
     robtraj = landmarkmap.robot_trajectory(
         np.array([[110,90,0],[140,60,0],[120,50,0],[110,90,0],[140,60,0]]) / scale,
-        0.2, np.pi/10, False, 100/scale, np.array([40, 40])/scale, nframes)
+        0.2, np.pi/50, True, 100/scale, np.array([40, 40])/scale, nframes)
     maxangle = 45*np.pi/180
     maxdist = 120 / scale
     return nframes,lmmap,robtraj,maxangle,maxdist
@@ -508,7 +508,7 @@ def articulated_slam(debug_inp=True):
 
 
 
-    lmvis = landmarkmap.LandmarksVisualizer([0,0], [7, 7], frame_period=10,
+    lmvis = landmarkmap.LandmarksVisualizer([0,0], [7, 7], frame_period=-1,
                                             imgshape=(700, 700))
     
     # EKF parameters for filtering
@@ -679,6 +679,8 @@ def articulated_slam(debug_inp=True):
 
             mm_probs.append(motion_class.prior)
 
+            if fidx==108:
+                pdb.set_trace()
             motion_class = ldmk_estimater[id]
             p1, p2, p3 = motion_class.prior[:3]
             color = np.int64((p1*rev_color
@@ -721,7 +723,10 @@ def articulated_slam(debug_inp=True):
                                     rob_state[2]) 
         assert ldmk_robot_obs.shape[1] == len(colors), '%d <=> %d' % (
             ldmk_robot_obs.shape[1], len(colors))
-        img = lmvis.genframe(ldmks, ldmk_robot_obs=ldmk_robot_obs, colors=colors)
+        
+        if fidx == 0:
+            pdb.set_trace()
+        img = lmvis.genframe(ldmks, ldmk_robot_obs=ldmk_robot_obs, robview = robview,colors=colors)
         imgr = lmvis.drawrobot(robview, img)
         imgrv = robview.drawtracks([ldmktracks[id] for id in ids],
                                    imgidx=robview.imgidx_by_timestamp(timestamp),
@@ -743,8 +748,8 @@ def articulated_slam(debug_inp=True):
                     imgr = lmvis.drawrevaxis(imgr, center3D, axis_vec, radius,
                                              rev_color)
 
-            robview.visualize(imgrv)
-            lmvis.imshow_and_wait(imgr)
+        robview.visualize(imgrv)
+        lmvis.imshow_and_wait(imgr)
         
         R_temp_true = np.array([[np.cos(-rob_state[2]), -np.sin(-rob_state[2]),0],
                       [np.sin(-rob_state[2]), np.cos(-rob_state[2]),0],
