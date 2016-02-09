@@ -35,7 +35,7 @@ import csv
 TrackedLdmk = namedtuple('TrackedLdmk', ['ts', 'pt3D'])
 models_names = ['Revolute','Prismatic','Static']
 
-SIMULATEDDATA = True
+SIMULATEDDATA =False 
 PLOTSIM = True
 #def threeptmap():
 #    nframes = 100
@@ -403,6 +403,7 @@ Pass in optional parameter for collecting debug output for all the landmarks
 '''
 def articulated_slam(debug_inp=True):
     # Writing to file variables
+    pdb.set_trace()
     f_gt = open('gt.txt','w')
     f_slam = open('slam.txt','w')    
     img_shape = (240, 320)
@@ -441,8 +442,8 @@ def articulated_slam(debug_inp=True):
 
     else:
 
-        timeseries_data_file = "/home/vikasdhi/mid/articulatedslam/2016-01-22/rev_2016-01-22-13-56-28/extracttrajectories_GFTT_SIFT_odom_gt_timeseries.txt"
-        bag_file = "/home/vikasdhi/mid/articulatedslam/2016-01-22/rev2_2016-01-22-14-32-13.bag"
+        timeseries_data_file = "../mid/articulatedslam/2016-01-22/rev_2016-01-22-13-56-28/extracttrajectories_GFTT_SIFT_odom_gt_timeseries.txt"
+        bag_file = "../mid/articulatedslam/2016-01-22/rev2_2016-01-22-14-32-13.bag"
         timeseries_dir = os.path.dirname(timeseries_data_file)
         image_file_fmt = os.path.join(timeseries_dir, "img/frame%04d.png")
         timestamps_file = os.path.join(timeseries_dir, 'img/timestamps.txt')
@@ -593,8 +594,9 @@ def articulated_slam(debug_inp=True):
         # v2.0
         for id, ldmk_rob_obv in zip(ids,np.dstack(ldmk_robot_obs)[0]):
             # Adding noise
-            ldmk_rob_obv = ldmk_rob_obv + csv[count,:]         
-            count = count + 1
+            if SIMULATEDDATA:
+                ldmk_rob_obv = ldmk_rob_obv + csv[count,:]         
+                count = count + 1
             
             if id not in first_traj_pt:
                 first_traj_pt[id] = ldmk_rob_obv
@@ -726,7 +728,7 @@ def articulated_slam(debug_inp=True):
         
         if fidx == 0:
             pdb.set_trace()
-        img = lmvis.genframe(ldmks, ldmk_robot_obs=ldmk_robot_obs, robview = robview,colors=colors)
+        img = lmvis.genframe(ldmks, ldmk_robot_obs=ldmk_robot_obs, robview = robview,colors=colors,SIMULATEDDATA=SIMULATEDDATA)
         imgr = lmvis.drawrobot(robview, img)
         imgrv = robview.drawtracks([ldmktracks[id] for id in ids],
                                    imgidx=robview.imgidx_by_timestamp(timestamp),

@@ -372,7 +372,7 @@ class LandmarksVisualizer(object):
         K, R, t = (self.camera_K, self.camera_R_w2c, self.camera_t_w2c)
         return homo2euc(K.dot(R.dot(points3D) + t))
 
-    def genframe(self, landmarks, ldmk_robot_obs=[], robview=None, colors=None):
+    def genframe(self, landmarks, ldmk_robot_obs=[], robview=None, colors=None,SIMULATEDDATA=True):
         img = np.ones(self._imgdims) * 255
         if landmarks.shape[1] > 10:
             radius_euc = 0.05
@@ -384,22 +384,41 @@ class LandmarksVisualizer(object):
         blue = (255, 0, 0)
         black = (0., 0., 0.)
         
-        if robview is not None:
-            in_view_ldmks = robview.in_view(landmarks)
-        else:
-            in_view_ldmks = np.zeros(landmarks.shape[1])
-        in_view_ldmks = np.asarray(in_view_ldmks,dtype='bool')
+        if SIMULATEDDATA:
 
-        if colors is not None and len(colors) > 0:
-            all_ldmks = np.hstack((landmarks, ldmk_robot_obs))
-            extcolors = np.empty((all_ldmks.shape[1], 3))
-            extcolors[in_view_ldmks, :] = np.array(colors)
-            extcolors[~in_view_ldmks, :] = black
-            colors = [tuple(a) for a in list(extcolors)]
+            if robview is not None:
+                in_view_ldmks = robview.in_view(landmarks)
+            else:
+                in_view_ldmks = np.zeros(landmarks.shape[1])
+            in_view_ldmks = np.asarray(in_view_ldmks,dtype='bool')
+
+            if colors is not None and len(colors) > 0:
+                all_ldmks = np.hstack((landmarks, ldmk_robot_obs))
+                extcolors = np.empty((all_ldmks.shape[1], 3))
+                extcolors[in_view_ldmks, :] = np.array(colors)
+                extcolors[~in_view_ldmks, :] = black
+                colors = [tuple(a) for a in list(extcolors)]
+            else:
+
+                colors = [(blue if in_view_ldmks[i] else black) for i in
+                          range(landmarks.shape[1])]
         else:
 
-            colors = [(blue if in_view_ldmks[i] else black) for i in
-                      range(landmarks.shape[1])]
+            if colors is not None and len(colors) > 0:
+                all_ldmks = np.hstack((landmarks, ldmk_robot_obs))
+                extcolors = np.empty((all_ldmks.shape[1], 3))
+                extcolors[landmarks.shape[1]:, :] = np.array(colors)
+                extcolors[:landmarks.shape[1], :] = black
+                colors = [tuple(a) for a in list(extcolors)]
+            else:
+                if robview is not None:
+                    in_view_ldmks = robview.in_view(landmarks)
+                else:
+                    in_view_ldmks = np.zeros(landmarks.shape[1])
+
+                colors = [(blue if in_view_ldmks[i] else black) for i in
+                          range(landmarks.shape[1])]
+            
         proj_ldmks = self.projectToImage(landmarks)
         for i in range(proj_ldmks.shape[1]):
             pt1 = np.int64(proj_ldmks[:, i])
