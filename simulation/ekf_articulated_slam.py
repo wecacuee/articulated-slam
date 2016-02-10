@@ -35,8 +35,8 @@ import csv
 TrackedLdmk = namedtuple('TrackedLdmk', ['ts', 'pt3D'])
 models_names = ['Revolute','Prismatic','Static']
 
-SIMULATEDDATA =False 
-PLOTSIM = True
+SIMULATEDDATA = False 
+PLOTSIM = False 
 #def threeptmap():
 #    nframes = 100
 #    map_conf = [# static
@@ -403,7 +403,6 @@ Pass in optional parameter for collecting debug output for all the landmarks
 '''
 def articulated_slam(debug_inp=True):
     # Writing to file variables
-    pdb.set_trace()
     f_gt = open('gt.txt','w')
     f_slam = open('slam.txt','w')    
     img_shape = (240, 320)
@@ -451,7 +450,7 @@ def articulated_slam(debug_inp=True):
         robview = landmarkmap.RobotView(img_shape, camera_K_z_view, maxdist,
                                    image_file_format=image_file_fmt,
                                    timestamps_file=timestamps_file)
-        use_bag = False
+        use_bag = False 
         if use_bag:
             data_iter = feature_odom_gt_pose_iter_from_bag(bag_file, "GFTT",
                                                        "SIFT")
@@ -509,7 +508,7 @@ def articulated_slam(debug_inp=True):
 
 
 
-    lmvis = landmarkmap.LandmarksVisualizer([0,0], [7, 7], frame_period=-1,
+    lmvis = landmarkmap.LandmarksVisualizer([0,0], [7, 7], frame_period=10,
                                             imgshape=(700, 700))
     
     # EKF parameters for filtering
@@ -546,13 +545,12 @@ def articulated_slam(debug_inp=True):
     # Processing all the observations
     for fidx,(timestamp, ids,rob_state_and_input, ldmks, ldmk_robot_obs) in enumerate(rob_obs_iter):    
         if not SIMULATEDDATA:
-            if fidx % 7 != 0 or fidx < 200:
+            if fidx%5!=0:# or fidx < 200:
                 continue
-
         rob_state = rob_state_and_input[:3]
         robot_input = rob_state_and_input[3:]
         print '+++++++++++++ fidx = %d +++++++++++' % fidx
-        print 'Robot true state and inputs:', rob_state, robot_input 
+        print 'Robot true state and inputs:', rob_state, robot_input
         print 'Observations size:',ldmk_robot_obs.shape
         
         # Following EKF steps now
@@ -599,7 +597,10 @@ def articulated_slam(debug_inp=True):
                 count = count + 1
             
             if id not in first_traj_pt:
-                first_traj_pt[id] = ldmk_rob_obv
+                
+                #first_traj_pt[id]=ldmk_rob_obv
+                Rc2w = rodrigues([0,0,1],slam_state[2])
+                first_traj_pt[id] = Rc2w.T.dot(ldmk_rob_obv)+np.asarray([slam_state[0],slam_state[1],0.0])
 
  
             motion_class = ldmk_estimater.setdefault(id, mm.Estimate_Mm())
@@ -641,15 +642,12 @@ def articulated_slam(debug_inp=True):
                 ld_ids_preds.append(curr_ind)
 
 		        # v2.0
-                R_temp = np.array([[np.cos(slam_state[2]), -np.sin(slam_state[2]),0],
-                        [np.sin(slam_state[2]), np.cos(slam_state[2]),0],
-                        [0,0,1]])
-
-
+                R_temp = rodrigues([0,0,1],slam_state[2]).T
                 pos_list = np.ndarray.tolist(slam_state[0:2])
                 pos_list.append(0.0)
-                z_pred = R_temp.dot(lk_pred-np.array(pos_list))
-                
+                # To match R_w2c matrix
+                z_pred = R_temp.T.dot(lk_pred-np.array(pos_list)) 
+
                 H_mat = np.zeros((3,index_set[-1]))
                 curr_obs = ldmk_rob_obv
                 theta = slam_state[2]
@@ -671,6 +669,7 @@ def articulated_slam(debug_inp=True):
                 # Updating SLAM covariance
                 slam_cov = np.dot(np.identity(slam_cov.shape[0])-np.dot(K_mat,H_mat),slam_cov)
             # end of if else ldmk_am[id]
+            
             if PLOTSIM:
                 if id == 40:
                     prob_plot1.append(motion_class.prior.copy())
@@ -681,8 +680,6 @@ def articulated_slam(debug_inp=True):
 
             mm_probs.append(motion_class.prior)
 
-            if fidx==108:
-                pdb.set_trace()
             motion_class = ldmk_estimater[id]
             p1, p2, p3 = motion_class.prior[:3]
             color = np.int64((p1*rev_color
@@ -726,55 +723,47 @@ def articulated_slam(debug_inp=True):
         assert ldmk_robot_obs.shape[1] == len(colors), '%d <=> %d' % (
             ldmk_robot_obs.shape[1], len(colors))
         
-        if fidx == 0:
-            pdb.set_trace()
-        img = lmvis.genframe(ldmks, ldmk_robot_obs=ldmk_robot_obs, robview = robview,colors=colors,SIMULATEDDATA=SIMULATEDDATA)
-        imgr = lmvis.drawrobot(robview, img)
-        imgrv = robview.drawtracks([ldmktracks[id] for id in ids],
-                                   imgidx=robview.imgidx_by_timestamp(timestamp),
-                                   colors=colors)
+        #Img = lmvis.genframe(ldmks, ldmk_robot_obs=ldmk_robot_obs, robview = robview,colors=colors,SIMULATEDDATA=SIMULATEDDATA)
+        #Imgr = lmvis.drawrobot(robview, img)
+        #Imgrv = robview.drawtracks([ldmktracks[id] for id in ids],
+        #                           imgidx=robview.imgidx_by_timestamp(timestamp),
+        #                           colors=colors)
 
 
-        if not SIMULATEDDATA:
+        #if not SIMULATEDDATA:
 
-            for id in ld_ids:
-                if model[id] == 0:
-                    config_pars = ldmk_am[id].config_pars
-                    vec1 = config_pars['vec1']
-                    vec2 = config_pars['vec2']
-                    center = config_pars['center']
-                    center3D = center[0]*vec1 + center[1]*vec2 + ldmk_am[id].plane_point
-                    axis_vec = np.cross(vec1, vec2)
-                    radius = config_pars['radius']
-                    imgrv = robview.drawrevaxis(imgrv, center3D, axis_vec, radius, rev_color)
-                    imgr = lmvis.drawrevaxis(imgr, center3D, axis_vec, radius,
-                                             rev_color)
+        #    for id in ld_ids:
+        #        if model[id] == 0:
+        #            config_pars = ldmk_am[id].config_pars
+        #            vec1 = config_pars['vec1']
+        #            vec2 = config_pars['vec2']
+        #            center = config_pars['center']
+        #            center3D = center[0]*vec1 + center[1]*vec2 + ldmk_am[id].plane_point
+        #            axis_vec = np.cross(vec1, vec2)
+        #            radius = config_pars['radius']
+        #            imgrv = robview.drawrevaxis(imgrv, center3D, axis_vec, radius, rev_color)
+        #            imgr = lmvis.drawrevaxis(imgr, center3D, axis_vec, radius,
+        #                                     rev_color)
 
-        robview.visualize(imgrv)
-        lmvis.imshow_and_wait(imgr)
-        
-        R_temp_true = np.array([[np.cos(-rob_state[2]), -np.sin(-rob_state[2]),0],
-                      [np.sin(-rob_state[2]), np.cos(-rob_state[2]),0],
-                      [0,0,1]]) 
-        R_temp = np.array([[np.cos(-slam_state[2]), -np.sin(-slam_state[2]),0],
-                      [np.sin(-slam_state[2]), np.cos(-slam_state[2]),0],
-                      [0,0,1]])
+        #robview.visualize(imgrv)
+        #lmvis.imshow_and_wait(imgr)
+            
 
-        quat_true = Rtoquat(R_temp_true)
-        quat_slam = Rtoquat(R_temp)    
-        if fidx < 100:
+        quat_true = Rtoquat(rodrigues([0,0,1],rob_state[2]))
+        quat_slam = Rtoquat(rodrigues([0,0,1],slam_state[2]))    
+        if fidx < 1000:
             f_gt.write(str(fidx+1)+" "+str(rob_state[0])+" "+str(rob_state[1])+" "+str(0)+" "+str(quat_true[0])+" "+str(quat_true[1])+" "+str(quat_true[2])+" "+str(quat_true[3])+" "+"\n")
             f_slam.write(str(fidx+1)+" "+str(slam_state[0])+" "+str(slam_state[1])+" "+str(0)+" "+str(quat_slam[0])+" "+str(quat_slam[1])+" "+str(quat_slam[2])+" "+str(quat_slam[3])+" "+"\n")
             true_robot_states.append(rob_state)
             slam_robot_states.append(slam_state[0:3].tolist())
 
         obs_num = obs_num + 1
-        print 'SLAM state:',slam_state
+        print 'SLAM state:',slam_state[0:4]
     # end of loop over frames
-    print fidx
-    # Plot experimental results
     
-    plot_sim_res(PLOTSIM,prob_plot1,prob_plot2,prob_plot3,traj_ldmk1,traj_ldmk2,traj_ldmk3,true_robot_states,slam_robot_states)
+    if PLOTSIM:
+    # Plot experimental results 
+        plot_sim_res(PLOTSIM,prob_plot1,prob_plot2,prob_plot3,traj_ldmk1,traj_ldmk2,traj_ldmk3,true_robot_states,slam_robot_states)
 
     # Debugging
     if debug_inp is True:

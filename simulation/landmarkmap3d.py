@@ -404,6 +404,11 @@ class LandmarksVisualizer(object):
                           range(landmarks.shape[1])]
         else:
 
+            if robview is not None:
+                in_view_ldmks = robview.in_view(landmarks)
+            else:
+                in_view_ldmks = np.zeros(landmarks.shape[1])
+
             if colors is not None and len(colors) > 0:
                 all_ldmks = np.hstack((landmarks, ldmk_robot_obs))
                 extcolors = np.empty((all_ldmks.shape[1], 3))
@@ -411,10 +416,6 @@ class LandmarksVisualizer(object):
                 extcolors[:landmarks.shape[1], :] = black
                 colors = [tuple(a) for a in list(extcolors)]
             else:
-                if robview is not None:
-                    in_view_ldmks = robview.in_view(landmarks)
-                else:
-                    in_view_ldmks = np.zeros(landmarks.shape[1])
 
                 colors = [(blue if in_view_ldmks[i] else black) for i in
                           range(landmarks.shape[1])]
