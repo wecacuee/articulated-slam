@@ -36,7 +36,7 @@ TrackedLdmk = namedtuple('TrackedLdmk', ['ts', 'pt3D'])
 models_names = ['Revolute','Prismatic','Static']
 
 SIMULATEDDATA = False 
-PLOTSIM = True 
+PLOTSIM = False 
 #def threeptmap():
 #    nframes = 100
 #    map_conf = [# static
@@ -384,9 +384,9 @@ def plot_sim_res(PLOTSIM,prob_plot1,prob_plot2,prob_plot3,traj_ldmk1,traj_ldmk2,
     #traj_ldmk1 = np.dstack(traj_ldmk1)[0]
     #traj_ldmk2 = np.dstack(traj_ldmk2)[0]
     #traj_ldmk3 = np.dstack(traj_ldmk3)[0]
-    plt.plot(true_robot_states[0],true_robot_states[1],'-k',linestyle='dashed',label='True Robot trajectory',markersize=15.0)
+    plt.plot(true_robot_states[0],true_robot_states[1],'+-k',linestyle='dashed',label='True Robot trajectory',markersize=15.0)
     plt.figure('Slam Traj')
-    plt.plot(slam_robot_states[0],slam_robot_states[1],'^g',label='A-SLAM trajectory',markersize=15.0)
+    plt.plot(slam_robot_states[0],slam_robot_states[1],'^-g',label='A-SLAM trajectory',markersize=15.0)
 
     #plt.plot(traj_ldmk1[0],traj_ldmk1[1],'*-g',linestyle='dotted',label='Prismatic joint',markersize=15.0)
     #plt.plot(traj_ldmk2[0],traj_ldmk2[1],'o-b',linestyle='dotted',label='Revolute joint',markersize=10.0)
@@ -599,7 +599,7 @@ def articulated_slam(debug_inp=True):
             if SIMULATEDDATA:
                 ldmk_rob_obv = ldmk_rob_obv + csv[count,:]         
                 count = count + 1
-            
+           
             if id not in first_traj_pt:
                 
                 #first_traj_pt[id]=ldmk_rob_obv
@@ -624,6 +624,7 @@ def articulated_slam(debug_inp=True):
                 if sum(motion_class.prior>m_thresh)>0:
                     model[id] = np.where(motion_class.prior>m_thresh)[0]	
                     print("INFO: Model estimated %s " % models_names[int(model[id])])
+                    print id
                     ldmk_am[id] = motion_class.am[int(model[id])]
                     ld_ids.append(id)
                     curr_ld_state = ldmk_am[id].current_state()
@@ -651,7 +652,7 @@ def articulated_slam(debug_inp=True):
                 pos_list.append(0.0)
                 # To match R_w2c matrix
                 z_pred = R_temp.dot(lk_pred-np.array(pos_list)) 
-
+                   
                 H_mat = np.zeros((3,index_set[-1]))
                 curr_obs = ldmk_rob_obv
                 theta = slam_state[2]
@@ -670,6 +671,7 @@ def articulated_slam(debug_inp=True):
                 # Updating SLAM state
                 # v2.0
                 slam_state = slam_state + np.hstack((np.dot(K_mat,(np.vstack((ldmk_rob_obv-z_pred))))))               
+                #print slam_state[0:3],id
                 # Updating SLAM covariance
                 slam_cov = np.dot(np.identity(slam_cov.shape[0])-np.dot(K_mat,H_mat),slam_cov)
             # end of if else ldmk_am[id]
@@ -682,19 +684,18 @@ def articulated_slam(debug_inp=True):
                 if id == 13:
                     prob_plot3.append(motion_class.prior.copy())
 
-            mm_probs.append(motion_class.prior)
+            mm_probs.append(motion_class.prior.copy())
 
-            motion_class = ldmk_estimater[id]
-            p1, p2, p3 = motion_class.prior[:3]
-            color = np.int64((p1*rev_color
-                     + p2*pris_color
-                     + p3*stat_color))
-            color = color - np.min(color)
-            colors.append(color)
-            ids_list.append(id)
+            #motion_class = ldmk_estimater[id]
+            #p1, p2, p3 = motion_class.prior[:3]
+            #color = np.int64((p1*rev_color
+            #         + p2*pris_color
+            #         + p3*stat_color))
+            #color = color - np.min(color)
+            #colors.append(color)
+            #ids_list.append(id)
 
         # end of loop over observations in single frame
-        
         if PLOTSIM:
             if 40 in ldmk_am.keys() and ldmk_am[40] is not None:
                 lk_pred = ldmk_am[40].predict_model(slam_state[index_set[ld_ids.index(40)]:index_set[ld_ids.index(40)]+1])
@@ -722,10 +723,10 @@ def articulated_slam(debug_inp=True):
                 TrackedLdmk(timestamp, ldmk_robot_obs[:, i:i+1]))
 
         # Handle new robot view code appropriately
-        robview.set_robot_pos_theta((rob_state[0], rob_state[1], 0),
-                                    rob_state[2]) 
-        assert ldmk_robot_obs.shape[1] == len(colors), '%d <=> %d' % (
-            ldmk_robot_obs.shape[1], len(colors))
+        #robview.set_robot_pos_theta((rob_state[0], rob_state[1], 0),
+        #                            rob_state[2]) 
+        #assert ldmk_robot_obs.shape[1] == len(colors), '%d <=> %d' % (
+        #    ldmk_robot_obs.shape[1], len(colors))
         
         ##Img = lmvis.genframe(ldmks, ldmk_robot_obs=ldmk_robot_obs, robview = robview,colors=colors,SIMULATEDDATA=SIMULATEDDATA)
         ##Imgr = lmvis.drawrobot(robview, img)

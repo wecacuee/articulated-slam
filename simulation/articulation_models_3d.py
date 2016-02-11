@@ -29,6 +29,8 @@ import scipy.linalg
 import pdb
 import utils_kin as uk
 
+np.random.seed(0)
+
 # Abstract class for storing and estimating various motion models
 class Articulation_Models:
     # Constructor for each motion model
