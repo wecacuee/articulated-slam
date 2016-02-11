@@ -36,7 +36,7 @@ TrackedLdmk = namedtuple('TrackedLdmk', ['ts', 'pt3D'])
 models_names = ['Revolute','Prismatic','Static']
 
 SIMULATEDDATA = False 
-PLOTSIM = False 
+PLOTSIM = True 
 #def threeptmap():
 #    nframes = 100
 #    map_conf = [# static
@@ -341,58 +341,59 @@ def get_timeseries_data_iter(timeseries_data_file):
     
 
 def plot_sim_res(PLOTSIM,prob_plot1,prob_plot2,prob_plot3,traj_ldmk1,traj_ldmk2,traj_ldmk3,true_robot_states,slam_robot_states):
-    prob_plot1_dup = prob_plot1
-    prob_plot2_dup = prob_plot2
-    prob_plot3_dup = prob_plot3
-    prob_plot1 = np.dstack(prob_plot1)[0]
-    prob_plot2 = np.dstack(prob_plot2)[0]
-    prob_plot3 = np.dstack(prob_plot3)[0]
+    #prob_plot1_dup = prob_plot1
+    #prob_plot2_dup = prob_plot2
+    #prob_plot3_dup = prob_plot3
+    #prob_plot1 = np.dstack(prob_plot1)[0]
+    #prob_plot2 = np.dstack(prob_plot2)[0]
+    #prob_plot3 = np.dstack(prob_plot3)[0]
 
-    plt.figure('Prismatic')
-    h1 = plt.plot(range(len(prob_plot1_dup)),prob_plot1[0],'o-b',label='Revolute',linewidth=3.0,markersize=15.0)
-    h2 = plt.plot(range(len(prob_plot1_dup)),prob_plot1[1],'*-g',label='Prismatic',linewidth=3.0,markersize=15.0)
-    h3 = plt.plot(range(len(prob_plot1_dup)),prob_plot1[2],'^-r',label='Static',linewidth = 3.0,markersize=15.0)
-    plt.xlabel('Number of frames',fontsize=24)
-    plt.ylabel('Probability',fontsize=24)
-    plt.xticks([0,2,4,6,8,10,12,14,16,18],fontsize=24)
-    plt.yticks([0,0.2,0.4,0.6,0.8,1.0],fontsize=24)
-    plt.legend(loc=3,fontsize=24)
+    #plt.figure('Prismatic')
+    #h1 = plt.plot(range(len(prob_plot1_dup)),prob_plot1[0],'o-b',label='Revolute',linewidth=3.0,markersize=15.0)
+    #h2 = plt.plot(range(len(prob_plot1_dup)),prob_plot1[1],'*-g',label='Prismatic',linewidth=3.0,markersize=15.0)
+    #h3 = plt.plot(range(len(prob_plot1_dup)),prob_plot1[2],'^-r',label='Static',linewidth = 3.0,markersize=15.0)
+    #plt.xlabel('Number of frames',fontsize=24)
+    #plt.ylabel('Probability',fontsize=24)
+    #plt.xticks([0,2,4,6,8,10,12,14,16,18],fontsize=24)
+    #plt.yticks([0,0.2,0.4,0.6,0.8,1.0],fontsize=24)
+    #plt.legend(loc=3,fontsize=24)
 
-    plt.figure("Revolute")
-    h1= plt.plot(range(len(prob_plot2_dup)),prob_plot2[0],'o-b',label='Revolute',linewidth = 3.0,markersize=15.0)
-    h2 = plt.plot(range(len(prob_plot2_dup)),prob_plot2[1],'*-g',label='Prismatic',linewidth = 3.0,markersize=15.0)
-    h3 = plt.plot(range(len(prob_plot2_dup)),prob_plot2[2],'^-r',label='Static',linewidth = 3.0,markersize=15.0)
-    plt.xlabel('Number of frames',fontsize=24)
-    plt.ylabel('Probability',fontsize=24)
-    plt.xticks([0,2,4,6,8,10,12,14,16,18,19],fontsize=14)
-    plt.yticks([0,0.2,0.4,0.6,0.8,1.0],fontsize=24)
-    plt.legend(loc=3,fontsize=24)
+    #plt.figure("Revolute")
+    #h1= plt.plot(range(len(prob_plot2_dup)),prob_plot2[0],'o-b',label='Revolute',linewidth = 3.0,markersize=15.0)
+    #h2 = plt.plot(range(len(prob_plot2_dup)),prob_plot2[1],'*-g',label='Prismatic',linewidth = 3.0,markersize=15.0)
+    #h3 = plt.plot(range(len(prob_plot2_dup)),prob_plot2[2],'^-r',label='Static',linewidth = 3.0,markersize=15.0)
+    #plt.xlabel('Number of frames',fontsize=24)
+    #plt.ylabel('Probability',fontsize=24)
+    #plt.xticks([0,2,4,6,8,10,12,14,16,18,19],fontsize=14)
+    #plt.yticks([0,0.2,0.4,0.6,0.8,1.0],fontsize=24)
+    #plt.legend(loc=3,fontsize=24)
 
-    plt.figure("Static")
-    h1= plt.plot(range(len(prob_plot3_dup)),prob_plot3[0],'o-b',label='Revolute',linewidth=3.0,markersize=15.0)
-    h2 = plt.plot(range(len(prob_plot3_dup)),prob_plot3[1],'*-g',label='Prismatic',linewidth=3.0,markersize=15.0)
-    h3 = plt.plot(range(len(prob_plot3_dup)),prob_plot3[2],'^-r',label='Static',linewidth=3.0,markersize=15.0)
-    plt.xlabel('Number of frames',fontsize=24)
-    plt.ylabel('Probability',fontsize=24)
-    plt.xticks([0,2,4,6,8],fontsize=24)
-    plt.yticks([0,0.2,0.4,0.6,0.8,1.0],fontsize=24)
-    plt.legend(loc=3,fontsize=24)
+    #plt.figure("Static")
+    #h1= plt.plot(range(len(prob_plot3_dup)),prob_plot3[0],'o-b',label='Revolute',linewidth=3.0,markersize=15.0)
+    #h2 = plt.plot(range(len(prob_plot3_dup)),prob_plot3[1],'*-g',label='Prismatic',linewidth=3.0,markersize=15.0)
+    #h3 = plt.plot(range(len(prob_plot3_dup)),prob_plot3[2],'^-r',label='Static',linewidth=3.0,markersize=15.0)
+    #plt.xlabel('Number of frames',fontsize=24)
+    #plt.ylabel('Probability',fontsize=24)
+    #plt.xticks([0,2,4,6,8],fontsize=24)
+    #plt.yticks([0,0.2,0.4,0.6,0.8,1.0],fontsize=24)
+    #plt.legend(loc=3,fontsize=24)
 
-    plt.figure('Trajectories')
+    plt.figure('True Trajectory')
     true_robot_states = np.dstack(true_robot_states)[0]
     slam_robot_states = np.dstack(slam_robot_states)[0]
-    traj_ldmk1 = np.dstack(traj_ldmk1)[0]
-    traj_ldmk2 = np.dstack(traj_ldmk2)[0]
-    traj_ldmk3 = np.dstack(traj_ldmk3)[0]
+    #traj_ldmk1 = np.dstack(traj_ldmk1)[0]
+    #traj_ldmk2 = np.dstack(traj_ldmk2)[0]
+    #traj_ldmk3 = np.dstack(traj_ldmk3)[0]
     plt.plot(true_robot_states[0],true_robot_states[1],'-k',linestyle='dashed',label='True Robot trajectory',markersize=15.0)
+    plt.figure('Slam Traj')
     plt.plot(slam_robot_states[0],slam_robot_states[1],'^g',label='A-SLAM trajectory',markersize=15.0)
 
-    plt.plot(traj_ldmk1[0],traj_ldmk1[1],'*-g',linestyle='dotted',label='Prismatic joint',markersize=15.0)
-    plt.plot(traj_ldmk2[0],traj_ldmk2[1],'o-b',linestyle='dotted',label='Revolute joint',markersize=10.0)
-    plt.plot(traj_ldmk3[0],traj_ldmk3[1],'^-r',label='Static joint',markersize=15.0)
-    plt.xticks([-2,0,2,4,6],fontsize=24)
-    plt.yticks([-2,0,2,4,6],fontsize=24)
-    plt.legend(loc=4,fontsize=24)
+    #plt.plot(traj_ldmk1[0],traj_ldmk1[1],'*-g',linestyle='dotted',label='Prismatic joint',markersize=15.0)
+    #plt.plot(traj_ldmk2[0],traj_ldmk2[1],'o-b',linestyle='dotted',label='Revolute joint',markersize=10.0)
+    #plt.plot(traj_ldmk3[0],traj_ldmk3[1],'^-r',label='Static joint',markersize=15.0)
+    #plt.xticks([-2,0,2,4,6],fontsize=24)
+    #plt.yticks([-2,0,2,4,6],fontsize=24)
+    #plt.legend(loc=4,fontsize=24)
     plt.show()
 
 
@@ -514,7 +515,7 @@ def articulated_slam(debug_inp=True):
     # EKF parameters for filtering
     first_traj_pt = dict()
     # Initially we only have the robot state
-    (_, _, rob_state_and_input, _, _) = rob_obs_iter.next()
+    (init_timestamp, _, rob_state_and_input, _, _) = rob_obs_iter.next()
     model = dict()
     slam_state =  np.array(rob_state_and_input[:3]) # \mu_{t} state at current time step
     
@@ -545,8 +546,11 @@ def articulated_slam(debug_inp=True):
     # Processing all the observations
     for fidx,(timestamp, ids,rob_state_and_input, ldmks, ldmk_robot_obs) in enumerate(rob_obs_iter):    
         if not SIMULATEDDATA:
-            if fidx%5!=0:# or fidx < 200:
+            if fidx < 200:
                 continue
+            dt = timestamp - init_timestamp
+            init_timestamp = timestamp
+
         rob_state = rob_state_and_input[:3]
         robot_input = rob_state_and_input[3:]
         print '+++++++++++++ fidx = %d +++++++++++' % fidx
@@ -558,7 +562,7 @@ def articulated_slam(debug_inp=True):
         # First step is propagate : both robot state and motion parameter of any active landmark
         slam_state[0:3],slam_cov[0:3,0:3]=robot_motion_prop(slam_state[0:3],
                                                             slam_cov[0:3,0:3],
-                                                            robot_input,
+                                                            robot_input,dt*1e-9,
                                                            motion_model=motion_model)
         # Active here means the landmark for which an articulation model has been associated
         if len(ld_ids)>0:
@@ -646,7 +650,7 @@ def articulated_slam(debug_inp=True):
                 pos_list = np.ndarray.tolist(slam_state[0:2])
                 pos_list.append(0.0)
                 # To match R_w2c matrix
-                z_pred = R_temp.T.dot(lk_pred-np.array(pos_list)) 
+                z_pred = R_temp.dot(lk_pred-np.array(pos_list)) 
 
                 H_mat = np.zeros((3,index_set[-1]))
                 curr_obs = ldmk_rob_obv
@@ -723,42 +727,42 @@ def articulated_slam(debug_inp=True):
         assert ldmk_robot_obs.shape[1] == len(colors), '%d <=> %d' % (
             ldmk_robot_obs.shape[1], len(colors))
         
-        #Img = lmvis.genframe(ldmks, ldmk_robot_obs=ldmk_robot_obs, robview = robview,colors=colors,SIMULATEDDATA=SIMULATEDDATA)
-        #Imgr = lmvis.drawrobot(robview, img)
-        #Imgrv = robview.drawtracks([ldmktracks[id] for id in ids],
-        #                           imgidx=robview.imgidx_by_timestamp(timestamp),
-        #                           colors=colors)
+        ##Img = lmvis.genframe(ldmks, ldmk_robot_obs=ldmk_robot_obs, robview = robview,colors=colors,SIMULATEDDATA=SIMULATEDDATA)
+        ##Imgr = lmvis.drawrobot(robview, img)
+        ##Imgrv = robview.drawtracks([ldmktracks[id] for id in ids],
+        ##                           imgidx=robview.imgidx_by_timestamp(timestamp),
+        ##                           colors=colors)
 
 
-        #if not SIMULATEDDATA:
+        ##if not SIMULATEDDATA:
 
-        #    for id in ld_ids:
-        #        if model[id] == 0:
-        #            config_pars = ldmk_am[id].config_pars
-        #            vec1 = config_pars['vec1']
-        #            vec2 = config_pars['vec2']
-        #            center = config_pars['center']
-        #            center3D = center[0]*vec1 + center[1]*vec2 + ldmk_am[id].plane_point
-        #            axis_vec = np.cross(vec1, vec2)
-        #            radius = config_pars['radius']
-        #            imgrv = robview.drawrevaxis(imgrv, center3D, axis_vec, radius, rev_color)
-        #            imgr = lmvis.drawrevaxis(imgr, center3D, axis_vec, radius,
-        #                                     rev_color)
+        ##    for id in ld_ids:
+        ##        if model[id] == 0:
+        ##            config_pars = ldmk_am[id].config_pars
+        ##            vec1 = config_pars['vec1']
+        ##            vec2 = config_pars['vec2']
+        ##            center = config_pars['center']
+        ##            center3D = center[0]*vec1 + center[1]*vec2 + ldmk_am[id].plane_point
+        ##            axis_vec = np.cross(vec1, vec2)
+        ##            radius = config_pars['radius']
+        ##            imgrv = robview.drawrevaxis(imgrv, center3D, axis_vec, radius, rev_color)
+        ##            imgr = lmvis.drawrevaxis(imgr, center3D, axis_vec, radius,
+        ##                                     rev_color)
 
-        #robview.visualize(imgrv)
-        #lmvis.imshow_and_wait(imgr)
-            
+        ##robview.visualize(imgrv)
+        ##lmvis.imshow_and_wait(imgr)
+        #    
 
         quat_true = Rtoquat(rodrigues([0,0,1],rob_state[2]))
         quat_slam = Rtoquat(rodrigues([0,0,1],slam_state[2]))    
         if fidx < 1000:
             f_gt.write(str(fidx+1)+" "+str(rob_state[0])+" "+str(rob_state[1])+" "+str(0)+" "+str(quat_true[0])+" "+str(quat_true[1])+" "+str(quat_true[2])+" "+str(quat_true[3])+" "+"\n")
             f_slam.write(str(fidx+1)+" "+str(slam_state[0])+" "+str(slam_state[1])+" "+str(0)+" "+str(quat_slam[0])+" "+str(quat_slam[1])+" "+str(quat_slam[2])+" "+str(quat_slam[3])+" "+"\n")
-            true_robot_states.append(rob_state)
-            slam_robot_states.append(slam_state[0:3].tolist())
+        true_robot_states.append(rob_state)
+        slam_robot_states.append(slam_state[0:3].tolist())
 
-        obs_num = obs_num + 1
-        print 'SLAM state:',slam_state[0:4]
+        #obs_num = obs_num + 1
+        print 'SLAM state:',slam_state[0:3]
     # end of loop over frames
     
     if PLOTSIM:
