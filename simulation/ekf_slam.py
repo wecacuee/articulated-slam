@@ -10,7 +10,31 @@ import utils_plot as up
 import scipy.linalg
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
+import sys
+import os
+import copy
 
+import numpy as np
+import cv2
+import landmarkmap3d as landmarkmap
+from landmarkmap3d import rodrigues
+import estimate_mm as mm # To figure out the right motion model
+import pdb
+import utils_plot as up
+import scipy.linalg
+import matplotlib.pyplot as plt
+import dataio
+from extracttrajectories import feature_odom_gt_pose_iter_from_bag
+
+from itertools import imap, izip, tee as itr_tee, islice
+from collections import namedtuple, deque
+import csv
+
+TrackedLdmk = namedtuple('TrackedLdmk', ['ts', 'pt3D'])
+models_names = ['Revolute','Prismatic','Static']
+
+SIMULATEDDATA = False 
+PLOTSIM = True
 
 '''
 Observation model of the robot - range bearing sensor
@@ -69,9 +93,10 @@ def robot_to_world(robot_state,gen_obv):
     x = robot_state[0]; y= robot_state[1]; theta = robot_state[2]
 
     # v2.0 Using inverse rotation matrix to retrieve landmark world frame co    ordinates
-    R = np.array([[np.cos(theta), -np.sin(theta),0],
-                [np.sin(theta), np.cos(theta),0],
-                [0,0,1]])
+    #R = np.array([[np.cos(theta), -np.sin(theta),0],
+    #            [np.sin(theta), np.cos(theta),0],
+    #            [0,0,1]])
+    R = rodrigues([0,0,1],theta)
     # v2.0 
     # State is (x,y,0) since we assume robot is on the ground
     return R.T.dot(gen_obv)+ np.array([x,y,0])
@@ -227,47 +252,237 @@ covarinace in previous state,
 actual robot input (translational and rotational component),
 and time interval
 '''
-def robot_motion_prop(prev_state,prev_state_cov,robot_input,delta_t=1):
+#def robot_motion_prop(prev_state,prev_state_cov,robot_input,delta_t=1):
+#    # Robot input is [v,w]^T where v is the linear velocity and w is the rotational component
+#    v = robot_input[0];w=robot_input[1];
+#    # Robot state is [x,y,\theta]^T, where x,y is the position and \theta is the orientation
+#    x = prev_state[0]; y=prev_state[1];theta = prev_state[2]
+#    robot_state = np.zeros(3)
+#    # Setting noise parameters, following Page 210 Chapter 7, Mobile Robot Localization of 
+#    # Probabilistic Robotics book
+#    alpha_1 = 0.1; alpha_2=0.05; alpha_3 = 0.05; alpha_4 = 0.1
+#    # M for transferring noise from input space to state-space
+#    M = np.array([[(alpha_1*(v**2))+(alpha_2*(w**2)),0],[0,(alpha_3*(v**2))+(alpha_4*(w**2))]])
+#    
+#    # Check if rotational velocity is close to 0
+#    if (abs(w)<1e-4):
+#        robot_state[0] = x+(v*delta_t*np.cos(theta))        
+#        robot_state[1] = y+(v*delta_t*np.sin(theta))        
+#        robot_state[2] = theta
+#        # Derivative of forward dynamics model w.r.t previous robot state
+#        G = np.array([[1,0,-v*delta_t*np.sin(theta)],\
+#                [0,1,v*delta_t*np.cos(theta)],\
+#                [0,0,1]])
+#        # Derivative of forward dynamics model w.r.t robot input
+#        V = np.array([[delta_t*np.cos(theta),0],[delta_t*np.sin(theta),0],[0,0]])
+#    else:
+#        # We have a non-zero rotation component
+#        robot_state[0] = x+(((-v/w)*np.sin(theta))+((v/w)*np.sin(theta+w*delta_t)))
+#        robot_state[1] = y+(((v/w)*np.cos(theta))-((v/w)*np.cos(theta+w*delta_t)))
+#        robot_state[2] = theta+(w*delta_t)
+#        G = np.array([[1,0,(v/w)*(-np.cos(theta)+np.cos(theta+w*delta_t))],\
+#                [0,1,(v/w)*(-np.sin(theta)+np.sin(theta+w*delta_t))],\
+#                [0,0,1]])
+#        # Derivative of forward dynamics model w.r.t robot input
+#        # Page 206, Eq 7.11
+#        V = np.array([[(-np.sin(theta)+np.sin(theta+w*delta_t))/w,\
+#                (v*(np.sin(theta)-np.sin(theta+w*delta_t)))/(w**2)+((v*np.cos(theta+w*delta_t)*delta_t)/w)],\
+#                [(np.cos(theta)-np.cos(theta+w*delta_t))/w,\
+#                (-v*(np.cos(theta)-np.cos(theta+w*delta_t)))/(w**2)+((v*np.sin(theta+w*delta_t)*delta_t)/w)],\
+#                [0,delta_t]])
+#    # Covariance in propagated state
+#    state_cov = np.dot(np.dot(G,prev_state_cov),np.transpose(G))+np.dot(np.dot(V,M),np.transpose(V))
+#    return robot_state,state_cov
+
+def robot_motion_prop(prev_state,prev_state_cov,robot_input,delta_t=1, 
+                     motion_model='nonholonomic'):
     # Robot input is [v,w]^T where v is the linear velocity and w is the rotational component
     v = robot_input[0];w=robot_input[1];
     # Robot state is [x,y,\theta]^T, where x,y is the position and \theta is the orientation
     x = prev_state[0]; y=prev_state[1];theta = prev_state[2]
     robot_state = np.zeros(3)
     # Setting noise parameters, following Page 210 Chapter 7, Mobile Robot Localization of 
-    # Probabilistic Robotics book
     alpha_1 = 0.1; alpha_2=0.05; alpha_3 = 0.05; alpha_4 = 0.1
-    # M for transferring noise from input space to state-space
-    M = np.array([[(alpha_1*(v**2))+(alpha_2*(w**2)),0],[0,(alpha_3*(v**2))+(alpha_4*(w**2))]])
     
-    # Check if rotational velocity is close to 0
-    if (abs(w)<1e-4):
-        robot_state[0] = x+(v*delta_t*np.cos(theta))        
-        robot_state[1] = y+(v*delta_t*np.sin(theta))        
-        robot_state[2] = theta
-        # Derivative of forward dynamics model w.r.t previous robot state
-        G = np.array([[1,0,-v*delta_t*np.sin(theta)],\
-                [0,1,v*delta_t*np.cos(theta)],\
-                [0,0,1]])
-        # Derivative of forward dynamics model w.r.t robot input
-        V = np.array([[delta_t*np.cos(theta),0],[delta_t*np.sin(theta),0],[0,0]])
+    if motion_model == 'holonomic':
+        vx, vy = v
+        robot_state = np.array([
+            x+(vx*np.cos(theta) - vy*np.sin(theta)) * delta_t,
+            y+(vx*np.sin(theta) + vy*np.cos(theta)) * delta_t,
+            theta + w * delta_t
+        ])
+        M = np.array([[(alpha_1*(vx**2))+(alpha_1*(vy**2))+(alpha_2*(w**2)),0, 0],
+                      [0, (alpha_1*(vx**2))+(alpha_1*(vy**2))+(alpha_2*(w**2)), 0],
+                      [0, 0, (alpha_3*(vx**2))+(alpha_3*(vy**2))+(alpha_4*(w**2))]])
+        # G = \del robot_state / \del [x,y,theta]
+        G = np.array(
+            [[1, 0, (-vx * np.sin(theta) - vy * np.cos(theta)) * delta_t],
+             [0, 1, (vx * np.cos(theta) - vy * np.sin(theta) ) * delta_t],
+             [0, 0,                                                    1]])
+
+        # V = \del robot_state / \del [vx, vy, w]
+        V = np.array(
+            [[np.cos(theta) * delta_t, -np.sin(theta) * delta_t, 0],
+             [np.sin(theta) * delta_t,  np.cos(theta) * delta_t, 0],
+             [                      0,                        0, 1]])
+    elif motion_model == 'nonholonomic':
+        # M for transferring noise from input space to state-space
+        M = np.array([[(alpha_1*(v**2))+(alpha_2*(w**2)),0],[0,(alpha_3*(v**2))+(alpha_4*(w**2))]])
+        # Check if rotational velocity is close to 0
+        if (abs(w)<1e-4):
+            robot_state[0] = x+(v*delta_t*np.cos(theta))        
+            robot_state[1] = y+(v*delta_t*np.sin(theta))        
+            robot_state[2] = theta
+            # Derivative of forward dynamics model w.r.t previous robot state
+            G = np.array([[1,0,-v*delta_t*np.sin(theta)],\
+                    [0,1,v*delta_t*np.cos(theta)],\
+                    [0,0,1]])
+            # Derivative of forward dynamics model w.r.t robot input
+            V = np.array([[delta_t*np.cos(theta),0],[delta_t*np.sin(theta),0],[0,0]])
+        else:
+            # We have a non-zero rotation component
+            robot_state[0] = x+(((-v/w)*np.sin(theta))+((v/w)*np.sin(theta+w*delta_t)))
+            robot_state[1] = y+(((v/w)*np.cos(theta))-((v/w)*np.cos(theta+w*delta_t)))
+            robot_state[2] = theta+(w*delta_t)
+            G = np.array([[1,0,(v/w)*(-np.cos(theta)+np.cos(theta+w*delta_t))],\
+                    [0,1,(v/w)*(-np.sin(theta)+np.sin(theta+w*delta_t))],\
+                    [0,0,1]])
+            # Derivative of forward dynamics model w.r.t robot input
+            # Page 206, Eq 7.11
+            V = np.array([[(-np.sin(theta)+np.sin(theta+w*delta_t))/w,\
+                    (v*(np.sin(theta)-np.sin(theta+w*delta_t)))/(w**2)+((v*np.cos(theta+w*delta_t)*delta_t)/w)],\
+                    [(np.cos(theta)-np.cos(theta+w*delta_t))/w,\
+                    (-v*(np.cos(theta)-np.cos(theta+w*delta_t)))/(w**2)+((v*np.sin(theta+w*delta_t)*delta_t)/w)],\
+                    [0,delta_t]])
     else:
-        # We have a non-zero rotation component
-        robot_state[0] = x+(((-v/w)*np.sin(theta))+((v/w)*np.sin(theta+w*delta_t)))
-        robot_state[1] = y+(((v/w)*np.cos(theta))-((v/w)*np.cos(theta+w*delta_t)))
-        robot_state[2] = theta+(w*delta_t)
-        G = np.array([[1,0,(v/w)*(-np.cos(theta)+np.cos(theta+w*delta_t))],\
-                [0,1,(v/w)*(-np.sin(theta)+np.sin(theta+w*delta_t))],\
-                [0,0,1]])
-        # Derivative of forward dynamics model w.r.t robot input
-        # Page 206, Eq 7.11
-        V = np.array([[(-np.sin(theta)+np.sin(theta+w*delta_t))/w,\
-                (v*(np.sin(theta)-np.sin(theta+w*delta_t)))/(w**2)+((v*np.cos(theta+w*delta_t)*delta_t)/w)],\
-                [(np.cos(theta)-np.cos(theta+w*delta_t))/w,\
-                (-v*(np.cos(theta)-np.cos(theta+w*delta_t)))/(w**2)+((v*np.sin(theta+w*delta_t)*delta_t)/w)],\
-                [0,delta_t]])
+        raise ValueError('Unknown motion model %s' % motion_model)
     # Covariance in propagated state
     state_cov = np.dot(np.dot(G,prev_state_cov),np.transpose(G))+np.dot(np.dot(V,M),np.transpose(V))
     return robot_state,state_cov
+
+class FilterTrackByLength(object):
+    def __init__(self):
+        self._track_lengths = dict()
+        self._min_track_length = 200
+
+    def count(self, rob_obs_iter):
+        for timestamp, ids,rob_state_and_input, ldmks, ldmk_robot_obs in rob_obs_iter:
+            for id in ids:
+                self._track_lengths[id] = self._track_lengths.get(id, 0) + 1
+
+    def isvalid(self, id):
+        return self._track_lengths.get(id, 0) > self._min_track_length
+
+    def filter(self, rob_obs_iter):
+        for timestamp, ids,rob_state_and_input, ldmks, ldmk_robot_obs in rob_obs_iter:
+            f_ids = [id for id in ids if self.isvalid(id)]
+            bool_valid = np.array([(True if self.isvalid(id) else False)
+                                   for id in ids])
+
+            f_ldmk_robot_obs = ldmk_robot_obs[:, bool_valid]
+            yield (timestamp, f_ids, rob_state_and_input,
+                   ldmks, f_ldmk_robot_obs)
+
+class RealDataToSimulatedFormat(object):
+    def __init__(self, K, max_depth=4):
+        # (z_view) real_k assumes Z in viewing direction, Y-axis downwards
+        # (x_viwe) Simulated data format assumes X in viewing direction, Z -axis upwards
+        R_x_view_2_z_view = rodrigues([0, 1, 0], -np.pi/2).dot(
+            rodrigues([1, 0, 0], np.pi/2))
+        K_x_view = K.dot(R_x_view_2_z_view)
+        self.camera_K_x_view = K_x_view
+        self._first_gt_pose = None
+        self._all_ldmks = np.zeros((2,0))
+        self._max_depth = max_depth
+
+    def first_gt_pose(self):
+        return self._first_gt_pose
+
+    def compute_ldmks_robot_pose(self, points, depths):
+        points_a = np.array(points).T
+        depths_a = np.array(depths)
+        Kinv = np.linalg.inv(self.camera_K_x_view)
+        ldmk_robot_obs = Kinv.dot(landmarkmap.euc2homo(points_a)) * depths_a
+        return ldmk_robot_obs
+
+    def prepare_ldmks_all_world(self, theta, ldmk_robot_obs, xy, track_ids):
+        # prepare ldmks
+        R_c2w = rodrigues([0, 0, 1], theta)
+        ldmks_world = R_c2w.dot(ldmk_robot_obs) \
+                + np.asarray([xy[0], xy[1], 0]).reshape(-1, 1)
+        max_track_id = np.maximum(np.max(track_ids), self._all_ldmks.shape[1])
+        all_ldmks = np.zeros((ldmks_world.shape[0], max_track_id + 1))
+        if (self._all_ldmks.shape[1]):
+            all_ldmks[:, :self._all_ldmks.shape[1]] = self._all_ldmks
+        all_ldmks[:, track_ids] = ldmks_world
+        self._all_ldmks = all_ldmks
+        return self._all_ldmks
+
+    def unpack_odom(self, odom):
+        (pos, quat), (linvel, angvel) = odom
+        assert(abs(linvel[2]) < 0.1)
+        assert(abs(angvel[0]) < 0.1)
+        assert(abs(angvel[1]) < 0.1)
+        return linvel[:2], angvel[2]
+
+    def unpack_gt_pose(self, gt_pose):
+        (xyz, abg) = gt_pose
+        if self._first_gt_pose is None:
+            self._first_gt_pose = copy.deepcopy(gt_pose)
+
+        (_, _, z0), _ = self._first_gt_pose
+        xyz[2] = xyz[2] - z0
+        assert abs(xyz[2]) < 0.15, 'xyz[2] - z0 = %f; z0 = %f' % (xyz[2], z0)
+        assert abs(abg[0]) < 0.05, 'abg[0] = %f' % abg[0]
+        assert abs(abg[1]) < 0.05, 'abg[1] = %f' % abg[1]
+        return (xyz[:2], abg[2])
+
+    def real_data_to_required_format(self, ts_features_odom_gt):
+        ts, features_odom_gt = ts_features_odom_gt
+        tracked_pts, odom, gt_pose = features_odom_gt
+        filtered_tracked_pts = [(id, pt, d) for id, pt, d in tracked_pts 
+                                if d < self._max_depth]
+        track_ids, points, depths  = zip(*filtered_tracked_pts)
+        (linvel2D, angvel2D) = self.unpack_odom(odom)
+        (xy, theta) = self.unpack_gt_pose(gt_pose)
+        ldmk_robot_obs = self.compute_ldmks_robot_pose(points, depths)
+        all_ldmks = self.prepare_ldmks_all_world(theta, ldmk_robot_obs,
+                                     xy, track_ids)
+
+        return (ts, track_ids, [xy[0], xy[1], theta,
+                            np.asarray(linvel2D), angvel2D],
+                all_ldmks, ldmk_robot_obs)
+
+def get_timeseries_data_iter(timeseries_data_file):
+    serializer = dataio.FeaturesOdomGTSerializer()
+    datafile = open(timeseries_data_file)
+    timestamps = serializer.init_load(datafile)
+    data_iter = izip(timestamps, serializer.load_iter(datafile))
+    return data_iter
+    
+
+def plot_sim_res(PLOTSIM,prob_plot1,prob_plot2,prob_plot3,traj_ldmk1,traj_ldmk2,traj_ldmk3,true_robot_states,slam_robot_states):
+    plt.figure('True Trajectory')
+    true_robot_states = np.dstack(true_robot_states)[0]
+    slam_robot_states = np.dstack(slam_robot_states)[0]
+    #traj_ldmk1 = np.dstack(traj_ldmk1)[0]
+    #traj_ldmk2 = np.dstack(traj_ldmk2)[0]
+    #traj_ldmk3 = np.dstack(traj_ldmk3)[0]
+    pdb.set_trace()
+    plt.plot(true_robot_states[0],true_robot_states[1],'+-k',linestyle='dashed',label='True Robot trajectory',markersize=15.0)
+    plt.figure('Slam Traj')
+    plt.plot(slam_robot_states[0],slam_robot_states[1],'^-g',label='A-SLAM trajectory',markersize=15.0)
+
+    #plt.plot(traj_ldmk1[0],traj_ldmk1[1],'*-g',linestyle='dotted',label='Prismatic joint',markers    ize=15.0)
+    #plt.plot(traj_ldmk2[0],traj_ldmk2[1],'o-b',linestyle='dotted',label='Revolute joint',markersi    ze=10.0)
+    #plt.plot(traj_ldmk3[0],traj_ldmk3[1],'^-r',label='Static joint',markersize=15.0)
+    #plt.xticks([-2,0,2,4,6],fontsize=24)
+    #plt.yticks([-2,0,2,4,6],fontsize=24)
+    #plt.legend(loc=4,fontsize=24)
+    plt.show()
+
+
+
 
 '''
 Performing EKF SLAM
@@ -279,24 +494,98 @@ def slam(debug_inp=True):
     f_slam = open('slam_orig.txt','w')
     f= 300
     img_shape = (240, 320)
-    K = np.array([[f, 0, img_shape[1]/2], [0, f, img_shape[0]/2], [0, 0, 1]])
+    camera_K_z_view = np.array([[f, 0, img_shape[1]/2], [0, f, img_shape[0]/2], [0, 0, 1]])
     # Getting the map
     #nframes, lmmap, lmvis, robtraj, maxangle, maxdist = threeptmap3d()
     nframes, lmmap, robtraj, maxangle, maxdist = threeptmap3d()
 
     ldmk_am = dict(); # To keep a tab on the landmarks that have been previously seen
 
-    #rev_color, pris_color, stat_color = [np.array(l) for l in (
-    #    [255, 0, 0], [0, 255, 0], [0, 0, 255])]
+    rev_color, pris_color, stat_color = [np.array(l) for l in (
+        [255, 0, 0], [0, 255, 0], [0, 0, 255])]
     # to get the landmarks with ids that are being seen by robot
-    rob_obs_iter = landmarkmap.get_robot_observations(lmmap, robtraj, maxangle, maxdist,img_shape,K,lmvis=None)
-    rob_obs_iter = list(rob_obs_iter)
+    if SIMULATEDDATA:
+        rob_obs_iter = landmarkmap.get_robot_observations(lmmap, robtraj, maxangle, maxdist,img_shape,camera_K_z_view,lmvis=None)
+        motion_model = 'nonholonomic'
+        csv = np.genfromtxt('expt_noise.csv',delimiter=',')
+        count = 0
+        robview = landmarkmap.RobotView(img_shape,camera_K_z_view,maxdist)
+    else:
+        timeseries_data_file = "../mid/articulatedslam/2016-01-22/rev_2016-01-22-13-56-28/extracttrajectories_GFTT_SIFT_odom_gt_timeseries.txt"
+        bag_file = "../mid/articulatedslam/2016-01-22/rev2_2016-01-22-14-32-13.bag"
+        timeseries_dir = os.path.dirname(timeseries_data_file)
+        image_file_fmt = os.path.join(timeseries_dir, "img/frame%04d.png")
+        timestamps_file = os.path.join(timeseries_dir, 'img/timestamps.txt')
+
+        robview = landmarkmap.RobotView(img_shape, camera_K_z_view, maxdist,
+                                   image_file_format=image_file_fmt,
+                                   timestamps_file=timestamps_file)
+        use_bag = False 
+        if use_bag:
+            data_iter = feature_odom_gt_pose_iter_from_bag(bag_file, "GFTT",
+                                                       "SIFT")
+        else:
+            data_iter = get_timeseries_data_iter(timeseries_data_file)
+
+        VISDEBUG = 0
+        if VISDEBUG:
+            plotables = dict()
+            for i, (ts, (features, odom, gt_pose)) in enumerate(data_iter):
+                if i % 100 != 0:
+                    continue
+                (pos, quat), (linvel, angvel) = odom
+                xyz, abg = gt_pose
+                plotables.setdefault('linvel[0]', []).append(linvel[0])
+                plotables.setdefault('linvel[1]', []).append(linvel[1])
+                plotables.setdefault('linvel[2]', []).append(linvel[2])
+                plotables.setdefault('angvel[0]', []).append(angvel[0])
+                plotables.setdefault('angvel[1]', []).append(angvel[1])
+                plotables.setdefault('angvel[2]', []).append(angvel[2])
+                plotables.setdefault('xyz[0]', []).append(xyz[0])
+                plotables.setdefault('xyz[1]', []).append(xyz[1])
+                plotables.setdefault('xyz[2]', []).append(xyz[2])
+                plotables.setdefault('abg[0]', []).append(abg[0])
+                plotables.setdefault('abg[1]', []).append(abg[1])
+                plotables.setdefault('abg[2]', []).append(abg[2])
+
+            for (k, v), m in zip(plotables.items(), ',.1234_x|^vo'):
+                plt.plot(v, label=k, marker=m)
+            plt.legend(loc='best')
+            plt.show()
+            sys.exit(0)
+
+        formatter = RealDataToSimulatedFormat(camera_K_z_view)
+        rob_obs_iter_all = imap(
+            formatter.real_data_to_required_format,
+            data_iter)
+        filter_by_length = FilterTrackByLength()
+        filter_by_length.count(islice(rob_obs_iter_all, 500))
+
+        if use_bag:
+            data_iter = feature_odom_gt_pose_iter_from_bag(bag_file, "GFTT",
+                                                       "SIFT")
+        else:
+            data_iter = get_timeseries_data_iter(timeseries_data_file)
+
+        formatter = RealDataToSimulatedFormat(camera_K_z_view)
+        rob_obs_iter_all = imap(
+            formatter.real_data_to_required_format,
+            data_iter)
+        rob_obs_iter = filter_by_length.filter(islice(rob_obs_iter_all, 500))
+
+        motion_model = 'holonomic'
+
+    lmvis = landmarkmap.LandmarksVisualizer([0,0], [7, 7], frame_period=10,
+            imgshape=(700, 700))
+
+    #rob_obs_iter = list(rob_obs_iter)
+    first_traj_pt = dict()
     #frame_period = lmvis.frame_period
     # EKF parameters for filtering
 
     # Initially we only have the robot state
-    ( _, rob_state_and_input,init_pt,_) = rob_obs_iter[0]
-    init_pt = np.dstack(init_pt)[0]
+    ( init_timestamp,_,rob_state_and_input,LDD,_) = rob_obs_iter.next()
+    model = dict()
     slam_state =  np.array(rob_state_and_input[:3]) # \mu_{t} state at current time step
     # Covariance following discussion on page 317
     # Assuming that position of the robot is exactly known
@@ -312,35 +601,41 @@ def slam(debug_inp=True):
     # For error estimation in robot localization
     true_robot_states = []
     slam_robot_states = []
-    prob_plot1 = []
-    prob_plot2 = []
-    prob_plot3 = []
-    # Noise settings
-    mu = 0.0
-    sigma = 0.1
- 
-    csv = np.genfromtxt('expt_noise.csv',delimiter=',')
-    count = 0 
-    pdb.set_trace()
+    ldmktracks = dict()
+
+    if PLOTSIM:
+        prob_plot1 = []
+        prob_plot2 = []
+        prob_plot3 = []
+        traj_ldmk1 = []
+        traj_ldmk2 = []
+        traj_ldmk3 = []
         # Processing all the observations
         # We need to skip the first observation because it was used to initialize SLAM State
-    for fidx, (ids, rob_state_and_input, ldmks,ldmk_robot_obs) in enumerate(rob_obs_iter[1:]): 
+    for fidx, (timestamp,ids, rob_state_and_input, ldmks,ldmk_robot_obs) in enumerate(rob_obs_iter): 
+        if not SIMULATEDDATA:
+            if fidx<200:
+                continue
+            dt = timestamp - init_timestamp
+            init_timestamp = timestamp
         rob_state = rob_state_and_input[:3]
         robot_input = rob_state_and_input[3:]
-        #print '+++++++++++++ fidx = %d +++++++++++' % fidx
-        #print 'Robot true state:', rob_state
-        ##print 'Observations:', zip(rs, thetas, ids)
-        #print 'Observations:', ldmk_robot_obs
-        if fidx == 91:
-            pdb.set_trace()
-        posdir = map(np.array, ([rob_state[0], rob_state[1]],
-                                [np.cos(rob_state[2]), np.sin(rob_state[2])]))
+        print '+++++++++++++ fidx = %d +++++++++++' % fidx
+        print 'Robot true state:', rob_state
+        print 'Observations:', ldmk_robot_obs.shape
+
+        #posdir = map(np.array, ([rob_state[0], rob_state[1]],
+        #                        [np.cos(rob_state[2]), np.sin(rob_state[2])]))
         #robview = landmarkmap.RobotView(posdir[0], posdir[1], maxangle, maxdist)
         
         # Following EKF steps now
 
         # First step is propagate : both robot state and motion parameter of any active landmark
-        slam_state[0:3],slam_cov[0:3,0:3]=robot_motion_prop(slam_state[0:3],slam_cov[0:3,0:3],robot_input)
+        if not SIMULATEDDATA:
+            slam_state[0:3],slam_cov[0:3,0:3]=robot_motion_prop(slam_state[0:3],slam_cov[0:3,0:3],robot_input,dt*1e-9,motion_model=motion_model)
+        else:   
+            slam_state[0:3],slam_cov[0:3,0:3]=robot_motion_prop(slam_state[0:3],slam_cov[0:3,0:3],robot_input)
+            
 
         colors = []
         mm_probs = []
@@ -350,9 +645,13 @@ def slam(debug_inp=True):
         for id,ldmk_rob_obv in zip(ids,np.dstack(ldmk_robot_obs)[0]):
             # Observation corresponding to current landmark is
             #obs = np.array([r, theta])
-            # Adding noise to observations
-            ldmk_rob_obv = ldmk_rob_obv + csv[count,:]
-            count = count + 1
+            if SIMULATEDDATA:
+                # Adding noise to observations
+                ldmk_rob_obv = ldmk_rob_obv + csv[count,:]
+                count = count + 1
+
+            #if id not in first_traj_pt:
+            #    first_traj_pt[id] = robot_to_world(slam_state[0:3],ldmk_rob_obv)
                 
             '''
             Step 1: Process Observations to first determine the motion model of each landmark
@@ -369,12 +668,6 @@ def slam(debug_inp=True):
                 ld_ids.append(id)
                 # Getting the current state to be added to the SLAM state (x,y) position of landmark
                 curr_ld_state = robot_to_world(slam_state,ldmk_rob_obv)
-                if id==40:
-                    prob_plot1 = curr_ld_state
-                if id==41:
-                    prob_plot2 = curr_ld_state
-                if id==13:
-                    prob_plot3 = curr_ld_state
                 curr_ld_cov = initial_cov 
                 index_set.append(index_set[-1]+curr_ld_state.shape[0])
                 # Extend Robot state by adding the motion parameter of the landmark
@@ -437,8 +730,21 @@ def slam(debug_inp=True):
             ids_list.append(id)
 
         # end of loop over observations in single frame
-        print fidx,count 
         # Follow all the steps on
+        for i, id in enumerate(ids):
+            ldmktracks.setdefault(id, []).append(TrackedLdmk(timestamp, ldmk_robot_obs[:, i:i+1]))
+
+        robview.set_robot_pos_theta((rob_state[0], rob_state[1], 0),
+                rob_state[2])
+
+        #img = lmvis.genframe(ldmks, ldmk_robot_obs=ldmk_robot_obs, robview = robview,colors=colors,SIMULATEDDATA=SIMULATEDDATA)
+        #imgr = lmvis.drawrobot(robview, img)
+        #imgrv = robview.drawtracks([ldmktracks[id] for id in ids],
+        #        imgidx=robview.imgidx_by_timestamp(timestamp),
+        #        colors=colors)
+        #robview.visualize(imgrv)
+        #lmvis.imshow_and_wait(imgr)
+
         #print "SLAM State for robot and landmarks is",slam_state
         obs_num = obs_num+1
         #up.slam_cov_plot(slam_state,slam_cov,obs_num,rob_state,ld_preds,ld_ids_preds)
@@ -453,32 +759,31 @@ def slam(debug_inp=True):
  
         quat_true = Rtoquat(R_temp_true)
         quat_slam = Rtoquat(R_temp)
-        if fidx<100:
+        if fidx<1000:
             f_gt.write(str(fidx+1)+" "+str(rob_state[0])+" "+str(rob_state[1])+" "+str(0)+" "+str(quat_true[0])+" "+str(quat_true[1])+" "+str(quat_true[2])+" "+str(quat_true[3])+" "+"\n")
             f_slam.write(str(fidx+1)+" "+str(slam_state[0])+" "+str(slam_state[1])+" "+str(0)+" "+str(quat_slam[0])+" "+str(quat_slam[1])+" "+str(quat_slam[2])+" "+str(quat_slam[3])+" "+"\n")
  
-
-
-            true_robot_states.append(rob_state)
-            slam_robot_states.append(slam_state[0:3].tolist())
+        true_robot_states.append(rob_state)
+        slam_robot_states.append(slam_state[0:3].tolist())
     # end of loop over frames
 
-    print count 
+    if PLOTSIM: 
+        plot_sim_res(PLOTSIM,prob_plot1,prob_plot2,prob_plot3,traj_ldmk1,traj_ldmk2,traj_ldmk3,true_robot_states,slam_robot_states)
+
     # Generating plots for paper
 
-    plt.figure('Trajectories')
-    pdb.set_trace()
-    true_robot_states = np.dstack(true_robot_states)[0]
-    slam_robot_states = np.dstack(slam_robot_states)[0]
-    plt.plot(true_robot_states[0],true_robot_states[1],'-k',linestyle='dashed',label='True Robot trajectory',markersize=15.0)
-    plt.plot(slam_robot_states[0],slam_robot_states[1],'^g',label='EKF SLAM trajectory',markersize=15.0)
-    plt.plot(prob_plot1[0],prob_plot1[1],'*g',label='Prismatic',markersize=15.0)
-    plt.plot(prob_plot2[0],prob_plot2[1],'ob',label='Revolute',markersize=15.0)
-    plt.plot(prob_plot3[0],prob_plot3[1],'^r',label='Static',markersize=15.0)
-    plt.yticks([-2,0,2,4,6],fontsize = 24)
-    plt.xticks([-2,0,2,4,6],fontsize = 24)
-    plt.legend(loc=4,fontsize=24)
-    plt.show()
+    #plt.figure('Trajectories')
+    #true_robot_states = np.dstack(true_robot_states)[0]
+    #slam_robot_states = np.dstack(slam_robot_states)[0]
+    #plt.plot(true_robot_states[0],true_robot_states[1],'-k',linestyle='dashed',label='True Robot trajectory',markersize=15.0)
+    #plt.plot(slam_robot_states[0],slam_robot_states[1],'^g',label='EKF SLAM trajectory',markersize=15.0)
+    #plt.plot(prob_plot1[0],prob_plot1[1],'*g',label='Prismatic',markersize=15.0)
+    #plt.plot(prob_plot2[0],prob_plot2[1],'ob',label='Revolute',markersize=15.0)
+    #plt.plot(prob_plot3[0],prob_plot3[1],'^r',label='Static',markersize=15.0)
+    #plt.yticks([-2,0,2,4,6],fontsize = 24)
+    #plt.xticks([-2,0,2,4,6],fontsize = 24)
+    #plt.legend(loc=4,fontsize=24)
+    #plt.show()
 
 
 

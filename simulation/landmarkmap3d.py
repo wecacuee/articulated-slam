@@ -576,7 +576,7 @@ def get_robot_observations(lmmap, robtraj, maxangle, maxdist, imgshape, K, lmvis
         # v2.0 Rename gen_obs
         R_c2w = rodrigues([0, 0, 1], rob_theta)
         R_w2c = R_c2w.T
-        ldmk_robot_obs = R_c2w.dot(selected_ldmks-pos)
+        ldmk_robot_obs = R_w2c.T.dot(selected_ldmks-pos)
         # Ignoring robot's Z component
         yield (0, ldmks_idx[0], [float(pos[0]), float(pos[1]),
                                              rob_theta,
