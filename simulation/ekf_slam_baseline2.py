@@ -602,6 +602,8 @@ def slam(debug_inp=True):
     true_robot_states = []
     slam_robot_states = []
     ldmktracks = dict()
+    xt2 = dict()
+    xt1 = dict()
 
     if PLOTSIM:
         prob_plot1 = []
@@ -650,75 +652,86 @@ def slam(debug_inp=True):
                 ldmk_rob_obv = ldmk_rob_obv + csv[count,:]
                 count = count + 1
 
-            #if id not in first_traj_pt:
-            #    first_traj_pt[id] = robot_to_world(slam_state[0:3],ldmk_rob_obv)
-                
-            '''
-            Step 1: Process Observations to first determine the motion model of each landmark
-            During this step we will use robot's internal odometry to get the best position of 
-            external landmark as we can and try to get enough data to estimate landmark's motion
-            model. 
-            '''
-            # Setting default none value for the current landmark observation
-            ldmk_am.setdefault(id,None)
-            # For each landmark id, we want to check if the landmark has been previously seen
-            if ldmk_am[id] is None:
-                # Assign a static landmark id
-                ldmk_am[id] = 2
-                ld_ids.append(id)
-                # Getting the current state to be added to the SLAM state (x,y) position of landmark
-                curr_ld_state = robot_to_world(slam_state,ldmk_rob_obv)
-                curr_ld_cov = initial_cov 
-                index_set.append(index_set[-1]+curr_ld_state.shape[0])
-                # Extend Robot state by adding the motion parameter of the landmark
-                slam_state = np.append(slam_state,curr_ld_state)
-                # Extend Robot covariance by adding the uncertainity corresponding to the 
-                # robot state
-                slam_cov = scipy.linalg.block_diag(slam_cov,curr_ld_cov) 
+            if id not in xt2:
+                xt2[id] = robot_to_world(slam_state[0:3],ldmk_rob_obv)                 
             else:
-                # This means this landmark is an actual observation that must be used for filtering
-                # the robot state as well as the motion parameter associated with the observed landmark
+                '''
+                Step 1: Process Observations to first determine the motion model of each landmark
+                During this step we will use robot's internal odometry to get the best position of 
+                external landmark as we can and try to get enough data to estimate landmark's motion
+                model. 
+                '''
+                # For each landmark id, we want to check if the landmark has been previously seen
+                # Setting default none value for the current landmark observation
+                ldmk_am.setdefault(id,None)
+                if ldmk_am[id] is None:
+                    # Assign a static landmark id
+                    ldmk_am[id] = 1 
+                    ld_ids.append(id)
+                    # Getting the current state to be added to the SLAM state (x,y) position of landmark
+                    curr_ld_state = robot_to_world(slam_state,ldmk_rob_obv)
+                    curr_ld_cov = initial_cov 
+                    index_set.append(index_set[-1]+curr_ld_state.shape[0])
+                    # Extend Robot state by adding the motion parameter of the landmark
+                    slam_state = np.append(slam_state,curr_ld_state)
+                    # Extend Robot covariance by adding the uncertainity corresponding to the 
+                    # robot state
+                    slam_cov = scipy.linalg.block_diag(slam_cov,curr_ld_cov) 
 
-                # Getting the predicted observation from the landmark articulated motion
-                # Getting the motion parameters associated with this landmark
-                curr_ind = ld_ids.index(id)
-                # Following steps from Table 10.2 from book Probabilistic Robotics
-                lk_pred = robot_to_world(slam_state[0:3],ldmk_rob_obv)
-            
-                R_temp = np.array([[np.cos(slam_state[2]), -np.sin(slam_state[2]),0],
-                         [np.sin(slam_state[2]), np.cos(slam_state[2]),0],
-                         [0,0,1]])
+                    # Copy of x_{t-1}
+                    xt1[id] = robot_to_world(slam_state[0:3],ldmk_rob_obv)
 
-                z_pred = R_temp.dot(slam_state[index_set[curr_ind]:index_set[curr_ind+1]] - np.append(slam_state[0:2],[0]))
+                else:
+                    # This means this landmark is an actual observation that must be used for filtering
+                    # the robot state as well as the motion parameter associated with the observed landmark
 
-                #diff_vec = lk_pred-slam_state[0:2]
-                #q_val = np.dot(diff_vec,diff_vec)
-                #z_pred = np.array([np.sqrt(q_val),np.arctan2(diff_vec[1],diff_vec[0])-slam_state[2]])
-                # Getting the jacobian matrix 
-                H_mat = np.zeros((3,index_set[-1]))
-                # w.r.t robot state
-                curr_obs = ldmk_rob_obv
-                theta = slam_state[2]
-                H_mat[0,0:3] = np.array([-np.cos(theta),-np.sin(theta),-np.sin(theta)*curr_obs[0] + np.cos(theta)*curr_obs[1]])
-                H_mat[1,0:3] = np.array([np.sin(theta),-np.cos(theta),(-np.cos(theta)*curr_obs[0]) - (np.sin(theta)*curr_obs[1])])
-                H_mat[2,0:3] = np.array([0,0,0])
-                H_mat[:,index_set[curr_ind]:index_set[curr_ind+1]] = np.dot(R_temp,np.array([[1],[1],[1]]))
+                    # Getting the predicted observation from the landmark articulated motion
+                    # Getting the motion parameters associated with this landmark
+                    curr_ind = ld_ids.index(id)
+                    # Following steps from Table 10.2 from book Probabilistic Robotics
+                    lk_pred = xt1[id] + (xt1[id] - xt2[id])
+
+                    #lk_pred = robot_to_world(slam_state[0:3],ldmk_rob_obv)
+                
+                    R_temp = np.array([[np.cos(slam_state[2]), -np.sin(slam_state[2]),0],
+                             [np.sin(slam_state[2]), np.cos(slam_state[2]),0],
+                             [0,0,1]])
+                    z_pred = R_temp.dot(lk_pred- np.append(slam_state[0:2],[0]))
+
+                    #z_pred = R_temp.dot(slam_state[index_set[curr_ind]:index_set[curr_ind+1]] - np.append(slam_state[0:2],[0]))
+
+                    #diff_vec = lk_pred-slam_state[0:2]
+                    #q_val = np.dot(diff_vec,diff_vec)
+                    #z_pred = np.array([np.sqrt(q_val),np.arctan2(diff_vec[1],diff_vec[0])-slam_state[2]])
+                    # Getting the jacobian matrix 
+                    H_mat = np.zeros((3,index_set[-1]))
+                    # w.r.t robot state
+                    curr_obs = ldmk_rob_obv
+                    theta = slam_state[2]
+                    H_mat[0,0:3] = np.array([-np.cos(theta),-np.sin(theta),-np.sin(theta)*curr_obs[0] + np.cos(theta)*curr_obs[1]])
+                    H_mat[1,0:3] = np.array([np.sin(theta),-np.cos(theta),(-np.cos(theta)*curr_obs[0]) - (np.sin(theta)*curr_obs[1])])
+                    H_mat[2,0:3] = np.array([0,0,0])
+                    H_mat[:,index_set[curr_ind]:index_set[curr_ind+1]] = np.dot(R_temp,np.array([[1],[1],[1]]))
 
 
-                # w.r.t landmark associated states
-                # Differentiation w.r.t landmark x and y first
-                #H_mat[:,index_set[curr_ind]:index_set[curr_ind+1]] = (1.0/q_val)*np.array(\
-                #        [[np.sqrt(q_val)*diff_vec[0],np.sqrt(q_val)*diff_vec[1]],\
-                #        [-diff_vec[1],diff_vec[0]]])
+                    # w.r.t landmark associated states
+                    # Differentiation w.r.t landmark x and y first
+                    #H_mat[:,index_set[curr_ind]:index_set[curr_ind+1]] = (1.0/q_val)*np.array(\
+                    #        [[np.sqrt(q_val)*diff_vec[0],np.sqrt(q_val)*diff_vec[1]],\
+                    #        [-diff_vec[1],diff_vec[0]]])
 
-                # Innovation covariance
-                inno_cov = np.dot(H_mat,np.dot(slam_cov,H_mat.T))+Q_obs
-                # Kalman Gain
-                K_mat = np.dot(np.dot(slam_cov,H_mat.T),np.linalg.inv(inno_cov))
-                # Updating SLAM state
-                slam_state = slam_state+np.hstack((np.dot(K_mat,np.vstack((ldmk_rob_obv-z_pred)))))
-                # Updating SLAM covariance
-                slam_cov = np.dot(np.identity(slam_cov.shape[0])-np.dot(K_mat,H_mat),slam_cov)
+                    # Innovation covariance
+                    inno_cov = np.dot(H_mat,np.dot(slam_cov,H_mat.T))+Q_obs
+                    # Kalman Gain
+                    K_mat = np.dot(np.dot(slam_cov,H_mat.T),np.linalg.inv(inno_cov))
+                    # Updating SLAM state
+                    slam_state = slam_state+np.hstack((np.dot(K_mat,np.vstack((ldmk_rob_obv-z_pred)))))
+                    # Updating SLAM covariance
+                    slam_cov = np.dot(np.identity(slam_cov.shape[0])-np.dot(K_mat,H_mat),slam_cov)
+
+                    # Updated model
+                    xt2[id] = xt1[id]
+                    xt1[id] = slam_state[index_set[curr_ind]:index_set[curr_ind+1]]
             # end of if else ldmk_am[id]
 
             #p1, p2, p3 = (0,0,1) # We are assuming everything to be static

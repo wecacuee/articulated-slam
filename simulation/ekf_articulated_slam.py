@@ -551,7 +551,6 @@ def articulated_slam(debug_inp=True):
                 continue
             dt = timestamp - init_timestamp
             init_timestamp = timestamp
-        pdb.set_trace()
         rob_state = rob_state_and_input[:3]
         robot_input = rob_state_and_input[3:]
         print '+++++++++++++ fidx = %d +++++++++++' % fidx
