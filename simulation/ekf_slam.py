@@ -33,8 +33,8 @@ import csv
 TrackedLdmk = namedtuple('TrackedLdmk', ['ts', 'pt3D'])
 models_names = ['Revolute','Prismatic','Static']
 
-SIMULATEDDATA = True 
-PLOTSIM = True
+SIMULATEDDATA = False 
+PLOTSIM = True 
 
 '''
 Observation model of the robot - range bearing sensor
@@ -88,7 +88,7 @@ def bearing_to_cartesian(obs,robot_state):
      
     return np.array([x+r*np.cos(theta+phi),y+r*np.sin(theta+phi)])
 
-def robot_to_world(robot_state,gen_obv):
+def robot_to_world(robot_state,gen_obv,SIM):
     # Robot state consists of (x,y,\theta) where \theta is heading angle
     x = robot_state[0]; y= robot_state[1]; theta = robot_state[2]
 
@@ -96,10 +96,13 @@ def robot_to_world(robot_state,gen_obv):
     #R = np.array([[np.cos(theta), -np.sin(theta),0],
     #            [np.sin(theta), np.cos(theta),0],
     #            [0,0,1]])
-    R = rodrigues([0,0,1],theta)
+    if not SIM:
+        R = rodrigues([0,0,1],theta)
+    else:
+        R = rodrigues([0,0,1],theta).T
     # v2.0 
     # State is (x,y,0) since we assume robot is on the ground
-    return R.T.dot(gen_obv)+ np.array([x,y,0])
+    return R.dot(gen_obv)+ np.array([x,y,0.0])
 
 
 # x,y in cartesian to robot bearing and range
@@ -199,19 +202,19 @@ def threeptmap3d():
                 delpos=np.array([0,0,0])/scale)
                 for x,y,z in zip([10]*10 + range(10,191,20)+[190]*10+range(10,191,20),
                                  range(10,191,20)+[190]*10+range(10,191,20)+[10]*10,
-                                 [5]*10 + range(1,11,1)+[1]*10+range(1,11,1))]
-                #]+[#Prismatic
-                #dict(ldmks=np.array([[40,160,0]]).T/scale,
-                #initthetas=[0,0,0],
-                #initpos=np.array([0,0,0])/scale,
-                #delthetas=[0,0,0],
-                #delpos=np.array([1,0,0])/scale)
-                #]+[#Revolute
-                #dict(ldmks=np.array([[10,10,0]]).T/scale,
-                #initthetas=[0,0,0],
-                #initpos=np.array([130,130,0])/scale,
-                #delthetas=[0,0,np.pi/5],
-                #delpos=np.array([0,0,0])/scale)]
+                                 [5]*10 + range(1,11,1)+[1]*10+range(1,11,1))
+                ]+[#Prismatic
+                dict(ldmks=np.array([[40,160,0]]).T/scale,
+                initthetas=[0,0,0],
+                initpos=np.array([0,0,0])/scale,
+                delthetas=[0,0,0],
+                delpos=np.array([1,0,0])/scale)
+                ]+[#Revolute
+                dict(ldmks=np.array([[10,10,0]]).T/scale,
+                initthetas=[0,0,0],
+                initpos=np.array([130,130,0])/scale,
+                delthetas=[0,0,np.pi/5],
+                delpos=np.array([0,0,0])/scale)]
 
     lmmap = landmarkmap.map_from_conf(map_conf,nframes)
     robtraj = landmarkmap.robot_trajectory(
@@ -462,7 +465,7 @@ def get_timeseries_data_iter(timeseries_data_file):
     
 
 def plot_sim_res(PLOTSIM,prob_plot1,prob_plot2,prob_plot3,traj_ldmk1,traj_ldmk2,traj_ldmk3,true_robot_states,slam_robot_states):
-    plt.figure('True Trajectory')
+    plt.figure('Trajectory')
     true_robot_states = np.dstack(true_robot_states)[0]
     slam_robot_states = np.dstack(slam_robot_states)[0]
     #traj_ldmk1 = np.dstack(traj_ldmk1)[0]
@@ -470,7 +473,6 @@ def plot_sim_res(PLOTSIM,prob_plot1,prob_plot2,prob_plot3,traj_ldmk1,traj_ldmk2,
     #traj_ldmk3 = np.dstack(traj_ldmk3)[0]
     pdb.set_trace()
     plt.plot(true_robot_states[0],true_robot_states[1],'+-k',linestyle='dashed',label='True Robot trajectory',markersize=15.0)
-    plt.figure('Slam Traj')
     plt.plot(slam_robot_states[0],slam_robot_states[1],'^-g',label='A-SLAM trajectory',markersize=15.0)
 
     #plt.plot(traj_ldmk1[0],traj_ldmk1[1],'*-g',linestyle='dotted',label='Prismatic joint',markers    ize=15.0)
@@ -614,7 +616,7 @@ def slam(debug_inp=True):
         # We need to skip the first observation because it was used to initialize SLAM State
     for fidx, (timestamp,ids, rob_state_and_input, ldmks,ldmk_robot_obs) in enumerate(rob_obs_iter): 
         if not SIMULATEDDATA:
-            if fidx<200:
+            if fidx<0:
                 continue
             dt = timestamp - init_timestamp
             init_timestamp = timestamp
@@ -667,7 +669,7 @@ def slam(debug_inp=True):
                 ldmk_am[id] = 2
                 ld_ids.append(id)
                 # Getting the current state to be added to the SLAM state (x,y) position of landmark
-                curr_ld_state = robot_to_world(slam_state,ldmk_rob_obv)
+                curr_ld_state = robot_to_world(slam_state,ldmk_rob_obv,SIMULATEDDATA)
                 curr_ld_cov = initial_cov 
                 index_set.append(index_set[-1]+curr_ld_state.shape[0])
                 # Extend Robot state by adding the motion parameter of the landmark
@@ -683,11 +685,15 @@ def slam(debug_inp=True):
                 # Getting the motion parameters associated with this landmark
                 curr_ind = ld_ids.index(id)
                 # Following steps from Table 10.2 from book Probabilistic Robotics
-                lk_pred = robot_to_world(slam_state[0:3],ldmk_rob_obv)
-            
-                R_temp = np.array([[np.cos(slam_state[2]), -np.sin(slam_state[2]),0],
-                         [np.sin(slam_state[2]), np.cos(slam_state[2]),0],
-                         [0,0,1]])
+                lk_pred = robot_to_world(slam_state[0:3],ldmk_rob_obv,SIMULATEDDATA)
+
+                if not SIMULATEDDATA:
+                    R_temp = rodrigues([0,0,1],slam_state[2]).T
+                else:
+                    R_temp = rodrigues([0,0,1],slam_state[2])
+                #R_temp = np.array([[np.cos(slam_state[2]), -np.sin(slam_state[2]),0],
+                #         [np.sin(slam_state[2]), np.cos(slam_state[2]),0],
+                #         [0,0,1]])
 
                 z_pred = R_temp.dot(slam_state[index_set[curr_ind]:index_set[curr_ind+1]] - np.append(slam_state[0:2],[0]))
 
@@ -750,16 +756,18 @@ def slam(debug_inp=True):
         #up.slam_cov_plot(slam_state,slam_cov,obs_num,rob_state,ld_preds,ld_ids_preds)
         #visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state[:2],
         #                          slam_cov[:2, :2], colors)
-        R_temp_true = np.array([[np.cos(rob_state[2]), -np.sin(rob_state[2]),0],
-                      [np.sin(rob_state[2]), np.cos(rob_state[2]),0],
-                      [0,0,1]])
-        R_temp = np.array([[np.cos(slam_state[2]), -np.sin(slam_state[2]),0],
-                      [np.sin(slam_state[2]), np.cos(slam_state[2]),0],
-                      [0,0,1]])
+        R_temp_true = rodrigues([0,0,1],rob_state[2])
+        R_temp = rodrigues([0,0,1],slam_state[2])
+        #R_temp_true = np.array([[np.cos(rob_state[2]), -np.sin(rob_state[2]),0],
+        #              [np.sin(rob_state[2]), np.cos(rob_state[2]),0],
+        #              [0,0,1]])
+        #R_temp = np.array([[np.cos(slam_state[2]), -np.sin(slam_state[2]),0],
+        #              [np.sin(slam_state[2]), np.cos(slam_state[2]),0],
+        #              [0,0,1]])
  
         quat_true = Rtoquat(R_temp_true)
         quat_slam = Rtoquat(R_temp)
-        if fidx<1000:
+        if (fidx<100 and SIMULATEDDATA) or (fidx<1000 and not SIMULATEDDATA):
             f_gt.write(str(fidx+1)+" "+str(rob_state[0])+" "+str(rob_state[1])+" "+str(0)+" "+str(quat_true[0])+" "+str(quat_true[1])+" "+str(quat_true[2])+" "+str(quat_true[3])+" "+"\n")
             f_slam.write(str(fidx+1)+" "+str(slam_state[0])+" "+str(slam_state[1])+" "+str(0)+" "+str(quat_slam[0])+" "+str(quat_slam[1])+" "+str(quat_slam[2])+" "+str(quat_slam[3])+" "+"\n")
  

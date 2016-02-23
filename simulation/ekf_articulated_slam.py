@@ -384,9 +384,7 @@ def plot_sim_res(PLOTSIM,prob_plot1,prob_plot2,prob_plot3,traj_ldmk1,traj_ldmk2,
     #traj_ldmk1 = np.dstack(traj_ldmk1)[0]
     #traj_ldmk2 = np.dstack(traj_ldmk2)[0]
     #traj_ldmk3 = np.dstack(traj_ldmk3)[0]
-    pdb.set_trace()
     plt.plot(true_robot_states[0],true_robot_states[1],'+-k',linestyle='dashed',label='True Robot trajectory',markersize=15.0)
-    plt.figure('Slam Traj')
     plt.plot(slam_robot_states[0],slam_robot_states[1],'^-g',label='A-SLAM trajectory',markersize=15.0)
 
     #plt.plot(traj_ldmk1[0],traj_ldmk1[1],'*-g',linestyle='dotted',label='Prismatic joint',markersize=15.0)
@@ -547,11 +545,11 @@ def articulated_slam(debug_inp=True):
     # Processing all the observations
     for fidx,(timestamp, ids,rob_state_and_input, ldmks, ldmk_robot_obs) in enumerate(rob_obs_iter):    
         if not SIMULATEDDATA:
-            if fidx < 200:
+            if fidx < 250:
                 continue
             dt = timestamp - init_timestamp
             init_timestamp = timestamp
-        rob_state = rob_state_and_input[:3]
+        rob_state = np.asarray(rob_state_and_input[:3])
         robot_input = rob_state_and_input[3:]
         print '+++++++++++++ fidx = %d +++++++++++' % fidx
         print 'Robot true state and inputs:', rob_state, robot_input
@@ -560,10 +558,16 @@ def articulated_slam(debug_inp=True):
         # Following EKF steps now
 
         # First step is propagate : both robot state and motion parameter of any active landmark
-        slam_state[0:3],slam_cov[0:3,0:3]=robot_motion_prop(slam_state[0:3],
+        if not SIMULATEDDATA:
+            slam_state[0:3],slam_cov[0:3,0:3]=robot_motion_prop(slam_state[0:3],
                                                             slam_cov[0:3,0:3],
                                                             robot_input,dt*1e-9,
                                                            motion_model=motion_model)
+        else:
+            slam_state[0:3],slam_cov[0:3,0:3]=robot_motion_prop(slam_state[0:3],
+                    slam_cov[0:3,0:3],
+                    robot_input)
+            
         # Active here means the landmark for which an articulation model has been associated
         if len(ld_ids)>0:
             '''
@@ -583,7 +587,8 @@ def articulated_slam(debug_inp=True):
         # end of if
 
 
-
+        #if fidx == 13:
+        #    pdb.set_trace()
         colors = []
         mm_probs = []
         # Collecting all the predictions made by the landmark
@@ -600,11 +605,14 @@ def articulated_slam(debug_inp=True):
                 ldmk_rob_obv = ldmk_rob_obv + csv[count,:]         
                 count = count + 1
            
-            if id not in first_traj_pt:
+            if id not in first_traj_pt.keys():
                 
                 #first_traj_pt[id]=ldmk_rob_obv
-                Rc2w = rodrigues([0,0,1],slam_state[2])
-                first_traj_pt[id] = Rc2w.T.dot(ldmk_rob_obv)+np.asarray([slam_state[0],slam_state[1],0.0])
+                if not SIMULATEDDATA:
+                    Rc2w = rodrigues([0,0,1],slam_state[2])
+                else:
+                    Rc2w = rodrigues([0,0,1],slam_state[2]).T
+                first_traj_pt[id] = Rc2w.dot(ldmk_rob_obv)+np.asarray([slam_state[0],slam_state[1],0.0])
 
  
             motion_class = ldmk_estimater.setdefault(id, mm.Estimate_Mm())
@@ -647,11 +655,15 @@ def articulated_slam(debug_inp=True):
                 ld_ids_preds.append(curr_ind)
 
 		        # v2.0
-                R_temp = rodrigues([0,0,1],slam_state[2]).T
+                if not SIMULATEDDATA:
+                    R_temp = rodrigues([0,0,1],slam_state[2]).T
+                else:
+                    R_temp = rodrigues([0,0,1],slam_state[2])
+    
                 pos_list = np.ndarray.tolist(slam_state[0:2])
                 pos_list.append(0.0)
                 # To match R_w2c matrix
-                z_pred = R_temp.dot(lk_pred-np.array(pos_list)) 
+                z_pred = R_temp.dot(lk_pred-np.append(slam_state[0:2],[0.0])) 
                    
                 H_mat = np.zeros((3,index_set[-1]))
                 curr_obs = ldmk_rob_obv
@@ -714,7 +726,7 @@ def articulated_slam(debug_inp=True):
         #print 'motion_class.priors', mm_probs
         #print 'ids:', ids_list
         #print 'colors:', colors
-        ##up.slam_cov_plot(slam_state,slam_cov,obs_num,rob_state,ld_preds,ld_ids_preds)
+        #up.slam_cov_plot(slam_state,slam_cov,obs_num,rob_state,ld_preds,ld_ids_preds)
         #visualize_ldmks_robot_cov(lmvis, ldmks, robview, slam_state[:2],
         #                          slam_cov[:2, :2], colors,obs_num)
 
@@ -724,39 +736,43 @@ def articulated_slam(debug_inp=True):
 
         #Handle new robot view code appropriately
         robview.set_robot_pos_theta((rob_state[0], rob_state[1], 0),
-                                    rob_state[2]) 
+                rob_state[2]) 
         assert ldmk_robot_obs.shape[1] == len(colors), '%d <=> %d' % (
             ldmk_robot_obs.shape[1], len(colors))
         
-        ##Img = lmvis.genframe(ldmks, ldmk_robot_obs=ldmk_robot_obs, robview = robview,colors=colors,SIMULATEDDATA=SIMULATEDDATA)
-        ##Imgr = lmvis.drawrobot(robview, img)
-        ##Imgrv = robview.drawtracks([ldmktracks[id] for id in ids],
-        ##                           imgidx=robview.imgidx_by_timestamp(timestamp),
-        ##                           colors=colors)
+        img = lmvis.genframe(ldmks, ldmk_robot_obs=ldmk_robot_obs, robview = robview,colors=colors,SIMULATEDDATA=SIMULATEDDATA)
+        imgr = lmvis.drawrobot(robview, img)
+        imgrv = robview.drawtracks([ldmktracks[id] for id in ids],
+                                   imgidx=robview.imgidx_by_timestamp(timestamp),
+                                   colors=colors)
 
 
-        ##if not SIMULATEDDATA:
+        if not SIMULATEDDATA:
+            fcenter3D = np.empty(3)
+            faxis_vec = np.empty(3)
+            fradius = np.empty(1)
+            mode_count = 0
+            for id in ld_ids:
+                if model[id] == 0:
+                    config_pars = ldmk_am[id].config_pars
+                    vec1 = config_pars['vec1']
+                    vec2 = config_pars['vec2']
+                    center = config_pars['center']
+                    center3D = center[0]*vec1 + center[1]*vec2 + ldmk_am[id].plane_point
+                    axis_vec = np.cross(vec1, vec2)
+                    radius = config_pars['radius']
+                    imgrv = robview.drawrevaxis(imgrv, center3D, axis_vec, radius, rev_color)
+                    imgr = lmvis.drawrevaxis(imgr, center3D, axis_vec, radius,rev_color)
+            
 
-        ##    for id in ld_ids:
-        ##        if model[id] == 0:
-        ##            config_pars = ldmk_am[id].config_pars
-        ##            vec1 = config_pars['vec1']
-        ##            vec2 = config_pars['vec2']
-        ##            center = config_pars['center']
-        ##            center3D = center[0]*vec1 + center[1]*vec2 + ldmk_am[id].plane_point
-        ##            axis_vec = np.cross(vec1, vec2)
-        ##            radius = config_pars['radius']
-        ##            imgrv = robview.drawrevaxis(imgrv, center3D, axis_vec, radius, rev_color)
-        ##            imgr = lmvis.drawrevaxis(imgr, center3D, axis_vec, radius,
-        ##                                     rev_color)
-
-        ##robview.visualize(imgrv)
-        ##lmvis.imshow_and_wait(imgr)
-        #    
+        robview.visualize(imgrv)
+        lmvis.imshow_and_wait(imgr)
+           
 
         quat_true = Rtoquat(rodrigues([0,0,1],rob_state[2]))
         quat_slam = Rtoquat(rodrigues([0,0,1],slam_state[2]))    
-        if fidx < 1000:
+        # Within 1 period = 100 for simulated
+        if (fidx < 100 and SIMULATEDDATA) or (fidx<1000 and not SIMULATEDDATA):
             f_gt.write(str(fidx+1)+" "+str(rob_state[0])+" "+str(rob_state[1])+" "+str(0)+" "+str(quat_true[0])+" "+str(quat_true[1])+" "+str(quat_true[2])+" "+str(quat_true[3])+" "+"\n")
             f_slam.write(str(fidx+1)+" "+str(slam_state[0])+" "+str(slam_state[1])+" "+str(0)+" "+str(quat_slam[0])+" "+str(quat_slam[1])+" "+str(quat_slam[2])+" "+str(quat_slam[3])+" "+"\n")
         true_robot_states.append(rob_state)
