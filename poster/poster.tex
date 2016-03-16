@@ -69,9 +69,10 @@
 % Name and authors of poster/paper/research
 %-----------------------------------------------------------
 
-\title{Articulated Motion Models for Scene Understanding}
-\author{Suren Kumar$^1$ \and Vikas Dhiman$^2$ \and Jason J Corso$^2$ \and Venkat N. Krovi$^1$}
-\institute{$^1$University at Buffalo  \hspace{1in} $^2$University of Michigan}
+\title{Spatiotemporal Articulated Models for Dynamic Environments}
+\author{Suren Kumar$^1$ \and Vikas Dhiman$^1$ \and Madan Ravi Ganesh$^1$ \and Jason J Corso$^1$ \and Venkat
+N. Krovi$^2$}
+\institute{$^1$ University of Michigan \hspace{1in} $^2$ University at Buffalo}
 
 %-----------------------------------------------------------
 % Start the poster itself
@@ -86,12 +87,20 @@
   \hspace{-\sepwid}
     \begin{column}{\onecolwid}
       \begin{block}{Introduction}
-        Imagine a robot moving in a typical living room environment which encounters indoor objects such as doors, drawers and chairs etc. We posit that in order for the robot to understand, map or interact with such objects, the robot needs to be able to understand the articulation. 
+	      We represent all motion in the environment as
+	      \begin{align}
+z_t = f_M(C,q(t)) + \nu \label{eq:articulated_model_representation}
+\end{align}
+where $z_t$ is the observed motion of an object (a trajectory in $3D$ at time
+$t$), $M \in \{M_j\}_{j=1}^r$ is one of the $r$ possible motion models, $C$ is
+the configuration space (e.g. axis vector in case of a door), $q(t)$ represents
+the time-varying motion variables (e.g. length of prismatic joint, angle of
+door) associated with the motion model $M$ and $\nu$ is the noise in
+observations.
 
         \begin{figure}
           \includegraphics[width=\onecolwid,trim=0 1in 0 3in,clip]{media/parts_of_scenes}
-          \caption{World is composed of rigid bodies. These rigid bodies are connected to each other by limited types of joints $\{C_j\}$, for example, static, prismatic etc
-}
+          %\caption{World is composed of rigid bodies. These rigid bodies are connected to each other by limited types of joints $\{C_j\}$, for example, static, prismatic etc}
         \end{figure}
       \end{block}
 
@@ -121,12 +130,12 @@
           \label{eq:time_update}
         \end{multline}
 
-        \begin{itemize}
-          \item
-            Robot motion can be obtained from the kinematic/dynamic model 
-          \item 
-            World motion is approximated by finite order motion model
-        \end{itemize}
+%        \begin{itemize}
+%          \item
+%            Robot motion can be obtained from the kinematic/dynamic model 
+%          \item 
+%            World motion is approximated by finite order motion model
+%        \end{itemize}
 
       \end{block}
     \end{column}
@@ -146,56 +155,40 @@
       \end{block}
 
       \begin{block}{Dynamic World Representation} 
-        We assume a uniform prior $\mu_j(0) = P(C_j), \sum_{j=1}^{p}\mu_j(0) = 1$ over different motion models for each scene part. Note that, this prior can be modified appropriately by object detection such as doors are more likely to have revolute joints etc. 
+        We assume a uniform prior $\mu_j(0) = P(M_j), \sum_{j=1}^{r}\mu_j(0) = 1$ over different motion models for each scene part. Note that, this prior can be modified appropriately by object detection such as doors are more likely to have revolute joints etc. 
         \begin{align*}
-          & \mu_j(k) \equiv P(C_j|\mathbf{Z}_{0:k})  = 
+          & \mu_j(k) \equiv P(M_j|\mathbf{Z}_{0:k})  = 
           %\frac{P(z_k|\mathbf{Z}_{0:k-1}, C_j)P(C_j|\mathbf{Z}_{0:k-1})}{P(z_k|\mathbf{Z}_{0:k-1})} \nonumber \\
           %&\mu_j(k) = 
-          \frac{P(z_k|\mathbf{Z}_{0:k-1}, C_j)\mu_j(k-1)}{\sum_{j=1}^{p} P(z_k|\mathbf{Z}_{0:k-1}, C_j)\mu_j(k-1) }
+          \frac{P(z_k|\mathbf{Z}_{0:k-1}, M_j)\mu_j(k-1)}{\sum_{j=1}^{r}
+	  P(z_k|\mathbf{Z}_{0:k-1}, M_j)\mu_j(k-1) }
         \end{align*}
       \end{block}
 
       \begin{block}{Temporal Modeling}
-        \begin{align}
-          \begin{bmatrix}
-            x^{1} \\
-            x^{2} \\
-            . \\
-            .\\
-            x^{n}
-          \end{bmatrix} &= 
-          \begin{bmatrix}
-            0 & 1  & . & . & 0\\
-            0 & 0  & . & . & 0\\
-            0 & 0  & . & . & 0\\
-            0& 0 & . & . & 1\\
-            0 & 0  & . & . & 0\\
-          \end{bmatrix}
-          \begin{bmatrix}
-            x \\
-            x^{1} \\
-            . \\
-            .\\
-            x^{n-1}
-          \end{bmatrix}
-          +\begin{bmatrix}
-            0 \\
-            0 \\
-            .\\
-            .\\
-            1
-          \end{bmatrix} 
-          \eta\\
-        y &=  \begin{bmatrix}
-          1 &
-          0 &
-          .&
-          .&
-           0
-          \end{bmatrix} 
-        \begin{bmatrix} x \\ x^{1} \\ . \\ .\\ x^{n-1} \end{bmatrix} + \omega
-        \end{align}
-        where $x^{n}$ denotes $n^{th}$ order derivative of the state variable and $\eta$ and $\omega$ are process and observation noise. 
+	      The system model for a finite order motion in discrete time domain with $\mathbb{X}(t) = [q,q^{(1)},.,.,q^{(n-1)}]$ \begin{align}
+	&\mathbb{X}(t+1) = A \mathbb{X}(t) + B \eta \nonumber\\
+	       &A = 
+\begin{bmatrix}
+ 1 & \delta  t & \frac{{\delta  t}^2}{2} &  . & . \\
+0 & 1 & \delta  t &  . & . \\
+0 & 0 & 1  &  . & . \\
+0 & 0 & 1  &  . & . \\
+0 & 0 & .  &  . & . \\
+0&  0&    0 &     0 &    1
+\end{bmatrix}
+B = 
+\begin{bmatrix}
+\frac{{\delta t}^n}{n!}\\
+\frac{{\delta t}^{n-1}}{(n-1)!}\\
+.\\
+.\\
+\frac{{\delta t}^2}{2!}\\
+\delta t
+\end{bmatrix}\label{eq:motion_parameter_prop}
+\end{align}
+     where $q^{(n)}$ denotes $n^{th}$ order derivative of the motion variable and $\eta$ is the noise.   
+      
       \end{block}
 
       \begin{block}{Experiments and Results}
@@ -225,20 +218,20 @@
       \begin{block}{Temporal Model Simulation}
         \centering
           \begin{figure}
-            \includegraphics[width=1.0\onecolwid]{media/temporal_model.pdf}
-            \caption{The ``Input Data'' is time varying parameter of the world
-            motion, which is approximated by a first order motion model and
-          it's trajectory is shown as ``State output''. The later plot show the
-        probability of the motion model explaining the observed model. The
-      probability decreases drastically after only a few frames.}
+            \includegraphics[width=1.0\onecolwid]{media/temporal_plots}
+            \caption{Comparison of EKF filtering based state estimation for
+	    various orders of a motion parameter.}
           \end{figure}
       \end{block}
 
       \begin{block}{Conclusion and Future Work}
         \begin{itemize}
-          \item We use constraints in the physical world to model dynamic world
-          \item Finite order motion models can explain any motion locally
-          \item We need further real world experiments to prove the effectiveness of our model
+		\item Configuration estimates selects a subspace of SE(3)
+		\item Temporal modeling models the motion along the selected
+			subspace
+		\item We use articulated constraints to model dynamic world
+		\item Finite order motion models can explain any motion locally
+		\item We need further real world experiments to prove the effectiveness of our model
         \end{itemize}
       \end{block}
       \begin{block}{References}
